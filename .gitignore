@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Переменные окружения - секреты не должны попасть в Git!
+.env
+
+# VS Code
+.vscode/
+
+# PostgreSQL
+*.sql
+
+# Node
+node_modules/
+dist/
