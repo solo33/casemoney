@@ -11,16 +11,14 @@ export default function Categories() {
     try {
       const res = await api.get("/api/categories/");
       setCategories(res.data);
-    } catch (e) {
+    } catch {
       setError("Ошибка загрузки категорий");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  useEffect(() => { fetchCategories(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -30,7 +28,7 @@ export default function Categories() {
       await api.post("/api/categories/", payload);
       setForm({ name: "", color: "#6366f1", icon: "" });
       fetchCategories();
-    } catch (e) {
+    } catch {
       setError("Ошибка создания категории");
     }
   };
@@ -39,20 +37,20 @@ export default function Categories() {
     try {
       await api.delete(`/api/categories/${id}`);
       fetchCategories();
-    } catch (e) {
+    } catch {
       setError("Нельзя удалить категорию (возможно, это системная)");
     }
   };
 
-  if (loading) return <div>Загрузка...</div>;
+  if (loading) return <div className="page">Загрузка...</div>;
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div className="page">
       <h1>Категории</h1>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p style={{ color: "#ef4444", marginBottom: 12 }}>{error}</p>}
 
-      <form onSubmit={handleCreate} style={{ marginBottom: "20px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <form onSubmit={handleCreate} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
         <input
           placeholder="Название"
           value={form.name}
@@ -60,61 +58,65 @@ export default function Categories() {
           required
         />
         <input
-          type="text"
           placeholder="Иконка (emoji)"
           value={form.icon}
           onChange={(e) => setForm({ ...form, icon: e.target.value })}
-          style={{ width: "80px" }}
+          style={{ width: 90 }}
         />
         <input
           type="color"
           value={form.color}
           onChange={(e) => setForm({ ...form, color: e.target.value })}
           title="Цвет"
+          style={{ width: 44, padding: 4, cursor: "pointer" }}
         />
         <button type="submit">Добавить</button>
       </form>
 
       {categories.length === 0 ? (
-        <p>Нет категорий.</p>
+        <p style={{ color: "#94a3b8" }}>Нет категорий.</p>
       ) : (
-        <table border="1" cellPadding="8">
-          <thead>
-            <tr>
-              <th>Иконка</th>
-              <th>Название</th>
-              <th>Цвет</th>
-              <th>Системная</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {categories.map((cat) => (
-              <tr key={cat.id}>
-                <td>{cat.icon || "—"}</td>
-                <td>{cat.name}</td>
-                <td>
-                  <span style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 20,
-                    backgroundColor: cat.color,
-                    borderRadius: 4,
-                    verticalAlign: "middle",
-                    marginRight: 6,
-                  }} />
-                  {cat.color}
-                </td>
-                <td>{cat.is_default ? "Да" : "Нет"}</td>
-                <td>
-                  {!cat.is_default && (
-                    <button onClick={() => handleDelete(cat.id)}>Удалить</button>
-                  )}
-                </td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Иконка</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Название</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Цвет</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Системная</th>
+                <th style={{ padding: "10px 12px" }}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {categories.map((cat) => (
+                <tr key={cat.id} style={{ borderTop: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "10px 12px", fontSize: 20 }}>{cat.icon || "—"}</td>
+                  <td style={{ padding: "10px 12px", fontWeight: 500 }}>{cat.name}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                    }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 4,
+                        background: cat.color, display: "inline-block",
+                        flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 13, color: "#64748b" }}>{cat.color}</span>
+                    </span>
+                  </td>
+                  <td style={{ padding: "10px 12px", color: "#64748b", fontSize: 13 }}>{cat.is_default ? "Да" : "Нет"}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    {!cat.is_default && (
+                      <button className="btn-danger" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => handleDelete(cat.id)}>
+                        Удалить
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

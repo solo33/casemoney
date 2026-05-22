@@ -11,16 +11,14 @@ export default function Accounts() {
     try {
       const res = await api.get("/api/accounts/");
       setAccounts(res.data);
-    } catch (e) {
+    } catch {
       setError("Ошибка загрузки счетов");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
+  useEffect(() => { fetchAccounts(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -28,7 +26,7 @@ export default function Accounts() {
       await api.post("/api/accounts/", form);
       setForm({ name: "", type: "cash", currency: "RUB", balance: 0 });
       fetchAccounts();
-    } catch (e) {
+    } catch {
       setError("Ошибка создания счёта");
     }
   };
@@ -37,20 +35,20 @@ export default function Accounts() {
     try {
       await api.delete(`/api/accounts/${id}`);
       fetchAccounts();
-    } catch (e) {
+    } catch {
       setError("Ошибка удаления счёта");
     }
   };
 
-  if (loading) return <div>Загрузка...</div>;
+  if (loading) return <div className="page">Загрузка...</div>;
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div className="page">
       <h1>Счета</h1>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p style={{ color: "#ef4444", marginBottom: 12 }}>{error}</p>}
 
-      <form onSubmit={handleCreate} style={{ marginBottom: "20px" }}>
+      <form onSubmit={handleCreate} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
         <input
           placeholder="Название"
           value={form.name}
@@ -72,38 +70,41 @@ export default function Accounts() {
           type="number"
           placeholder="Баланс"
           value={form.balance}
+          style={{ width: 110 }}
           onChange={(e) => setForm({ ...form, balance: parseFloat(e.target.value) })}
         />
         <button type="submit">Добавить счёт</button>
       </form>
 
       {accounts.length === 0 ? (
-        <p>Нет счетов. Создайте первый!</p>
+        <p style={{ color: "#94a3b8" }}>Нет счетов. Создайте первый!</p>
       ) : (
-        <table border="1" cellPadding="8">
-          <thead>
-            <tr>
-              <th>Название</th>
-              <th>Тип</th>
-              <th>Баланс</th>
-              <th>Валюта</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((acc) => (
-              <tr key={acc.id}>
-                <td>{acc.name}</td>
-                <td>{acc.type}</td>
-                <td>{acc.balance}</td>
-                <td>{acc.currency}</td>
-                <td>
-                  <button onClick={() => handleDelete(acc.id)}>Удалить</button>
-                </td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Название</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Тип</th>
+                <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>Баланс</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Валюта</th>
+                <th style={{ padding: "10px 12px" }}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {accounts.map((acc) => (
+                <tr key={acc.id} style={{ borderTop: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "10px 12px", fontWeight: 500 }}>{acc.name}</td>
+                  <td style={{ padding: "10px 12px", color: "#64748b" }}>{acc.type}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>{acc.balance.toLocaleString("ru-RU")}</td>
+                  <td style={{ padding: "10px 12px", color: "#64748b" }}>{acc.currency}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <button className="btn-danger" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => handleDelete(acc.id)}>Удалить</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
