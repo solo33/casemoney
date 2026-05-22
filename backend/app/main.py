@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import engine, Base
+from fastapi.openapi.utils import get_openapi
 
+from app.database import engine, Base
 from app.models.user import User
 from app.models.category import Category
 from app.models.account import Account
 from app.models.transaction import Transaction
-
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 
@@ -19,7 +19,16 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 
-from fastapi.openapi.utils import get_openapi
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router)
+app.include_router(accounts_router)
 
 def custom_openapi():
     if app.openapi_schema:
@@ -41,17 +50,6 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(auth_router)
-app.include_router(accounts_router)
 
 @app.get("/")
 def root():
