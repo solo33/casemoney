@@ -7,9 +7,12 @@ class Account(Base):
     __tablename__ = "accounts"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)        # "Наличные", "Карта Сбер"
-    balance = Column(Float, default=0.0)         # текущий баланс
-    currency = Column(String, default="RUB")     # валюта
+    name = Column(String, nullable=False)
+    type = Column(String, default="cash")        # cash, card, bank, crypto
+    balance = Column(Float, default=0.0)
+    currency = Column(String, default="RUB")
+    color = Column(String, nullable=True)
+    icon = Column(String, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
