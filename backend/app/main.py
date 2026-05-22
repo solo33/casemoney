@@ -9,6 +9,8 @@ from app.models.account import Account
 from app.models.transaction import Transaction
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
+from app.api.categories import router as categories_router
+from app.api.transactions import router as transactions_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -29,6 +31,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(accounts_router)
+app.include_router(categories_router)
+app.include_router(transactions_router)
 
 def custom_openapi():
     if app.openapi_schema:

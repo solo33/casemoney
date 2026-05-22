@@ -3,13 +3,21 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Accounts from './pages/Accounts'
+import Categories from './pages/Categories'
+import Transactions from './pages/Transactions'
+import Nav from './components/Nav'
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
   if (!token) {
     return <Navigate to="/login" replace />
   }
-  return children
+  return (
+    <>
+      <Nav />
+      {children}
+    </>
+  )
 }
 
 export default function App() {
@@ -33,6 +41,24 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Accounts />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/categories"
+          element={
+            <ProtectedRoute>
+              <Categories />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/transactions"
+          element={
+            <ProtectedRoute>
+              <Transactions />
             </ProtectedRoute>
           }
         />
