@@ -4,18 +4,18 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserResponse, Token
 from app.services.auth import hash_password, verify_password, create_access_token
+from app.models.category import Category
+from app.seeds import seed_default_categories
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse)
 def register(data: UserRegister, db: Session = Depends(get_db)):
-    # Проверяем что email не занят
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    # Создаём пользователя
     user = User(
         email=data.email,
         username=data.username,
@@ -24,8 +24,10 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return user
 
+    # FIN-17: seed дефолтных категорий
+    seed_default_categories(db, user.id) 
+    return user
 
 @router.post("/login", response_model=Token)
 def login(data: UserLogin, db: Session = Depends(get_db)):
