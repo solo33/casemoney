@@ -2,10 +2,11 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 const links = [
-  { to: "/dashboard", label: "Главная" },
+  { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
   { to: "/categories", label: "Категории" },
   { to: "/transactions", label: "Транзакции" },
+  { to: "/dashboard", label: "Отчёты" },
 ];
 
 export default function Nav() {
