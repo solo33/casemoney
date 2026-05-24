@@ -48,6 +48,19 @@ class SummaryResponse(BaseModel):
     top_5: List[CategoryBreakdown]
 
 
+class MonthlyTrendPoint(BaseModel):
+    month: str        # "2026-05"
+    label: str        # "Май"
+    income: float
+    expense: float
+    net: float        # income - expense
+
+
+class MonthlyTrendResponse(BaseModel):
+    months: int
+    points: List[MonthlyTrendPoint]
+
+
 # --- Утилита: построить диапазон дат по period-параметру ---
 
 RU_MONTHS = ["", "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -157,3 +170,74 @@ def get_summary(
         category_breakdown=breakdown,
         top_5=breakdown[:5],
     )
+
+
+@router.get("/monthly-trend", response_model=MonthlyTrendResponse)
+def get_monthly_trend(
+    months: int = Query(6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Тренд за последние N месяцев: доходы, расходы, нетто."""
+    now = datetime.now(timezone.utc)
+
+    # Стартовая точка: первое число месяца N-1 месяцев назад
+    start_year = now.year
+    start_month = now.month - (months - 1)
+    while start_month <= 0:
+        start_month += 12
+        start_year -= 1
+    start_date = date(start_year, start_month, 1)
+
+    rows = (
+        db.query(
+            func.extract("year", Transaction.date).label("year"),
+            func.extract("month", Transaction.date).label("month"),
+            Transaction.type,
+            func.sum(Transaction.amount).label("total"),
+        )
+        .filter(
+            Transaction.user_id == user_id,
+            func.date(Transaction.date) >= start_date,
+        )
+        .group_by("year", "month", Transaction.type)
+        .all()
+    )
+
+    # Заполняем все месяцы нулями (чтобы пустые тоже отображались)
+    points_map: dict[str, dict] = {}
+    y, m = start_year, start_month
+    for _ in range(months):
+        key = f"{y:04d}-{m:02d}"
+        points_map[key] = {
+            "month": key,
+            "label": RU_MONTHS[m].capitalize(),
+            "income": 0.0,
+            "expense": 0.0,
+        }
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+
+    for r in rows:
+        key = f"{int(r.year):04d}-{int(r.month):02d}"
+        if key not in points_map:
+            continue  # вне диапазона (edge case)
+        if r.type == TransactionType.income:
+            points_map[key]["income"] = round(r.total, 2)
+        elif r.type == TransactionType.expense:
+            points_map[key]["expense"] = round(r.total, 2)
+
+    points = [
+        MonthlyTrendPoint(
+            month=p["month"],
+            label=p["label"],
+            income=p["income"],
+            expense=p["expense"],
+            net=round(p["income"] - p["expense"], 2),
+        )
+        for p in sorted(points_map.values(), key=lambda x: x["month"])
+    ]
+
+    return MonthlyTrendResponse(months=months, points=points)
