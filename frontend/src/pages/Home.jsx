@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
+import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444", transfer: "#3b82f6" };
@@ -23,12 +24,19 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     api.get("/api/dashboard/")
       .then(res => setData(res.data))
       .catch(() => setError("Ошибка загрузки"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchData();
+    // обновляемся после быстрого добавления через FAB
+    window.addEventListener(TX_ADDED_EVENT, fetchData);
+    return () => window.removeEventListener(TX_ADDED_EVENT, fetchData);
+  }, [fetchData]);
 
   if (loading) return <div className="page">Загрузка...</div>;
   if (error) return <div className="page" style={{ color: "#ef4444" }}>{error}</div>;

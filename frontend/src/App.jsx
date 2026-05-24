@@ -7,6 +7,7 @@ import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import Transactions from './pages/Transactions'
 import Nav from './components/Nav'
+import QuickAddFab from './components/QuickAddFab'
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -17,6 +18,7 @@ function ProtectedRoute({ children }) {
     <>
       <Nav />
       {children}
+      <QuickAddFab />
     </>
   )
 }
