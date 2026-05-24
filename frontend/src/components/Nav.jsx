@@ -6,7 +6,7 @@ const links = [
   { to: "/accounts", label: "Счета" },
   { to: "/categories", label: "Категории" },
   { to: "/transactions", label: "Транзакции" },
-  { to: "/dashboard", label: "Отчёты" },
+  { to: "/reports", label: "Отчёты" },
 ];
 
 export default function Nav() {

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
-import Dashboard from './pages/Dashboard'
+import Reports from './pages/Reports'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import Transactions from './pages/Transactions'
@@ -40,13 +40,16 @@ export default function App() {
         />
 
         <Route
-          path="/dashboard"
+          path="/reports"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <Reports />
             </ProtectedRoute>
           }
         />
+
+        {/* старый /dashboard теперь редиректит на /reports */}
+        <Route path="/dashboard" element={<Navigate to="/reports" replace />} />
 
         <Route
           path="/accounts"
