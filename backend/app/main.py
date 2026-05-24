@@ -12,6 +12,7 @@ from app.api.accounts import router as accounts_router
 from app.api.categories import router as categories_router
 from app.api.transactions import router as transactions_router
 from app.api.dashboard import router as dashboard_router
+from app.api.reports import router as reports_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -35,6 +36,7 @@ app.include_router(accounts_router)
 app.include_router(categories_router)
 app.include_router(transactions_router)
 app.include_router(dashboard_router)
+app.include_router(reports_router)
 
 def custom_openapi():
     if app.openapi_schema:
