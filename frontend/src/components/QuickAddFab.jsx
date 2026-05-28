@@ -173,7 +173,7 @@ export default function QuickAddFab() {
             </div>
 
             <form onSubmit={handleSubmit}>
-              {/* Тип — сегментед */}
+              {/* Тип — сегментед. При смене типа сбрасываем категорию (она привязана к типу). */}
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 {TYPE_OPTIONS.map(opt => {
                   const active = form.type === opt.value;
@@ -181,7 +181,7 @@ export default function QuickAddFab() {
                     <button
                       type="button"
                       key={opt.value}
-                      onClick={() => setForm({ ...form, type: opt.value })}
+                      onClick={() => setForm({ ...form, type: opt.value, category_id: "" })}
                       style={{
                         flex: 1,
                         padding: "10px",

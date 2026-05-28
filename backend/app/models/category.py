@@ -7,6 +7,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String, nullable=False)
+    type = Column(String, nullable=False, default="expense")  # income | expense
     color = Column(String, default="#6366f1")   # hex цвет
     icon = Column(String, nullable=True)         # emoji или название иконки
     is_default = Column(Boolean, default=False)  # системные категории

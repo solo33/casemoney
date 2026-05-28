@@ -52,6 +52,11 @@ export default function Transactions() {
     }
   };
 
+  // Категории, релевантные выбранному типу транзакции. Для transfer показываем все.
+  const filteredCategories = form.type === "transfer"
+    ? categories
+    : categories.filter(c => c.type === form.type);
+
   const handleDelete = async (id) => {
     try {
       await api.delete(`/api/transactions/${id}`);
@@ -80,7 +85,10 @@ export default function Transactions() {
       {error && <p style={{ color: "#ef4444", marginBottom: 12 }}>{error}</p>}
 
       <form onSubmit={handleCreate} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-        <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
+        <select
+          value={form.type}
+          onChange={e => setForm({ ...form, type: e.target.value, category_id: "" })}
+        >
           <option value="expense">Расход</option>
           <option value="income">Доход</option>
           <option value="transfer">Перевод</option>
@@ -108,7 +116,7 @@ export default function Transactions() {
           onChange={e => setForm({ ...form, category_id: e.target.value })}
         >
           <option value="">— Категория —</option>
-          {categories.map(c => (
+          {filteredCategories.map(c => (
             <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ""}{c.name}</option>
           ))}
         </select>
