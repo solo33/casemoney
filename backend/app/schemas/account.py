@@ -1,27 +1,46 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
-from decimal import Decimal
 
+
+# --- AccountBalance ---
+
+class AccountBalanceResponse(BaseModel):
+    currency: str
+    balance: float
+    balance_in_main: float  # эквивалент в main_currency пользователя
+
+    class Config:
+        from_attributes = True
+
+
+class AccountBalanceCreate(BaseModel):
+    currency: str = Field(..., min_length=2, max_length=10)
+    balance: float = 0.0
+
+
+class AccountBalanceUpdate(BaseModel):
+    balance: float
+
+
+# --- Account ---
 
 class AccountBase(BaseModel):
     name: str
     type: str          # cash, card, bank, crypto
-    currency: str      # USD, EUR, RUB
-    balance: Decimal = Decimal("0.00")
     color: Optional[str] = None
     icon: Optional[str] = None
     group_id: Optional[int] = None
 
 
 class AccountCreate(AccountBase):
-    pass
+    # Начальная валюта и баланс — создаются первая запись AccountBalance
+    initial_currency: str = Field("RUB", min_length=2, max_length=10)
+    initial_balance: float = 0.0
 
 
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
-    currency: Optional[str] = None
-    balance: Optional[Decimal] = None
     color: Optional[str] = None
     icon: Optional[str] = None
     group_id: Optional[int] = None  # передать null чтобы вынести из группы
@@ -30,6 +49,8 @@ class AccountUpdate(BaseModel):
 class AccountResponse(AccountBase):
     id: int
     user_id: int
+    balances: List[AccountBalanceResponse] = []
+    total_in_main: float = 0.0  # сумма всех балансов в main_currency пользователя
 
     class Config:
         from_attributes = True
@@ -46,4 +67,4 @@ class GroupSummary(BaseModel):
 class AccountGroupBucket(BaseModel):
     group: GroupSummary
     accounts: List[AccountResponse]
-    total_balance: float
+    total_in_main: float  # сумма total_in_main всех счетов в группе

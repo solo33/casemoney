@@ -1,4 +1,5 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 
 
 class UserRegister(BaseModel):
@@ -16,9 +17,14 @@ class UserResponse(BaseModel):
     id: int
     email: str
     username: str
+    main_currency: str = "RUB"
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    main_currency: Optional[str] = Field(None, min_length=2, max_length=10)
 
 
 class Token(BaseModel):

@@ -11,6 +11,8 @@ from app.database import get_db
 from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
 from app.services.auth import decode_token
+from app.services import accounts as accounts_svc
+from app.services import exchange as exchange_svc
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 security = HTTPBearer()
@@ -32,17 +34,18 @@ class CategoryBreakdown(BaseModel):
     category_name: str
     category_color: str
     category_icon: Optional[str]
-    total: float
+    total: float        # в main_currency
     percent: float
 
 
 class SummaryResponse(BaseModel):
+    main_currency: str
     period_label: str
     date_from: date
     date_to: date
-    total_income: float
-    total_expense: float
-    net: float
+    total_income: float    # в main_currency
+    total_expense: float   # в main_currency
+    net: float             # в main_currency
     transactions_count: int
     category_breakdown: List[CategoryBreakdown]
     top_5: List[CategoryBreakdown]
@@ -51,20 +54,28 @@ class SummaryResponse(BaseModel):
 class MonthlyTrendPoint(BaseModel):
     month: str        # "2026-05"
     label: str        # "Май"
-    income: float
-    expense: float
+    income: float     # в main_currency
+    expense: float    # в main_currency
     net: float        # income - expense
 
 
 class MonthlyTrendResponse(BaseModel):
+    main_currency: str
     months: int
     points: List[MonthlyTrendPoint]
 
 
-# --- Утилита: построить диапазон дат по period-параметру ---
+# --- Утилиты ---
 
 RU_MONTHS = ["", "январь", "февраль", "март", "апрель", "май", "июнь",
              "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
+
+
+def _to_main(db: Session, amount: float, currency: str, main: str) -> float:
+    try:
+        return exchange_svc.convert(db, amount, currency, main)
+    except exchange_svc.ExchangeError:
+        return 0.0
 
 
 def resolve_period(
@@ -75,7 +86,6 @@ def resolve_period(
     date_from: Optional[date],
     date_to: Optional[date],
 ) -> tuple[date, date, str]:
-    """Возвращает (date_from, date_to, label) для указанного периода."""
     now = datetime.now(timezone.utc)
     y = year or now.year
 
@@ -108,7 +118,7 @@ def resolve_period(
     raise HTTPException(status_code=400, detail=f"Неизвестный period: {period}")
 
 
-# --- Эндпоинт ---
+# --- Эндпоинты ---
 
 @router.get("/summary", response_model=SummaryResponse)
 def get_summary(
@@ -121,27 +131,30 @@ def get_summary(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    main = accounts_svc.get_user_main_currency(db, user_id)
     df, dt, label = resolve_period(period, year, month, quarter, date_from, date_to)
 
-    # Все транзакции пользователя за период (один SQL)
-    q = db.query(Transaction).filter(
-        Transaction.user_id == user_id,
-        func.date(Transaction.date) >= df,
-        func.date(Transaction.date) <= dt,
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            func.date(Transaction.date) >= df,
+            func.date(Transaction.date) <= dt,
+        )
+        .all()
     )
-    transactions = q.all()
 
-    total_income = sum(t.amount for t in transactions if t.type == TransactionType.income)
-    total_expense = sum(t.amount for t in transactions if t.type == TransactionType.expense)
-
-    # Группируем расходы по категориям
+    total_income = 0.0
+    total_expense = 0.0
     cat_totals: dict[Optional[int], float] = {}
     for t in transactions:
-        if t.type != TransactionType.expense:
-            continue
-        cat_totals[t.category_id] = cat_totals.get(t.category_id, 0.0) + t.amount
+        amount_main = _to_main(db, t.amount, t.currency, main)
+        if t.type == TransactionType.income:
+            total_income += amount_main
+        elif t.type == TransactionType.expense:
+            total_expense += amount_main
+            cat_totals[t.category_id] = cat_totals.get(t.category_id, 0.0) + amount_main
 
-    # Загружаем категории за один запрос
     categories_map = {
         c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
     }
@@ -160,6 +173,7 @@ def get_summary(
         ))
 
     return SummaryResponse(
+        main_currency=main,
         period_label=label,
         date_from=df,
         date_to=dt,
@@ -178,10 +192,9 @@ def get_monthly_trend(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Тренд за последние N месяцев: доходы, расходы, нетто."""
+    main = accounts_svc.get_user_main_currency(db, user_id)
     now = datetime.now(timezone.utc)
 
-    # Стартовая точка: первое число месяца N-1 месяцев назад
     start_year = now.year
     start_month = now.month - (months - 1)
     while start_month <= 0:
@@ -189,22 +202,17 @@ def get_monthly_trend(
         start_year -= 1
     start_date = date(start_year, start_month, 1)
 
-    rows = (
-        db.query(
-            func.extract("year", Transaction.date).label("year"),
-            func.extract("month", Transaction.date).label("month"),
-            Transaction.type,
-            func.sum(Transaction.amount).label("total"),
-        )
+    # Загружаем сырые транзакции (нельзя SUM в SQL — валюты разные)
+    transactions = (
+        db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
             func.date(Transaction.date) >= start_date,
         )
-        .group_by("year", "month", Transaction.type)
         .all()
     )
 
-    # Заполняем все месяцы нулями (чтобы пустые тоже отображались)
+    # Заполняем все месяцы нулями
     points_map: dict[str, dict] = {}
     y, m = start_year, start_month
     for _ in range(months):
@@ -220,24 +228,25 @@ def get_monthly_trend(
             m = 1
             y += 1
 
-    for r in rows:
-        key = f"{int(r.year):04d}-{int(r.month):02d}"
+    for t in transactions:
+        key = f"{t.date.year:04d}-{t.date.month:02d}"
         if key not in points_map:
-            continue  # вне диапазона (edge case)
-        if r.type == TransactionType.income:
-            points_map[key]["income"] = round(r.total, 2)
-        elif r.type == TransactionType.expense:
-            points_map[key]["expense"] = round(r.total, 2)
+            continue
+        amt = _to_main(db, t.amount, t.currency, main)
+        if t.type == TransactionType.income:
+            points_map[key]["income"] += amt
+        elif t.type == TransactionType.expense:
+            points_map[key]["expense"] += amt
 
     points = [
         MonthlyTrendPoint(
             month=p["month"],
             label=p["label"],
-            income=p["income"],
-            expense=p["expense"],
+            income=round(p["income"], 2),
+            expense=round(p["expense"], 2),
             net=round(p["income"] - p["expense"], 2),
         )
         for p in sorted(points_map.values(), key=lambda x: x["month"])
     ]
 
-    return MonthlyTrendResponse(months=months, points=points)
+    return MonthlyTrendResponse(main_currency=main, months=months, points=points)

@@ -6,8 +6,10 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.transaction import Transaction, TransactionType
 from app.models.account import Account
+from app.models.account_balance import AccountBalance
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.auth import decode_token
+from app.services import accounts as accounts_svc
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
@@ -20,6 +22,18 @@ def get_current_user_id(
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     return int(payload["sub"])
+
+
+def _apply_to_balance(
+    bal: AccountBalance, tx_type: TransactionType, amount: float, reverse: bool = False
+) -> None:
+    """Применяет/отменяет дельту транзакции к балансу."""
+    sign = -1 if reverse else 1
+    if tx_type == TransactionType.income:
+        bal.balance += sign * amount
+    elif tx_type == TransactionType.expense:
+        bal.balance -= sign * amount
+    # transfer пока обрабатываем как изменение одного счёта (без второй стороны)
 
 
 @router.get("/", response_model=List[TransactionResponse])
@@ -56,8 +70,21 @@ def create_transaction(
     except KeyError:
         raise HTTPException(status_code=400, detail=f"Invalid type: {data.type}")
 
+    # Определяем валюту транзакции
+    if data.currency:
+        currency = data.currency.upper()
+    elif account.balances:
+        currency = account.balances[0].currency
+    else:
+        # fallback на main_currency пользователя
+        currency = accounts_svc.get_user_main_currency(db, user_id)
+
+    # find or auto-create balance row для этого account+currency
+    bal = accounts_svc.get_or_create_balance(db, account.id, currency)
+
     transaction = Transaction(
         amount=data.amount,
+        currency=currency,
         type=tx_type,
         description=data.description,
         date=data.date,
@@ -67,11 +94,7 @@ def create_transaction(
     )
     db.add(transaction)
 
-    # обновляем баланс счёта
-    if tx_type == TransactionType.income:
-        account.balance += data.amount
-    elif tx_type == TransactionType.expense:
-        account.balance -= data.amount
+    _apply_to_balance(bal, tx_type, data.amount, reverse=False)
 
     db.commit()
     db.refresh(transaction)
@@ -90,12 +113,13 @@ def delete_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    account = db.query(Account).filter(Account.id == tx.account_id).first()
-    if account:
-        if tx.type == TransactionType.income:
-            account.balance -= tx.amount
-        elif tx.type == TransactionType.expense:
-            account.balance += tx.amount
+    # Откатываем эффект на конкретный balance
+    bal = db.query(AccountBalance).filter(
+        AccountBalance.account_id == tx.account_id,
+        AccountBalance.currency == tx.currency,
+    ).first()
+    if bal is not None:
+        _apply_to_balance(bal, tx.type, tx.amount, reverse=True)
 
     db.delete(tx)
     db.commit()

@@ -19,6 +19,7 @@ from app.api.transactions import router as transactions_router
 from app.api.dashboard import router as dashboard_router
 from app.api.reports import router as reports_router
 from app.api.exchange import router as exchange_router
+from app.api.me import router as me_router
 
 app = FastAPI(
     title="CaseMoney API",
@@ -43,6 +44,7 @@ app.include_router(transactions_router)
 app.include_router(dashboard_router)
 app.include_router(reports_router)
 app.include_router(exchange_router)
+app.include_router(me_router)
 
 def custom_openapi():
     if app.openapi_schema:
