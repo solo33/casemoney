@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import Reports from './pages/Reports'
+import AnnualReport from './pages/AnnualReport'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import Currencies from './pages/Currencies'
@@ -49,6 +50,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Reports />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/annual"
+          element={
+            <ProtectedRoute>
+              <AnnualReport />
             </ProtectedRoute>
           }
         />

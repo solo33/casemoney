@@ -73,6 +73,28 @@ class MonthlyTrendResponse(BaseModel):
     points: List[MonthlyTrendPoint]
 
 
+class AnnualRow(BaseModel):
+    category_id: Optional[int]
+    category_name: str
+    parent_id: Optional[int]      # для отступа в UI
+    is_parent: bool               # для жирного выделения
+    monthly: List[float]          # 12 значений в main_currency
+    total: float                  # сумма за год
+
+
+class AnnualReport(BaseModel):
+    main_currency: str
+    year: int
+    income: List[AnnualRow]
+    expense: List[AnnualRow]
+    income_totals: List[float]    # 12 + сумма не сохраняется отдельно
+    income_total: float
+    expense_totals: List[float]
+    expense_total: float
+    net_monthly: List[float]      # income - expense по месяцам
+    net_total: float
+
+
 # --- Утилиты ---
 
 RU_MONTHS = ["", "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -229,6 +251,150 @@ def get_summary(
         transactions_count=len(transactions),
         category_breakdown=breakdown,
         top_5=breakdown[:5],
+    )
+
+
+@router.get("/annual", response_model=AnnualReport)
+def get_annual(
+    year: int = Query(..., ge=1900, le=2100),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Годовой анализ: матрица 'категория x месяц', доходы и расходы.
+
+    Категории идут плоско, но в порядке parent -> children -> next parent.
+    Родительские суммы = own + сумма дочерних (per month).
+    """
+    main = accounts_svc.get_user_main_currency(db, user_id)
+
+    transactions = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            func.date(Transaction.date) >= date(year, 1, 1),
+            func.date(Transaction.date) <= date(year, 12, 31),
+        )
+        .all()
+    )
+
+    categories_map = {
+        c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
+    }
+
+    # Группируем: (cat_id, month) -> sum_in_main, отдельно для income/expense
+    inc_buckets: dict[Optional[int], list[float]] = {}
+    exp_buckets: dict[Optional[int], list[float]] = {}
+    for t in transactions:
+        if t.type not in (TransactionType.income, TransactionType.expense):
+            continue
+        m_idx = t.date.month - 1
+        amount = _to_main(db, user_id, t.amount, t.currency, main)
+        bucket = inc_buckets if t.type == TransactionType.income else exp_buckets
+        if t.category_id not in bucket:
+            bucket[t.category_id] = [0.0] * 12
+        bucket[t.category_id][m_idx] += amount
+
+    def build_rows(buckets: dict[Optional[int], list[float]], cat_type: str) -> List[AnnualRow]:
+        """Иерархия: root -> children. Родителю суммируются amounts детей."""
+        # Идентификаторы участвующих категорий + их родителей
+        involved_ids = set(buckets.keys()) - {None}
+        for cid in list(involved_ids):
+            cat = categories_map.get(cid)
+            if cat and cat.parent_id:
+                involved_ids.add(cat.parent_id)
+
+        # Берём все корневые этого типа, у которых есть данные (own или children)
+        roots = []
+        for c in categories_map.values():
+            if c.type != cat_type:
+                continue
+            if c.parent_id:
+                continue
+            if c.id in involved_ids:
+                roots.append(c)
+        roots.sort(key=lambda x: x.name.lower())
+
+        # Дети каждой корневой
+        children_map: dict[int, list] = {}
+        for c in categories_map.values():
+            if c.parent_id and c.parent_id in {r.id for r in roots} and c.id in involved_ids:
+                children_map.setdefault(c.parent_id, []).append(c)
+        for lst in children_map.values():
+            lst.sort(key=lambda x: x.name.lower())
+
+        rows: list[AnnualRow] = []
+        for root in roots:
+            own = buckets.get(root.id, [0.0] * 12)
+            kids = children_map.get(root.id, [])
+
+            # Сумма по месяцам = own + сумма всех children
+            total_monthly = list(own)
+            for ch in kids:
+                ch_monthly = buckets.get(ch.id, [0.0] * 12)
+                for i in range(12):
+                    total_monthly[i] += ch_monthly[i]
+
+            rows.append(AnnualRow(
+                category_id=root.id,
+                category_name=root.name,
+                parent_id=None,
+                is_parent=True,
+                monthly=[round(v, 2) for v in total_monthly],
+                total=round(sum(total_monthly), 2),
+            ))
+            for ch in kids:
+                ch_monthly = buckets.get(ch.id, [0.0] * 12)
+                rows.append(AnnualRow(
+                    category_id=ch.id,
+                    category_name=ch.name,
+                    parent_id=root.id,
+                    is_parent=False,
+                    monthly=[round(v, 2) for v in ch_monthly],
+                    total=round(sum(ch_monthly), 2),
+                ))
+
+        # Транзакции без категории
+        if None in buckets:
+            monthly = buckets[None]
+            rows.append(AnnualRow(
+                category_id=None,
+                category_name="Без категории",
+                parent_id=None,
+                is_parent=True,
+                monthly=[round(v, 2) for v in monthly],
+                total=round(sum(monthly), 2),
+            ))
+
+        return rows
+
+    income_rows = build_rows(inc_buckets, "income")
+    expense_rows = build_rows(exp_buckets, "expense")
+
+    # Итоги по месяцам — сумма только корневых (children уже включены)
+    inc_totals = [0.0] * 12
+    for r in income_rows:
+        if r.is_parent:
+            for i in range(12):
+                inc_totals[i] += r.monthly[i]
+    exp_totals = [0.0] * 12
+    for r in expense_rows:
+        if r.is_parent:
+            for i in range(12):
+                exp_totals[i] += r.monthly[i]
+
+    net_monthly = [round(inc_totals[i] - exp_totals[i], 2) for i in range(12)]
+
+    return AnnualReport(
+        main_currency=main,
+        year=year,
+        income=income_rows,
+        expense=expense_rows,
+        income_totals=[round(v, 2) for v in inc_totals],
+        income_total=round(sum(inc_totals), 2),
+        expense_totals=[round(v, 2) for v in exp_totals],
+        expense_total=round(sum(exp_totals), 2),
+        net_monthly=net_monthly,
+        net_total=round(sum(net_monthly), 2),
     )
 
 

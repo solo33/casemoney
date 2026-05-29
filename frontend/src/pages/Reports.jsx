@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -134,7 +135,12 @@ export default function Reports() {
 
   return (
     <div className="page">
-      <h1 style={{ marginBottom: 16 }}>Отчёты</h1>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        <h1 style={{ margin: 0 }}>Отчёты</h1>
+        <Link to="/reports/annual" style={{ fontSize: 14, color: "#9f1239", textDecoration: "none", fontWeight: 500 }}>
+          Годовой анализ →
+        </Link>
+      </div>
 
       {/* Переключатель периода */}
       <div style={{
