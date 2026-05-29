@@ -12,6 +12,7 @@ from app.models.account_balance import AccountBalance  # noqa: F401
 from app.models.transaction import Transaction  # noqa: F401
 from app.models.exchange_rate import ExchangeRate  # noqa: F401
 from app.models.user_currency import UserCurrency  # noqa: F401
+from app.models.goal import Goal  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -24,6 +25,7 @@ from app.api.me import router as me_router
 from app.api.currencies import router as currencies_router
 from app.api.import_csv import router as import_router
 from app.api.export_csv import router as export_router
+from app.api.goals import router as goals_router
 
 app = FastAPI(
     title="CaseMoney API",
@@ -52,6 +54,7 @@ app.include_router(me_router)
 app.include_router(currencies_router)
 app.include_router(import_router)
 app.include_router(export_router)
+app.include_router(goals_router)
 
 def custom_openapi():
     if app.openapi_schema:

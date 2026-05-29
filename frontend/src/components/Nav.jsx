@@ -10,6 +10,7 @@ const links = [
   { to: "/currencies", label: "Валюты" },
   { to: "/transactions", label: "Транзакции" },
   { to: "/reports", label: "Отчёты" },
+  { to: "/goals", label: "Цели" },
   { to: "/import", label: "Импорт" },
   { to: "/settings", label: "Настройки" },
 ];
