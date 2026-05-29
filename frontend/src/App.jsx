@@ -6,6 +6,7 @@ import Reports from './pages/Reports'
 import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import Currencies from './pages/Currencies'
+import Import from './pages/Import'
 import Transactions from './pages/Transactions'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
@@ -76,6 +77,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Currencies />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/import"
+          element={
+            <ProtectedRoute>
+              <Import />
             </ProtectedRoute>
           }
         />
