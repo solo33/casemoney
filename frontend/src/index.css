@@ -7,9 +7,9 @@
   --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
 
   /* Backgrounds */
-  --bg: #f5f3ee;          /* тёплый off-white фон страницы */
-  --surface: #fbfaf6;     /* карточки */
-  --surface-2: #f0ede5;   /* шапки таблиц, subtle divider'ы */
+  --bg: #faf8f3;          /* тёплый off-white фон страницы (светлее) */
+  --surface: #ffffff;     /* карточки (чистый белый — больше контраста с bg) */
+  --surface-2: #f5f3ee;   /* шапки таблиц, subtle divider'ы */
 
   /* Text */
   --text: #1c1917;
