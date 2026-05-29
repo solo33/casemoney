@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../api/client";
+import { COMMON_CURRENCIES, formatMoneyWithCurrency } from "../utils/money";
 
-// Глобальное событие, чтобы страницы могли подписаться и перезагрузить данные
+// Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
 
 const TYPE_OPTIONS = [
@@ -17,13 +18,13 @@ export default function QuickAddFab() {
     type: "expense",
     amount: "",
     account_id: "",
+    currency: "",       // выбранная валюта (из balances счёта или COMMON)
     category_id: "",
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Лениво грузим аккаунты/категории только когда лист открывается
   useEffect(() => {
     if (!open) return;
     Promise.all([
@@ -34,13 +35,31 @@ export default function QuickAddFab() {
         setAccounts(acc.data);
         setCategories(cat.data);
         if (acc.data.length > 0) {
-          setForm(f => f.account_id ? f : { ...f, account_id: String(acc.data[0].id) });
+          setForm(f => {
+            const next = { ...f };
+            if (!next.account_id) {
+              next.account_id = String(acc.data[0].id);
+              next.currency = acc.data[0].balances?.[0]?.currency || "";
+            }
+            return next;
+          });
         }
       })
       .catch(() => setError("Не удалось загрузить счета/категории"));
   }, [open]);
 
-  // Esc закрывает
+  // При смене счёта подставляем первую валюту этого счёта
+  useEffect(() => {
+    if (!form.account_id || !accounts.length) return;
+    const acc = accounts.find(a => String(a.id) === String(form.account_id));
+    if (!acc) return;
+    if (!acc.balances?.length) return;
+    const currencies = acc.balances.map(b => b.currency);
+    if (!currencies.includes(form.currency)) {
+      setForm(f => ({ ...f, currency: currencies[0] }));
+    }
+  }, [form.account_id, accounts]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -49,7 +68,6 @@ export default function QuickAddFab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Блокировка скролла body когда открыт лист
   useEffect(() => {
     if (open) {
       const orig = document.body.style.overflow;
@@ -63,24 +81,32 @@ export default function QuickAddFab() {
     setError(null);
   };
 
+  const selectedAccount = useMemo(
+    () => accounts.find(a => String(a.id) === String(form.account_id)),
+    [accounts, form.account_id]
+  );
+
+  const accountBalances = selectedAccount?.balances || [];
+  const accountCurrencies = accountBalances.map(b => b.currency);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     if (!form.account_id) { setError("Выберите счёт"); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { setError("Введите сумму"); return; }
+    if (!form.currency) { setError("Выберите валюту"); return; }
 
     setSubmitting(true);
     try {
       await api.post("/api/transactions/", {
         amount: parseFloat(form.amount),
         type: form.type,
+        currency: form.currency,
         description: form.description || undefined,
         account_id: parseInt(form.account_id),
         category_id: form.category_id ? parseInt(form.category_id) : undefined,
       });
-      // оповещаем страницы
       window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
-      // ресет суммы/описания/категории, но запоминаем счёт и тип
       setForm(f => ({ ...f, amount: "", description: "", category_id: "" }));
       close();
     } catch (e) {
@@ -92,7 +118,6 @@ export default function QuickAddFab() {
 
   return (
     <>
-      {/* FAB */}
       <button
         onClick={() => setOpen(true)}
         aria-label="Добавить транзакцию"
@@ -100,21 +125,12 @@ export default function QuickAddFab() {
           position: "fixed",
           right: 20,
           bottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          background: "#6366f1",
-          color: "#fff",
-          border: "none",
-          fontSize: 28,
-          lineHeight: 1,
-          cursor: "pointer",
+          width: 56, height: 56, borderRadius: "50%",
+          background: "#6366f1", color: "#fff", border: "none",
+          fontSize: 28, lineHeight: 1, cursor: "pointer",
           boxShadow: "0 6px 16px rgba(99,102,241,0.4)",
-          zIndex: 90,
-          padding: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          zIndex: 90, padding: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
         }}
       >
         +
@@ -122,38 +138,28 @@ export default function QuickAddFab() {
 
       {open && (
         <>
-          {/* Backdrop */}
           <div
             onClick={close}
             style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(15,23,42,0.5)",
-              zIndex: 200,
+              position: "fixed", inset: 0,
+              background: "rgba(15,23,42,0.5)", zIndex: 200,
               animation: "fab-fade 0.15s ease-out",
             }}
           />
 
-          {/* Bottom sheet */}
           <div
             role="dialog"
             aria-label="Быстрое добавление"
             style={{
-              position: "fixed",
-              left: 0,
-              right: 0,
-              bottom: 0,
+              position: "fixed", left: 0, right: 0, bottom: 0,
               background: "#fff",
               borderRadius: "20px 20px 0 0",
               padding: "12px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
-              zIndex: 201,
-              maxHeight: "90vh",
-              overflowY: "auto",
+              zIndex: 201, maxHeight: "90vh", overflowY: "auto",
               boxShadow: "0 -8px 24px rgba(0,0,0,0.15)",
               animation: "fab-slide 0.2s ease-out",
             }}
           >
-            {/* drag handle */}
             <div style={{
               width: 40, height: 4, borderRadius: 2,
               background: "#cbd5e1", margin: "0 auto 12px",
@@ -162,8 +168,7 @@ export default function QuickAddFab() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 17 }}>Быстрое добавление</h3>
               <button
-                type="button"
-                onClick={close}
+                type="button" onClick={close}
                 className="btn-ghost"
                 style={{ padding: "4px 10px", fontSize: 18, lineHeight: 1 }}
                 aria-label="Закрыть"
@@ -173,7 +178,6 @@ export default function QuickAddFab() {
             </div>
 
             <form onSubmit={handleSubmit}>
-              {/* Тип — сегментед. При смене типа сбрасываем категорию (она привязана к типу). */}
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 {TYPE_OPTIONS.map(opt => {
                   const active = form.type === opt.value;
@@ -183,15 +187,11 @@ export default function QuickAddFab() {
                       key={opt.value}
                       onClick={() => setForm({ ...form, type: opt.value, category_id: "" })}
                       style={{
-                        flex: 1,
-                        padding: "10px",
-                        borderRadius: 10,
+                        flex: 1, padding: "10px", borderRadius: 10,
                         border: `2px solid ${active ? opt.color : "#e2e8f0"}`,
                         background: active ? opt.color : "#fff",
                         color: active ? "#fff" : "#475569",
-                        fontWeight: 600,
-                        fontSize: 14,
-                        cursor: "pointer",
+                        fontWeight: 600, fontSize: 14, cursor: "pointer",
                       }}
                     >
                       {opt.label}
@@ -200,28 +200,38 @@ export default function QuickAddFab() {
                 })}
               </div>
 
-              {/* Сумма */}
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Сумма</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0"
-                  value={form.amount}
-                  onChange={e => setForm({ ...form, amount: e.target.value })}
-                  autoFocus
-                  required
-                  style={{
-                    width: "100%",
-                    fontSize: 24,
-                    fontWeight: 600,
-                    padding: "10px 12px",
-                    marginTop: 4,
-                  }}
-                />
-              </label>
+              {/* Сумма + валюта */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <label style={{ flex: 1 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Сумма</span>
+                  <input
+                    type="number" inputMode="decimal" min="0.01" step="0.01"
+                    placeholder="0"
+                    value={form.amount}
+                    onChange={e => setForm({ ...form, amount: e.target.value })}
+                    autoFocus required
+                    style={{
+                      width: "100%", fontSize: 24, fontWeight: 600,
+                      padding: "10px 12px", marginTop: 4,
+                    }}
+                  />
+                </label>
+                <label style={{ width: 110 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>Валюта</span>
+                  <select
+                    value={form.currency}
+                    onChange={e => setForm({ ...form, currency: e.target.value })}
+                    style={{ width: "100%", marginTop: 4, fontSize: 16, padding: "10px 12px" }}
+                  >
+                    {accountCurrencies.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                    {accountCurrencies.length === 0 && COMMON_CURRENCIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
               {/* Счёт */}
               <label style={{ display: "block", marginBottom: 12 }}>
@@ -233,11 +243,15 @@ export default function QuickAddFab() {
                   style={{ width: "100%", marginTop: 4 }}
                 >
                   <option value="">— Выбрать —</option>
-                  {accounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.icon ? `${a.icon} ` : ""}{a.name} ({a.balance.toLocaleString("ru-RU")} {a.currency})
-                    </option>
-                  ))}
+                  {accounts.map(a => {
+                    const summary = (a.balances || [])
+                      .map(b => formatMoneyWithCurrency(b.balance, b.currency)).join(", ");
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {a.icon ? `${a.icon} ` : ""}{a.name}{summary ? ` — ${summary}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
 
@@ -250,7 +264,7 @@ export default function QuickAddFab() {
                   style={{ width: "100%", marginTop: 4 }}
                 >
                   <option value="">— Без категории —</option>
-                  {categories.map(c => (
+                  {categories.filter(c => c.type === form.type).map(c => (
                     <option key={c.id} value={c.id}>
                       {c.icon ? `${c.icon} ` : ""}{c.name}
                     </option>
@@ -258,7 +272,6 @@ export default function QuickAddFab() {
                 </select>
               </label>
 
-              {/* Описание */}
               <label style={{ display: "block", marginBottom: 16 }}>
                 <span style={{ fontSize: 12, color: "#64748b" }}>Описание (необязательно)</span>
                 <input
@@ -278,10 +291,7 @@ export default function QuickAddFab() {
                 type="submit"
                 disabled={submitting}
                 style={{
-                  width: "100%",
-                  padding: "12px",
-                  fontSize: 15,
-                  fontWeight: 600,
+                  width: "100%", padding: "12px", fontSize: 15, fontWeight: 600,
                   opacity: submitting ? 0.6 : 1,
                   cursor: submitting ? "not-allowed" : "pointer",
                 }}

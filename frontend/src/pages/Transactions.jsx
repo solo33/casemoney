@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../api/client";
+import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444", transfer: "#3b82f6" };
@@ -8,7 +9,10 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState({ amount: "", type: "expense", description: "", account_id: "", category_id: "" });
+  const [form, setForm] = useState({
+    amount: "", type: "expense", currency: "",
+    description: "", account_id: "", category_id: "",
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -23,7 +27,12 @@ export default function Transactions() {
       setAccounts(accRes.data);
       setCategories(catRes.data);
       if (accRes.data.length > 0 && !form.account_id) {
-        setForm(f => ({ ...f, account_id: String(accRes.data[0].id) }));
+        const firstAcc = accRes.data[0];
+        setForm(f => ({
+          ...f,
+          account_id: String(firstAcc.id),
+          currency: firstAcc.balances?.[0]?.currency || "RUB",
+        }));
       }
     } catch {
       setError("Ошибка загрузки данных");
@@ -34,6 +43,23 @@ export default function Transactions() {
 
   useEffect(() => { fetchAll(); }, []);
 
+  // При смене счёта — переключиться на его первую валюту, если текущей нет
+  useEffect(() => {
+    if (!form.account_id || !accounts.length) return;
+    const acc = accounts.find(a => String(a.id) === String(form.account_id));
+    if (!acc?.balances?.length) return;
+    const codes = acc.balances.map(b => b.currency);
+    if (!codes.includes(form.currency)) {
+      setForm(f => ({ ...f, currency: codes[0] }));
+    }
+  }, [form.account_id, accounts]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedAccount = useMemo(
+    () => accounts.find(a => String(a.id) === String(form.account_id)),
+    [accounts, form.account_id]
+  );
+  const accountCurrencies = (selectedAccount?.balances || []).map(b => b.currency);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setError(null);
@@ -41,6 +67,7 @@ export default function Transactions() {
       await api.post("/api/transactions/", {
         amount: parseFloat(form.amount),
         type: form.type,
+        currency: form.currency || undefined,
         description: form.description || undefined,
         account_id: parseInt(form.account_id),
         category_id: form.category_id ? parseInt(form.category_id) : undefined,
@@ -52,7 +79,6 @@ export default function Transactions() {
     }
   };
 
-  // Категории, релевантные выбранному типу транзакции. Для transfer показываем все.
   const filteredCategories = form.type === "transfer"
     ? categories
     : categories.filter(c => c.type === form.type);
@@ -94,15 +120,23 @@ export default function Transactions() {
           <option value="transfer">Перевод</option>
         </select>
         <input
-          type="number"
-          placeholder="Сумма"
+          type="number" placeholder="Сумма"
           value={form.amount}
-          min="0.01"
-          step="0.01"
+          min="0.01" step="0.01"
           onChange={e => setForm({ ...form, amount: e.target.value })}
           required
           style={{ width: 110 }}
         />
+        <select
+          value={form.currency}
+          onChange={e => setForm({ ...form, currency: e.target.value })}
+          style={{ width: 90 }}
+        >
+          {accountCurrencies.length > 0
+            ? accountCurrencies.map(c => <option key={c} value={c}>{c}</option>)
+            : COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)
+          }
+        </select>
         <select
           value={form.account_id}
           onChange={e => setForm({ ...form, account_id: e.target.value })}
@@ -150,7 +184,7 @@ export default function Transactions() {
                   <td style={{ padding: "10px 12px", color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{formatDate(tx.date)}</td>
                   <td style={{ padding: "10px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>{TYPE_LABEL[tx.type]}</td>
                   <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: TYPE_COLOR[tx.type], whiteSpace: "nowrap" }}>
-                    {tx.type === "expense" ? "−" : "+"}{tx.amount.toLocaleString("ru-RU")}
+                    {tx.type === "expense" ? "−" : "+"}{tx.amount.toLocaleString("ru-RU")} {currencySymbol(tx.currency)}
                   </td>
                   <td style={{ padding: "10px 12px", fontSize: 13 }}>{accountName(tx.account_id)}</td>
                   <td style={{ padding: "10px 12px", fontSize: 13 }}>{tx.category_id ? categoryName(tx.category_id) : "—"}</td>

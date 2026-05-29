@@ -2,13 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import { useUser } from "../contexts/UserContext";
+import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444", transfer: "#3b82f6" };
-
-function formatMoney(amount) {
-  return amount.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
 
 function formatDate(iso) {
   const d = new Date(iso);
@@ -20,6 +18,7 @@ function formatDate(iso) {
 }
 
 export default function Home() {
+  const { mainCurrency } = useUser();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,14 +32,18 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
-    // обновляемся после быстрого добавления через FAB
     window.addEventListener(TX_ADDED_EVENT, fetchData);
     return () => window.removeEventListener(TX_ADDED_EVENT, fetchData);
   }, [fetchData]);
 
+  // Перезагружаем при смене основной валюты
+  useEffect(() => { fetchData(); }, [mainCurrency, fetchData]);
+
   if (loading) return <div className="page">Загрузка...</div>;
   if (error) return <div className="page" style={{ color: "#ef4444" }}>{error}</div>;
 
+  const main = data.main_currency || mainCurrency;
+  const sym = currencySymbol(main);
   const recent5 = (data.recent_transactions || []).slice(0, 5);
   const monthNet = data.month_income - data.month_expense;
   const now = new Date();
@@ -59,7 +62,10 @@ export default function Home() {
       }}>
         <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>Общий баланс</div>
         <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: -0.5 }}>
-          {formatMoney(data.total_balance)} ₽
+          {formatMoney(data.total_balance)} {sym}
+        </div>
+        <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
+          в {main} (пересчёт по текущему курсу)
         </div>
       </div>
 
@@ -74,7 +80,7 @@ export default function Home() {
         }}>
           <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>Доходы</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#22c55e" }}>
-            +{formatMoney(data.month_income)} ₽
+            +{formatMoney(data.month_income)} {sym}
           </div>
         </div>
         <div style={{
@@ -83,7 +89,7 @@ export default function Home() {
         }}>
           <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>Расходы</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444" }}>
-            −{formatMoney(data.month_expense)} ₽
+            −{formatMoney(data.month_expense)} {sym}
           </div>
         </div>
         <div style={{
@@ -95,7 +101,7 @@ export default function Home() {
             fontSize: 20, fontWeight: 700,
             color: monthNet >= 0 ? "#22c55e" : "#ef4444",
           }}>
-            {monthNet >= 0 ? "+" : ""}{formatMoney(monthNet)} ₽
+            {monthNet >= 0 ? "+" : ""}{formatMoney(monthNet)} {sym}
           </div>
         </div>
       </div>
@@ -134,7 +140,7 @@ export default function Home() {
                 <span style={{ fontSize: 13, color: "#64748b" }}>{acc.name}</span>
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: acc.color || "#0f172a" }}>
-                {formatMoney(acc.balance)} <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{acc.currency}</span>
+                {formatMoney(acc.total_in_main)} <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{sym}</span>
               </div>
             </div>
           ))}
@@ -182,7 +188,7 @@ export default function Home() {
                 fontWeight: 600, fontSize: 15,
                 color: TYPE_COLOR[tx.type], whiteSpace: "nowrap",
               }}>
-                {tx.type === "expense" ? "−" : "+"}{formatMoney(tx.amount)} ₽
+                {tx.type === "expense" ? "−" : "+"}{formatMoneyWithCurrency(tx.amount, tx.currency)}
               </div>
             </div>
           ))}

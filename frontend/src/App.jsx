@@ -8,6 +8,7 @@ import Categories from './pages/Categories'
 import Transactions from './pages/Transactions'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
+import { UserProvider } from './contexts/UserContext'
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -15,11 +16,11 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />
   }
   return (
-    <>
+    <UserProvider>
       <Nav />
       {children}
       <QuickAddFab />
-    </>
+    </UserProvider>
   )
 }
 

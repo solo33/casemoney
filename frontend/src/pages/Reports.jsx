@@ -5,10 +5,8 @@ import {
 } from "recharts";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
-
-function formatMoney(v) {
-  return v.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
+import { useUser } from "../contexts/UserContext";
+import { currencySymbol, formatMoney } from "../utils/money";
 
 // Пресеты периодов → query params для /api/reports/summary
 function buildPresetParams(preset, custom) {
@@ -53,6 +51,7 @@ function isoDate(d) {
 }
 
 export default function Reports() {
+  const { mainCurrency } = useUser();
   const [preset, setPreset] = useState("current_month");
   const today = useMemo(() => new Date(), []);
   const monthAgo = useMemo(() => {
@@ -83,6 +82,11 @@ export default function Reports() {
     window.addEventListener(TX_ADDED_EVENT, fetchData);
     return () => window.removeEventListener(TX_ADDED_EVENT, fetchData);
   }, [fetchData]);
+
+  // Перезагружаем при смене основной валюты пользователя
+  useEffect(() => { fetchData(); }, [mainCurrency, fetchData]);
+
+  const sym = currencySymbol(summary?.main_currency || mainCurrency);
 
   const pieData = summary ? summary.category_breakdown.map(c => ({
     name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
@@ -167,13 +171,14 @@ export default function Reports() {
         <>
           {/* Карточки итогов */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-            <StatCard label="Доходы" value={summary.total_income} color="#22c55e" sign="+" />
-            <StatCard label="Расходы" value={summary.total_expense} color="#ef4444" sign="−" />
+            <StatCard label="Доходы" value={summary.total_income} color="#22c55e" sign="+" sym={sym} />
+            <StatCard label="Расходы" value={summary.total_expense} color="#ef4444" sign="−" sym={sym} />
             <StatCard
               label="Сальдо"
               value={summary.net}
               color={summary.net >= 0 ? "#22c55e" : "#ef4444"}
               sign={summary.net >= 0 ? "+" : ""}
+              sym={sym}
             />
           </div>
 
@@ -189,7 +194,7 @@ export default function Reports() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v) => formatMoney(v) + " ₽"} />
+                    <Tooltip formatter={(v) => formatMoney(v) + " " + sym} />
                     <Legend />
                     <Bar dataKey="Доходы" fill="#22c55e" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="Расходы" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -217,7 +222,7 @@ export default function Reports() {
                     >
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ₽ (${props.payload.percent}%)`, props.payload.name]} />
+                    <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.percent}%)`, props.payload.name]} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -252,7 +257,7 @@ export default function Reports() {
                           {c.category_name}
                         </td>
                         <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                          {formatMoney(c.total)} ₽
+                          {formatMoney(c.total)} {sym}
                         </td>
                         <td style={{ padding: "10px 12px", textAlign: "right", color: "#64748b" }}>
                           {c.percent}%
@@ -270,7 +275,7 @@ export default function Reports() {
   );
 }
 
-function StatCard({ label, value, color, sign = "" }) {
+function StatCard({ label, value, color, sign = "", sym = "₽" }) {
   return (
     <div style={{
       flex: 1, minWidth: 140, background: "#fff", border: "1px solid #e2e8f0",
@@ -278,7 +283,7 @@ function StatCard({ label, value, color, sign = "" }) {
     }}>
       <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color }}>
-        {sign}{formatMoney(value)} ₽
+        {sign}{formatMoney(value)} {sym}
       </div>
     </div>
   );

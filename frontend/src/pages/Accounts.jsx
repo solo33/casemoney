@@ -1,110 +1,580 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  DragOverlay,
+} from "@dnd-kit/core";
 import api from "../api/client";
+import { useUser } from "../contexts/UserContext";
+import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import { COMMON_CURRENCIES, currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
+
+const ACCOUNT_TYPES = [
+  { value: "cash",   label: "Наличные" },
+  { value: "card",   label: "Карта" },
+  { value: "bank",   label: "Банк" },
+  { value: "crypto", label: "Крипто" },
+];
+
+const UNGROUPED_KEY = "__ungrouped__";
 
 export default function Accounts() {
-  const [accounts, setAccounts] = useState([]);
-  const [form, setForm] = useState({ name: "", type: "cash", currency: "RUB", balance: 0 });
+  const { mainCurrency } = useUser();
+  const [groups, setGroups] = useState([]);  // grouped response
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchAccounts = async () => {
+  // Forms / state
+  const [newGroupName, setNewGroupName] = useState("");
+  const [showNewAccount, setShowNewAccount] = useState(false);
+  const [newAccount, setNewAccount] = useState({
+    name: "", type: "cash", color: "", icon: "",
+    initial_currency: "RUB", initial_balance: 0,
+    group_id: "",
+  });
+  const [expanded, setExpanded] = useState(new Set());        // account ids with expanded balances
+  const [addingCurrencyTo, setAddingCurrencyTo] = useState(null);  // account.id
+  const [currencyForm, setCurrencyForm] = useState({ currency: "USD", balance: 0 });
+  const [activeDrag, setActiveDrag] = useState(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const fetchGroups = useCallback(async () => {
     try {
-      const res = await api.get("/api/accounts/");
-      setAccounts(res.data);
-    } catch {
-      setError("Ошибка загрузки счетов");
+      const res = await api.get("/api/accounts/grouped");
+      setGroups(res.data);
+    } catch (e) {
+      setError(e.response?.data?.detail || "Ошибка загрузки счетов");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchGroups();
+    window.addEventListener(TX_ADDED_EVENT, fetchGroups);
+    return () => window.removeEventListener(TX_ADDED_EVENT, fetchGroups);
+  }, [fetchGroups]);
+
+  // Refetch when main currency changes (нужны новые total_in_main)
+  useEffect(() => { fetchGroups(); }, [mainCurrency, fetchGroups]);
+
+  const toggleExpand = (id) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
-  useEffect(() => { fetchAccounts(); }, []);
+  // --- Group ops ---
 
-  const handleCreate = async (e) => {
+  const handleCreateGroup = async (e) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    try {
+      await api.post("/api/account-groups/", { name: newGroupName.trim(), sort_order: groups.length });
+      setNewGroupName("");
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Ошибка создания группы");
+    }
+  };
+
+  const handleDeleteGroup = async (group) => {
+    if (!group.id) return;  // virtual ungrouped
+    if (!confirm(`Удалить группу «${group.name}»? Счета останутся (без группы).`)) return;
+    try {
+      await api.delete(`/api/account-groups/${group.id}`);
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось удалить группу");
+    }
+  };
+
+  // --- Account ops ---
+
+  const handleCreateAccount = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/api/accounts/", form);
-      setForm({ name: "", type: "cash", currency: "RUB", balance: 0 });
-      fetchAccounts();
-    } catch {
-      setError("Ошибка создания счёта");
+      const payload = {
+        ...newAccount,
+        group_id: newAccount.group_id ? parseInt(newAccount.group_id) : null,
+      };
+      if (!payload.color) delete payload.color;
+      if (!payload.icon) delete payload.icon;
+      payload.initial_balance = parseFloat(payload.initial_balance) || 0;
+      await api.post("/api/accounts/", payload);
+      setShowNewAccount(false);
+      setNewAccount({
+        name: "", type: "cash", color: "", icon: "",
+        initial_currency: "RUB", initial_balance: 0, group_id: "",
+      });
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Ошибка создания счёта");
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDeleteAccount = async (acc) => {
+    if (!confirm(`Удалить счёт «${acc.name}»? Все балансы и транзакции этого счёта будут потеряны.`)) return;
     try {
-      await api.delete(`/api/accounts/${id}`);
-      fetchAccounts();
-    } catch {
-      setError("Ошибка удаления счёта");
+      await api.delete(`/api/accounts/${acc.id}`);
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось удалить счёт");
     }
   };
+
+  // --- Currency ops ---
+
+  const handleAddCurrency = async (e, acc) => {
+    e.preventDefault();
+    try {
+      await api.post(`/api/accounts/${acc.id}/balances`, {
+        currency: currencyForm.currency,
+        balance: parseFloat(currencyForm.balance) || 0,
+      });
+      setAddingCurrencyTo(null);
+      setCurrencyForm({ currency: "USD", balance: 0 });
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось добавить валюту");
+    }
+  };
+
+  const handleEditBalance = async (acc, bal) => {
+    const newValue = prompt(`Изменить баланс ${bal.currency}:`, bal.balance);
+    if (newValue === null) return;
+    const num = parseFloat(newValue);
+    if (Number.isNaN(num)) { setError("Некорректное число"); return; }
+    try {
+      await api.put(`/api/accounts/${acc.id}/balances/${bal.currency}`, { balance: num });
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось обновить баланс");
+    }
+  };
+
+  const handleDeleteCurrency = async (acc, bal) => {
+    if (Math.abs(bal.balance) > 0.005) {
+      setError(`Сначала обнулите баланс ${bal.currency} (сейчас ${bal.balance})`);
+      return;
+    }
+    if (!confirm(`Удалить валюту ${bal.currency} у счёта «${acc.name}»?`)) return;
+    try {
+      await api.delete(`/api/accounts/${acc.id}/balances/${bal.currency}`);
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось удалить валюту");
+    }
+  };
+
+  // --- DnD ---
+
+  const handleDragStart = (event) => {
+    setActiveDrag(event.active.data.current);
+  };
+
+  const handleDragEnd = async (event) => {
+    setActiveDrag(null);
+    const { active, over } = event;
+    if (!over) return;
+    const dragged = active.data.current;
+    const target = over.data.current;
+    if (!dragged || !target) return;
+    const targetGroupId = target.groupId === UNGROUPED_KEY ? null : target.groupId;
+    if (dragged.groupId === targetGroupId) return;
+    try {
+      await api.put(`/api/accounts/${dragged.accountId}`, { group_id: targetGroupId });
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось переместить счёт");
+    }
+  };
+
+  const grandTotal = groups.reduce((s, g) => s + (g.total_in_main || 0), 0);
 
   if (loading) return <div className="page">Загрузка...</div>;
 
   return (
     <div className="page">
-      <h1>Счета</h1>
-
-      {error && <p style={{ color: "#ef4444", marginBottom: 12 }}>{error}</p>}
-
-      <form onSubmit={handleCreate} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-        <input
-          placeholder="Название"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-        />
-        <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-          <option value="cash">Наличные</option>
-          <option value="card">Карта</option>
-          <option value="bank">Банк</option>
-          <option value="crypto">Крипто</option>
-        </select>
-        <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
-          <option value="RUB">RUB</option>
-          <option value="USD">USD</option>
-          <option value="EUR">EUR</option>
-        </select>
-        <input
-          type="number"
-          placeholder="Баланс"
-          value={form.balance}
-          style={{ width: 110 }}
-          onChange={(e) => setForm({ ...form, balance: parseFloat(e.target.value) })}
-        />
-        <button type="submit">Добавить счёт</button>
-      </form>
-
-      {accounts.length === 0 ? (
-        <p style={{ color: "#94a3b8" }}>Нет счетов. Создайте первый!</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Название</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Тип</th>
-                <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>Баланс</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Валюта</th>
-                <th style={{ padding: "10px 12px" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((acc) => (
-                <tr key={acc.id} style={{ borderTop: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "10px 12px", fontWeight: 500 }}>{acc.name}</td>
-                  <td style={{ padding: "10px 12px", color: "#64748b" }}>{acc.type}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>{acc.balance.toLocaleString("ru-RU")}</td>
-                  <td style={{ padding: "10px 12px", color: "#64748b" }}>{acc.currency}</td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <button className="btn-danger" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => handleDelete(acc.id)}>Удалить</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Header: общий баланс + действия */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center",
+        marginBottom: 20,
+      }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 13, color: "#64748b" }}>Общий баланс</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#6366f1" }}>
+            {formatMoney(grandTotal)} {currencySymbol(mainCurrency)}
+          </div>
         </div>
+
+        <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: 6 }}>
+          <input
+            placeholder="Новая группа"
+            value={newGroupName}
+            onChange={e => setNewGroupName(e.target.value)}
+            style={{ width: 180 }}
+          />
+          <button type="submit">+ Группа</button>
+        </form>
+
+        <button onClick={() => setShowNewAccount(s => !s)} type="button">
+          {showNewAccount ? "Отмена" : "+ Счёт"}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{
+          color: "#ef4444", marginBottom: 12, padding: "8px 12px",
+          background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="btn-ghost" style={{ padding: "2px 8px" }}>×</button>
+        </div>
+      )}
+
+      {/* Форма создания счёта */}
+      {showNewAccount && (
+        <form onSubmit={handleCreateAccount} style={{
+          background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+          padding: 16, marginBottom: 20,
+          display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
+        }}>
+          <input
+            placeholder="Название"
+            value={newAccount.name}
+            onChange={e => setNewAccount({ ...newAccount, name: e.target.value })}
+            required
+            autoFocus
+          />
+          <select
+            value={newAccount.type}
+            onChange={e => setNewAccount({ ...newAccount, type: e.target.value })}
+          >
+            {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          <select
+            value={newAccount.group_id}
+            onChange={e => setNewAccount({ ...newAccount, group_id: e.target.value })}
+          >
+            <option value="">— Без группы —</option>
+            {groups.filter(g => g.group.id !== null).map(g => (
+              <option key={g.group.id} value={g.group.id}>{g.group.name}</option>
+            ))}
+          </select>
+          <select
+            value={newAccount.initial_currency}
+            onChange={e => setNewAccount({ ...newAccount, initial_currency: e.target.value })}
+          >
+            {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input
+            type="number"
+            placeholder="Начальный баланс"
+            value={newAccount.initial_balance}
+            step="0.01"
+            onChange={e => setNewAccount({ ...newAccount, initial_balance: e.target.value })}
+            style={{ width: 140 }}
+          />
+          <input
+            placeholder="Иконка"
+            value={newAccount.icon}
+            onChange={e => setNewAccount({ ...newAccount, icon: e.target.value })}
+            style={{ width: 70 }}
+          />
+          <button type="submit">Создать</button>
+        </form>
+      )}
+
+      {/* Группы */}
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        {groups.length === 0 ? (
+          <p style={{ color: "#94a3b8" }}>Нет счетов. Создайте первый!</p>
+        ) : (
+          groups.map(bucket => (
+            <GroupBucket
+              key={bucket.group.id ?? UNGROUPED_KEY}
+              bucket={bucket}
+              mainCurrency={mainCurrency}
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
+              onDeleteGroup={handleDeleteGroup}
+              onDeleteAccount={handleDeleteAccount}
+              addingCurrencyTo={addingCurrencyTo}
+              setAddingCurrencyTo={setAddingCurrencyTo}
+              currencyForm={currencyForm}
+              setCurrencyForm={setCurrencyForm}
+              onAddCurrency={handleAddCurrency}
+              onEditBalance={handleEditBalance}
+              onDeleteCurrency={handleDeleteCurrency}
+              activeDrag={activeDrag}
+            />
+          ))
+        )}
+
+        <DragOverlay>
+          {activeDrag ? (
+            <div style={{
+              background: "#fff",
+              border: "2px solid #6366f1",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontSize: 14,
+              fontWeight: 500,
+              boxShadow: "0 8px 16px rgba(0,0,0,0.15)",
+            }}>
+              {activeDrag.icon ? `${activeDrag.icon} ` : ""}{activeDrag.name}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  );
+}
+
+// --- subcomponents ---
+
+function GroupBucket({
+  bucket, mainCurrency, expanded, onToggleExpand,
+  onDeleteGroup, onDeleteAccount,
+  addingCurrencyTo, setAddingCurrencyTo, currencyForm, setCurrencyForm,
+  onAddCurrency, onEditBalance, onDeleteCurrency,
+  activeDrag,
+}) {
+  const groupId = bucket.group.id;
+  const groupKey = groupId === null ? UNGROUPED_KEY : groupId;
+  const { setNodeRef, isOver } = useDroppable({
+    id: `group-${groupKey}`,
+    data: { groupId: groupKey },
+  });
+
+  const canAccept = activeDrag && activeDrag.groupId !== groupId;
+  const dropHighlight = isOver && canAccept;
+
+  return (
+    <div ref={setNodeRef} style={{
+      marginBottom: 16,
+      border: `1px solid ${dropHighlight ? "#6366f1" : "#e2e8f0"}`,
+      background: "#fff",
+      borderRadius: 10,
+      outline: dropHighlight ? "2px solid rgba(99,102,241,0.25)" : "none",
+    }}>
+      {/* Group header */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "10px 14px",
+        background: "#f8fafc",
+        borderRadius: "10px 10px 0 0",
+        borderBottom: bucket.accounts.length ? "1px solid #e2e8f0" : "none",
+      }}>
+        <span style={{ fontWeight: 600, color: "#334155", flex: 1 }}>
+          {bucket.group.name}
+          <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 8, fontSize: 13 }}>
+            ({bucket.accounts.length})
+          </span>
+        </span>
+        <span style={{ fontWeight: 700 }}>
+          {formatMoney(bucket.total_in_main)} {currencySymbol(mainCurrency)}
+        </span>
+        {groupId !== null && (
+          <button
+            type="button"
+            onClick={() => onDeleteGroup(bucket.group)}
+            className="btn-ghost"
+            style={{ padding: "2px 8px", fontSize: 12, color: "#ef4444" }}
+            title="Удалить группу"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Accounts list */}
+      {bucket.accounts.length === 0 ? (
+        <div style={{ padding: 16, color: "#94a3b8", fontSize: 13 }}>
+          Перетащите счёт сюда
+        </div>
+      ) : (
+        bucket.accounts.map(acc => (
+          <AccountRow
+            key={acc.id}
+            acc={acc}
+            groupId={groupId}
+            mainCurrency={mainCurrency}
+            isExpanded={expanded.has(acc.id)}
+            onToggleExpand={() => onToggleExpand(acc.id)}
+            onDelete={onDeleteAccount}
+            isAddingCurrency={addingCurrencyTo === acc.id}
+            setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
+            currencyForm={currencyForm}
+            setCurrencyForm={setCurrencyForm}
+            onAddCurrency={onAddCurrency}
+            onEditBalance={onEditBalance}
+            onDeleteCurrency={onDeleteCurrency}
+          />
+        ))
+      )}
+    </div>
+  );
+}
+
+function AccountRow({
+  acc, groupId, mainCurrency,
+  isExpanded, onToggleExpand,
+  onDelete,
+  isAddingCurrency, setAddingCurrency,
+  currencyForm, setCurrencyForm,
+  onAddCurrency, onEditBalance, onDeleteCurrency,
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `acc-${acc.id}`,
+    data: { accountId: acc.id, groupId, name: acc.name, icon: acc.icon },
+  });
+
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.3 : 1,
+  };
+
+  const multiCurrency = (acc.balances || []).length > 1;
+  const presentCurrencies = (acc.balances || []).map(b => b.currency);
+  const availableCurrencies = COMMON_CURRENCIES.filter(c => !presentCurrencies.includes(c));
+
+  return (
+    <div ref={setNodeRef} style={{ ...style }}>
+      {/* Main row */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "10px 14px",
+        borderTop: "1px solid #f1f5f9",
+        background: "#fff",
+      }}>
+        <span
+          style={{ cursor: "grab", color: "#cbd5e1", fontSize: 16, userSelect: "none" }}
+          {...listeners}
+          {...attributes}
+          title="Перетащите в другую группу"
+        >
+          ⋮⋮
+        </span>
+        {acc.icon && <span style={{ fontSize: 18 }}>{acc.icon}</span>}
+        <span style={{ fontWeight: 500, flex: 1, cursor: multiCurrency ? "pointer" : "default" }}
+              onClick={() => multiCurrency && onToggleExpand()}>
+          {acc.name}
+          {multiCurrency && (
+            <span style={{ marginLeft: 6, color: "#94a3b8", fontSize: 12 }}>
+              {isExpanded ? "▾" : "▸"} {acc.balances.length} валют
+            </span>
+          )}
+        </span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: acc.color || "#0f172a" }}>
+          {formatMoney(acc.total_in_main)} {currencySymbol(mainCurrency)}
+        </span>
+        <button
+          type="button"
+          onClick={() => setAddingCurrency(!isAddingCurrency)}
+          className="btn-ghost"
+          style={{ padding: "3px 8px", fontSize: 12 }}
+          title="Добавить валюту"
+        >
+          + валюта
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(acc)}
+          className="btn-ghost"
+          style={{ padding: "2px 8px", fontSize: 14, color: "#ef4444" }}
+          title="Удалить счёт"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Balances detail */}
+      {(isExpanded || !multiCurrency) && (acc.balances || []).length > 0 && (
+        <div style={{ padding: "0 14px 8px 44px" }}>
+          {acc.balances.map(b => (
+            <div key={b.currency} style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "4px 0",
+              fontSize: 13, color: "#475569",
+            }}>
+              <span style={{ minWidth: 50, fontWeight: 600 }}>{b.currency}</span>
+              <span style={{ flex: 1 }}>
+                {formatMoneyWithCurrency(b.balance, b.currency)}
+              </span>
+              {b.currency !== mainCurrency && (
+                <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                  ≈ {formatMoney(b.balance_in_main)} {currencySymbol(mainCurrency)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => onEditBalance(acc, b)}
+                className="btn-ghost"
+                style={{ padding: "1px 6px", fontSize: 11 }}
+              >
+                ✎
+              </button>
+              {acc.balances.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onDeleteCurrency(acc, b)}
+                  className="btn-ghost"
+                  style={{ padding: "1px 6px", fontSize: 11, color: "#ef4444" }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add currency form */}
+      {isAddingCurrency && (
+        <form onSubmit={(e) => onAddCurrency(e, acc)} style={{
+          display: "flex", gap: 6, padding: "0 14px 12px 44px", alignItems: "center",
+        }}>
+          <select
+            value={currencyForm.currency}
+            onChange={e => setCurrencyForm({ ...currencyForm, currency: e.target.value })}
+            style={{ fontSize: 13 }}
+          >
+            {availableCurrencies.length > 0
+              ? availableCurrencies.map(c => <option key={c} value={c}>{c}</option>)
+              : COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)
+            }
+          </select>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="0"
+            value={currencyForm.balance}
+            onChange={e => setCurrencyForm({ ...currencyForm, balance: e.target.value })}
+            style={{ width: 120, fontSize: 13 }}
+          />
+          <button type="submit" style={{ fontSize: 13, padding: "4px 10px" }}>Добавить</button>
+          <button
+            type="button"
+            onClick={() => setAddingCurrency(false)}
+            className="btn-ghost"
+            style={{ fontSize: 13, padding: "4px 10px" }}
+          >
+            Отмена
+          </button>
+        </form>
       )}
     </div>
   );

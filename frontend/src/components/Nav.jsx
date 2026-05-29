@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useUser } from "../contexts/UserContext";
+import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
 
 const links = [
   { to: "/home", label: "Главная" },
@@ -12,10 +14,21 @@ const links = [
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { mainCurrency, updateMainCurrency, user } = useUser();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/login");
+  };
+
+  const handleChangeMainCurrency = async (e) => {
+    const cur = e.target.value;
+    try {
+      await updateMainCurrency(cur);
+    } catch (err) {
+      alert("Не удалось обновить валюту: " + (err.response?.data?.detail || err.message));
+    }
   };
 
   const linkStyle = ({ isActive }) => ({
@@ -46,12 +59,10 @@ export default function Nav() {
         alignItems: "center",
         gap: 8,
       }}>
-        {/* Лого */}
         <span style={{ fontWeight: 700, fontSize: 16, color: "#6366f1", marginRight: 8, whiteSpace: "nowrap" }}>
           💰 CaseMoney
         </span>
 
-        {/* Десктоп ссылки */}
         <div style={{ display: "flex", gap: 4, flex: 1 }} className="nav-links-desktop">
           {links.map(l => (
             <NavLink key={l.to} to={l.to} style={linkStyle}>
@@ -60,16 +71,56 @@ export default function Nav() {
           ))}
         </div>
 
-        {/* Кнопка выйти — десктоп */}
+        {/* Settings: main currency */}
+        <div style={{ position: "relative", marginLeft: "auto" }} className="nav-settings-desktop">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(o => !o)}
+            className="btn-ghost"
+            style={{ fontSize: 13, padding: "5px 10px", whiteSpace: "nowrap" }}
+            title="Основная валюта"
+          >
+            ⚙ {currencySymbol(mainCurrency)} {mainCurrency}
+          </button>
+          {settingsOpen && (
+            <div style={{
+              position: "absolute", right: 0, top: "100%", marginTop: 6,
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
+              boxShadow: "0 8px 16px rgba(0,0,0,0.1)", padding: 12, minWidth: 200,
+              zIndex: 110,
+            }}>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
+                Основная валюта
+              </div>
+              <select
+                value={mainCurrency}
+                onChange={handleChangeMainCurrency}
+                style={{ width: "100%" }}
+              >
+                {COMMON_CURRENCIES.map(c => (
+                  <option key={c} value={c}>{currencySymbol(c)} {c}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+                Все суммы в дашбордах конвертируются по текущему курсу.
+              </div>
+              {user && (
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 10, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                  {user.username} · {user.email}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={handleLogout}
           className="btn-ghost"
-          style={{ marginLeft: "auto", fontSize: 13, padding: "5px 12px", whiteSpace: "nowrap" }}
+          style={{ fontSize: 13, padding: "5px 12px", whiteSpace: "nowrap" }}
         >
           Выйти
         </button>
 
-        {/* Бургер — мобильный */}
         <button
           onClick={() => setOpen(o => !o)}
           className="btn-ghost nav-burger"
@@ -80,7 +131,6 @@ export default function Nav() {
         </button>
       </div>
 
-      {/* Мобильное меню */}
       {open && (
         <div className="nav-mobile-menu" style={{
           background: "#fff",
@@ -100,6 +150,14 @@ export default function Nav() {
               {l.label}
             </NavLink>
           ))}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <span style={{ fontSize: 12, color: "#64748b" }}>Валюта:</span>
+            <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>
+              {COMMON_CURRENCIES.map(c => (
+                <option key={c} value={c}>{currencySymbol(c)} {c}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={handleLogout}
             className="btn-ghost"
@@ -112,11 +170,12 @@ export default function Nav() {
 
       <style>{`
         .nav-links-desktop { display: flex !important; }
+        .nav-settings-desktop { display: block !important; }
         .nav-burger { display: none !important; }
         @media (max-width: 600px) {
           .nav-links-desktop { display: none !important; }
+          .nav-settings-desktop { display: none !important; }
           .nav-burger { display: block !important; }
-          /* скрыть кнопку Выйти на десктопе в бургере уже есть */
         }
       `}</style>
     </nav>
