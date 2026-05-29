@@ -196,9 +196,8 @@ def delete_category(
     category = db.query(Category).filter(
         Category.id == category_id,
         Category.user_id == user_id,
-        Category.is_default == False,
     ).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found or is default")
+        raise HTTPException(status_code=404, detail="Category not found")
     db.delete(category)
     db.commit()

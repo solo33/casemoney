@@ -302,16 +302,14 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
         >
           +
         </button>
-        {!root.is_default && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(root); }}
-            className="btn-danger"
-            style={{ padding: "4px 8px", fontSize: 12 }}
-          >
-            Удалить
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(root); }}
+          className="btn-danger"
+          style={{ padding: "4px 8px", fontSize: 12 }}
+        >
+          Удалить
+        </button>
       </div>
 
       {/* Subcategory inline form */}
@@ -403,17 +401,15 @@ function ChildNode({ child, onDelete }) {
       }} />
       {child.icon && <span style={{ fontSize: 14 }}>{child.icon}</span>}
       <span style={{ flex: 1 }}>{child.name}</span>
-      {!child.is_default && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete(child); }}
-          className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 12, color: "#b91c1c" }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          ×
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(child); }}
+        className="btn-ghost"
+        style={{ padding: "2px 8px", fontSize: 12, color: "#b91c1c" }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        ×
+      </button>
     </div>
   );
 }

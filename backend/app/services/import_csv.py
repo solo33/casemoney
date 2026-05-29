@@ -171,16 +171,21 @@ def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPre
     existing_accounts = {
         a.name: a for a in db.query(Account).filter(Account.user_id == user_id).all()
     }
-    existing_categories = {
-        c.name.lower(): c for c in db.query(Category).filter(Category.user_id == user_id).all()
-    }
+    all_existing_cats = db.query(Category).filter(Category.user_id == user_id).all()
+    cats_by_id_pre = {c.id: c for c in all_existing_cats}
+    existing_categories: dict[tuple, Category] = {}
+    for c in all_existing_cats:
+        parent_name = None
+        if c.parent_id and c.parent_id in cats_by_id_pre:
+            parent_name = cats_by_id_pre[c.parent_id].name.lower()
+        existing_categories[(parent_name, c.name.lower())] = c
     existing_user_currencies = {
         uc.currency.upper() for uc in db.query(UserCurrency).filter(UserCurrency.user_id == user_id).all()
     }
 
     new_accounts: set[str] = set()
     seen_accounts: set[str] = set()
-    new_categories: dict[str, str] = {}   # name → type
+    new_categories: dict[tuple, str] = {}   # (parent_name, name) → type
     seen_categories: set[str] = set()
     currencies: set[str] = set()
     total_income = total_expense = 0.0
@@ -214,19 +219,30 @@ def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPre
         # Категории (только для не-transfer)
         if not r.transfer_to:
             cat_type = "expense" if r.amount < 0 else "income"
-            for name in filter(None, [r.category_parent, r.category_child]):
-                key = name.lower()
+            # Корневая
+            if r.category_parent:
+                key = (None, r.category_parent.lower())
                 if key in existing_categories:
-                    seen_categories.add(name)
+                    seen_categories.add(r.category_parent)
                 else:
-                    # Если уже планировали — оставим тип первого encounter
-                    new_categories.setdefault(name, cat_type)
+                    new_categories.setdefault(key, cat_type)
+            # Дочерняя
+            if r.category_child:
+                key = (r.category_parent.lower() if r.category_parent else None,
+                       r.category_child.lower())
+                if key in existing_categories:
+                    seen_categories.add(r.category_child)
+                else:
+                    new_categories.setdefault(key, cat_type)
 
     p = ImportPreview()
     p.rows = rows
     p.new_accounts = sorted(new_accounts)
     p.existing_accounts = sorted(seen_accounts)
-    p.new_categories = [{"name": n, "type": t} for n, t in sorted(new_categories.items())]
+    p.new_categories = [
+        {"name": (k[1] if not k[0] else f"{k[0]}\\{k[1]}"), "type": t}
+        for k, t in sorted(new_categories.items())
+    ]
     p.existing_categories = sorted(seen_categories)
     p.currencies_to_add = sorted(currencies - existing_user_currencies)
     p.totals = {
@@ -251,9 +267,16 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
     accounts_cache: dict[str, Account] = {
         a.name: a for a in db.query(Account).filter(Account.user_id == user_id).all()
     }
-    categories_cache: dict[str, Category] = {
-        c.name.lower(): c for c in db.query(Category).filter(Category.user_id == user_id).all()
-    }
+    # Кэш категорий по ключу (parent_name_lower_or_None, name_lower) — чтобы поддержать
+    # одноимённые подкатегории под разными родителями (напр. Развлечения в Отдых и в Личные Фима).
+    all_cats = db.query(Category).filter(Category.user_id == user_id).all()
+    cats_by_id = {c.id: c for c in all_cats}
+    categories_cache: dict[tuple, Category] = {}
+    for c in all_cats:
+        parent_name = None
+        if c.parent_id and c.parent_id in cats_by_id:
+            parent_name = cats_by_id[c.parent_id].name.lower()
+        categories_cache[(parent_name, c.name.lower())] = c
     user_currencies_cache: set[str] = {
         uc.currency.upper() for uc in db.query(UserCurrency).filter(UserCurrency.user_id == user_id).all()
     }
@@ -286,19 +309,17 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
         return bal
 
     def ensure_category(name: str, cat_type: str, parent: Optional[Category] = None) -> Category:
-        key = name.lower()
+        parent_name = parent.name.lower() if parent else None
+        key = (parent_name, name.lower())
         if key in categories_cache:
-            existing = categories_cache[key]
-            # Обновляем parent_id если ранее был корневой, а теперь у него есть родитель
-            if parent and existing.parent_id is None:
-                existing.parent_id = parent.id
-                db.flush()
-            return existing
+            return categories_cache[key]
+        # Если у корня (parent=None) уже есть категория с таким именем но другим parent — НЕ
+        # переиспользуем, создаём новую. Так "Развлечения" в Отдых и в Личные Фима — это разные.
         cat = Category(
             user_id=user_id,
             name=name,
             type=cat_type,
-            color="#6366f1",
+            color="#9f1239",
             icon=None,
             parent_id=parent.id if parent else None,
         )
