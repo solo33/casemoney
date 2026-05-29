@@ -98,7 +98,7 @@ export default function Currencies() {
   };
 
   if (loading) return <div className="page">Загрузка...</div>;
-  if (!data) return <div className="page" style={{ color: "#ef4444" }}>{error || "Нет данных"}</div>;
+  if (!data) return <div className="page" style={{ color: "#b91c1c" }}>{error || "Нет данных"}</div>;
 
   const presentCodes = data.currencies.map(c => c.currency);
   const addable = COMMON_CURRENCIES.filter(c => !presentCodes.includes(c));
@@ -109,8 +109,8 @@ export default function Currencies() {
 
       {error && (
         <div style={{
-          color: "#ef4444", marginBottom: 12, padding: "8px 12px",
-          background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8,
+          color: "#b91c1c", marginBottom: 12, padding: "8px 12px",
+          background: "#fef2f0", border: "1px solid #fecdd3", borderRadius: 8,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
           <span>{error}</span>
@@ -119,16 +119,16 @@ export default function Currencies() {
       )}
 
       <div style={{
-        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10,
+        background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
         padding: 20,
       }}>
         {/* Основная валюта */}
         <div style={{
           display: "flex", alignItems: "center", gap: 12,
           paddingBottom: 16, marginBottom: 16,
-          borderBottom: "1px solid #f1f5f9",
+          borderBottom: "1px solid #ede9df",
         }}>
-          <span style={{ color: "#475569", fontSize: 14 }}>Основная валюта</span>
+          <span style={{ color: "#57534e", fontSize: 14 }}>Основная валюта</span>
           <select
             value={data.main_currency}
             onChange={handleChangeMain}
@@ -138,7 +138,7 @@ export default function Currencies() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-          <span style={{ color: "#94a3b8", fontSize: 12 }}>
+          <span style={{ color: "#a8a29e", fontSize: 12 }}>
             Все суммы в дашбордах будут пересчитаны в эту валюту.
           </span>
         </div>
@@ -148,7 +148,7 @@ export default function Currencies() {
           display: "grid",
           gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
           gap: 12, alignItems: "center",
-          fontSize: 12, color: "#94a3b8", textTransform: "uppercase",
+          fontSize: 12, color: "#a8a29e", textTransform: "uppercase",
           letterSpacing: 0.5, marginBottom: 8, padding: "0 4px",
         }}>
           <span>Наименование</span>
@@ -174,9 +174,9 @@ export default function Currencies() {
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
           marginTop: 16, paddingTop: 16,
-          borderTop: "1px solid #f1f5f9",
+          borderTop: "1px solid #ede9df",
         }}>
-          <span style={{ color: "#475569", fontSize: 14 }}>Добавить валюту</span>
+          <span style={{ color: "#57534e", fontSize: 14 }}>Добавить валюту</span>
           <select
             value={newCurrency}
             onChange={e => setNewCurrency(e.target.value)}
@@ -253,7 +253,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
       gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
       gap: 12, alignItems: "center",
       padding: "8px 4px",
-      borderBottom: "1px solid #f8fafc",
+      borderBottom: "1px solid #faf8f3",
       opacity: saving ? 0.6 : 1,
     }}>
       <input
@@ -264,7 +264,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
         placeholder={uc.currency}
         style={{ fontSize: 14 }}
       />
-      <span style={{ color: "#64748b", fontSize: 13, fontWeight: 600 }}>{uc.currency}</span>
+      <span style={{ color: "#78716c", fontSize: 13, fontWeight: 600 }}>{uc.currency}</span>
       <input
         type="text"
         value={shortCode}
@@ -276,10 +276,10 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
 
       {/* Курс */}
       {isMain ? (
-        <span style={{ color: "#94a3b8", fontSize: 13 }}>—</span>
+        <span style={{ color: "#a8a29e", fontSize: 13 }}>—</span>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <span style={{ color: "#64748b", whiteSpace: "nowrap" }}>1 {uc.currency} =</span>
+          <span style={{ color: "#78716c", whiteSpace: "nowrap" }}>1 {uc.currency} =</span>
           <input
             type="text"
             value={rateInput}
@@ -288,13 +288,13 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
             disabled={uc.auto}
             style={{
               width: 120, fontSize: 13,
-              color: uc.auto ? "#3b82f6" : "#0f172a",
-              background: uc.auto ? "#f1f5f9" : "#fff",
+              color: uc.auto ? "#1d4ed8" : "#1c1917",
+              background: uc.auto ? "#ede9df" : "#fff",
               textDecoration: uc.auto ? "underline" : "none",
               cursor: uc.auto ? "default" : "text",
             }}
           />
-          <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#475569", fontSize: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#57534e", fontSize: 12 }}>
             <input
               type="checkbox"
               checked={uc.auto}
@@ -311,7 +311,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
           type="button"
           onClick={onDelete}
           className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 14, color: "#ef4444" }}
+          style={{ padding: "2px 8px", fontSize: 14, color: "#b91c1c" }}
           title="Удалить"
         >
           ×

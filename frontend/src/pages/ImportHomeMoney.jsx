@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 
-const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444", transfer: "#3b82f6" };
+const TYPE_COLOR = { income: "#15803d", expense: "#b91c1c", transfer: "#1d4ed8" };
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 
 export default function ImportHomeMoney() {
@@ -82,7 +82,7 @@ export default function ImportHomeMoney() {
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: 12 }}>
-        <Link to="/import" style={{ fontSize: 13, color: "#6366f1", textDecoration: "none" }}>
+        <Link to="/import" style={{ fontSize: 13, color: "#9f1239", textDecoration: "none" }}>
           ← К выбору источника
         </Link>
       </div>
@@ -97,7 +97,7 @@ export default function ImportHomeMoney() {
 
       {result ? (
         <div style={{
-          background: "#dcfce7", border: "1px solid #22c55e",
+          background: "#dcfce7", border: "1px solid #15803d",
           borderRadius: 10, padding: 20,
         }}>
           <h3 style={{ marginTop: 0, color: "#15803d" }}>✓ Импорт завершён</h3>
@@ -108,7 +108,7 @@ export default function ImportHomeMoney() {
           {result.errors.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <details>
-                <summary style={{ cursor: "pointer", color: "#dc2626" }}>
+                <summary style={{ cursor: "pointer", color: "#991b1b" }}>
                   Ошибки ({result.errors.length})
                 </summary>
                 <ul style={{ fontSize: 13 }}>
@@ -133,8 +133,8 @@ export default function ImportHomeMoney() {
             onDrop={onDrop}
             onClick={() => inputRef.current?.click()}
             style={{
-              border: `2px dashed ${dragOver ? "#6366f1" : "#cbd5e1"}`,
-              background: dragOver ? "rgba(99,102,241,0.05)" : "#f8fafc",
+              border: `2px dashed ${dragOver ? "#9f1239" : "#d6d3d1"}`,
+              background: dragOver ? "rgba(159, 18, 57, 0.05)" : "#faf8f3",
               borderRadius: 10,
               padding: "32px 20px",
               textAlign: "center",
@@ -146,17 +146,17 @@ export default function ImportHomeMoney() {
             <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
             {file ? (
               <>
-                <div style={{ fontWeight: 600, color: "#0f172a" }}>{file.name}</div>
-                <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                <div style={{ fontWeight: 600, color: "#1c1917" }}>{file.name}</div>
+                <div style={{ fontSize: 13, color: "#78716c", marginTop: 4 }}>
                   {(file.size / 1024).toFixed(1)} KB · нажмите для замены
                 </div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 14, color: "#475569" }}>
+                <div style={{ fontSize: 14, color: "#57534e" }}>
                   Перетащите CSV-файл сюда или нажмите для выбора
                 </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 6 }}>
                   Формат: iHomeMoney / HomeMoney (date;account;category;total;currency;description;transfer)
                 </div>
               </>
@@ -185,15 +185,15 @@ export default function ImportHomeMoney() {
           {preview && (
             <>
               <Summary preview={preview} />
-              <h3 style={{ fontSize: 14, color: "#334155", margin: "20px 0 10px" }}>
+              <h3 style={{ fontSize: 14, color: "#44403c", margin: "20px 0 10px" }}>
                 Строки ({preview.rows.length})
               </h3>
               <div className="table-wrap" style={{
-                background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
+                background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
                 maxHeight: 400, overflowY: "auto",
               }}>
                 <table style={{ minWidth: 880 }}>
-                  <thead style={{ position: "sticky", top: 0, background: "#f8fafc" }}>
+                  <thead style={{ position: "sticky", top: 0, background: "#faf8f3" }}>
                     <tr>
                       <Th>#</Th>
                       <Th>Дата</Th>
@@ -209,11 +209,11 @@ export default function ImportHomeMoney() {
                       <tr
                         key={r.line_no}
                         style={{
-                          borderTop: "1px solid #f1f5f9",
-                          background: r.error ? "#fef2f2" : "transparent",
+                          borderTop: "1px solid #ede9df",
+                          background: r.error ? "#fef2f0" : "transparent",
                         }}
                       >
-                        <Td style={{ color: "#94a3b8", fontSize: 12 }}>{r.line_no}</Td>
+                        <Td style={{ color: "#a8a29e", fontSize: 12 }}>{r.line_no}</Td>
                         <Td style={{ fontSize: 13, whiteSpace: "nowrap" }}>{r.date || "—"}</Td>
                         <Td style={{ color: TYPE_COLOR[r.tx_type], fontSize: 12, fontWeight: 600 }}>
                           {TYPE_LABEL[r.tx_type]}
@@ -224,15 +224,15 @@ export default function ImportHomeMoney() {
                         <Td style={{ fontSize: 13 }}>
                           {r.account}
                           {r.transfer_to && (
-                            <span style={{ color: "#94a3b8" }}> → {r.transfer_to}</span>
+                            <span style={{ color: "#a8a29e" }}> → {r.transfer_to}</span>
                           )}
                         </Td>
-                        <Td style={{ fontSize: 13, color: "#64748b" }}>
+                        <Td style={{ fontSize: 13, color: "#78716c" }}>
                           {r.category_path || (r.transfer_to ? "перевод" : "—")}
                         </Td>
-                        <Td style={{ fontSize: 13, color: "#64748b" }}>
+                        <Td style={{ fontSize: 13, color: "#78716c" }}>
                           {r.error
-                            ? <span style={{ color: "#ef4444" }}>⚠ {r.error}</span>
+                            ? <span style={{ color: "#b91c1c" }}>⚠ {r.error}</span>
                             : (r.description || "")}
                         </Td>
                       </tr>
@@ -263,17 +263,17 @@ function Summary({ preview }) {
       gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
       gap: 12,
     }}>
-      <Stat label="Всего строк" value={totals.rows_total} color="#64748b" />
-      <Stat label="К импорту" value={totals.ok} color="#22c55e" />
-      {totals.errors > 0 && <Stat label="Ошибок" value={totals.errors} color="#ef4444" />}
-      <Stat label="Переводов" value={totals.transfers} color="#3b82f6" />
-      <Stat label="Доходы" value={`+${totals.income_sum.toLocaleString("ru-RU")}`} color="#22c55e" />
-      <Stat label="Расходы" value={`−${totals.expense_sum.toLocaleString("ru-RU")}`} color="#ef4444" />
+      <Stat label="Всего строк" value={totals.rows_total} color="#78716c" />
+      <Stat label="К импорту" value={totals.ok} color="#15803d" />
+      {totals.errors > 0 && <Stat label="Ошибок" value={totals.errors} color="#b91c1c" />}
+      <Stat label="Переводов" value={totals.transfers} color="#1d4ed8" />
+      <Stat label="Доходы" value={`+${totals.income_sum.toLocaleString("ru-RU")}`} color="#15803d" />
+      <Stat label="Расходы" value={`−${totals.expense_sum.toLocaleString("ru-RU")}`} color="#b91c1c" />
 
-      <Pills title="Новые счета" items={new_accounts} color="#22c55e" />
-      <Pills title="Существующие счета" items={existing_accounts} color="#64748b" />
-      <Pills title="Новые категории" items={new_categories.map(c => c.name)} color="#6366f1" />
-      <Pills title="Существующие категории" items={existing_categories} color="#64748b" />
+      <Pills title="Новые счета" items={new_accounts} color="#15803d" />
+      <Pills title="Существующие счета" items={existing_accounts} color="#78716c" />
+      <Pills title="Новые категории" items={new_categories.map(c => c.name)} color="#9f1239" />
+      <Pills title="Существующие категории" items={existing_categories} color="#78716c" />
       {currencies_to_add.length > 0 && (
         <Pills title="Новые валюты" items={currencies_to_add} color="#f59e0b" />
       )}
@@ -284,10 +284,10 @@ function Summary({ preview }) {
 function Stat({ label, value, color }) {
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
+      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
       padding: "10px 14px",
     }}>
-      <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 11, color: "#78716c", textTransform: "uppercase", letterSpacing: 0.5 }}>
         {label}
       </div>
       <div style={{ fontSize: 18, fontWeight: 700, color, marginTop: 4 }}>
@@ -301,10 +301,10 @@ function Pills({ title, items, color }) {
   if (!items?.length) return null;
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
+      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
       padding: "10px 14px",
     }}>
-      <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+      <div style={{ fontSize: 11, color: "#78716c", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
         {title} ({items.length})
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -317,7 +317,7 @@ function Pills({ title, items, color }) {
           </span>
         ))}
         {items.length > 12 && (
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>+{items.length - 12}</span>
+          <span style={{ fontSize: 12, color: "#a8a29e" }}>+{items.length - 12}</span>
         )}
       </div>
     </div>
@@ -328,8 +328,8 @@ function Th({ children, align = "left" }) {
   return (
     <th style={{
       padding: "10px 12px", textAlign: align,
-      fontSize: 12, color: "#64748b", fontWeight: 600,
-      background: "#f8fafc", whiteSpace: "nowrap",
+      fontSize: 12, color: "#78716c", fontWeight: 600,
+      background: "#faf8f3", whiteSpace: "nowrap",
     }}>
       {children}
     </th>
@@ -344,7 +344,7 @@ function Td({ children, align = "left", style = {} }) {
 
 const errorBox = {
   display: "flex", alignItems: "center",
-  color: "#ef4444", padding: "10px 14px",
-  background: "#fef2f2", border: "1px solid #fecaca",
+  color: "#b91c1c", padding: "10px 14px",
+  background: "#fef2f0", border: "1px solid #fecdd3",
   borderRadius: 8, marginBottom: 12,
 };

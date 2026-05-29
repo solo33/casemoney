@@ -92,7 +92,7 @@ export default function Settings() {
     <div className="page" style={{ maxWidth: 760 }}>
       <h1 style={{ marginBottom: 20 }}>Настройки</h1>
 
-      {error && <FlashBox color="#ef4444" bg="#fef2f2" border="#fecaca">{error}</FlashBox>}
+      {error && <FlashBox color="#b91c1c" bg="#fef2f0" border="#fecdd3">{error}</FlashBox>}
       {msg && <FlashBox color="#15803d" bg="#dcfce7" border="#86efac">{msg}</FlashBox>}
 
       {/* Профиль */}
@@ -224,14 +224,14 @@ function Section({ title, tone, children }) {
   return (
     <div style={{
       background: "#fff",
-      border: `1px solid ${danger ? "#fecaca" : "#e2e8f0"}`,
+      border: `1px solid ${danger ? "#fecdd3" : "#e7e5e0"}`,
       borderRadius: 10,
       padding: 18,
       marginBottom: 16,
     }}>
       <h3 style={{
         marginTop: 0, marginBottom: 14, fontSize: 14,
-        color: danger ? "#dc2626" : "#334155",
+        color: danger ? "#991b1b" : "#44403c",
         textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700,
       }}>
         {title}
@@ -244,7 +244,7 @@ function Section({ title, tone, children }) {
 function Field({ label, children }) {
   return (
     <label style={{ display: "grid", gridTemplateColumns: "minmax(160px, 200px) 1fr", gap: 12, alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "#64748b" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "#78716c" }}>{label}</span>
       {children}
     </label>
   );
@@ -254,19 +254,19 @@ function DangerRow({ title, description, label, onClick, destructive }) {
   return (
     <div style={{
       display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap",
-      padding: "10px 0", borderTop: "1px solid #f1f5f9",
+      padding: "10px 0", borderTop: "1px solid #ede9df",
     }}>
       <div style={{ flex: 1, minWidth: 240 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
-        <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{description}</div>
+        <div style={{ fontSize: 12, color: "#78716c", marginTop: 2 }}>{description}</div>
       </div>
       <button
         onClick={onClick}
         className="btn-danger"
         style={{
-          background: destructive ? "#dc2626" : "#fff",
-          color: destructive ? "#fff" : "#dc2626",
-          border: destructive ? "none" : "1px solid #fecaca",
+          background: destructive ? "#991b1b" : "#fff",
+          color: destructive ? "#fff" : "#991b1b",
+          border: destructive ? "none" : "1px solid #fecdd3",
           padding: "6px 14px", fontSize: 13,
         }}
       >
@@ -287,4 +287,4 @@ function FlashBox({ color, bg, border, children }) {
   );
 }
 
-const muted = { color: "#64748b", fontSize: 13, margin: 0 };
+const muted = { color: "#78716c", fontSize: 13, margin: 0 };

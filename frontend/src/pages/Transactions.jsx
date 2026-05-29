@@ -3,7 +3,7 @@ import api from "../api/client";
 import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
-const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444", transfer: "#3b82f6" };
+const TYPE_COLOR = { income: "#15803d", expense: "#b91c1c", transfer: "#1d4ed8" };
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
@@ -108,7 +108,7 @@ export default function Transactions() {
     <div className="page">
       <h1>Транзакции</h1>
 
-      {error && <p style={{ color: "#ef4444", marginBottom: 12 }}>{error}</p>}
+      {error && <p style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</p>}
 
       <form onSubmit={handleCreate} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
         <select
@@ -163,32 +163,32 @@ export default function Transactions() {
       </form>
 
       {transactions.length === 0 ? (
-        <p style={{ color: "#94a3b8" }}>Нет транзакций. Добавьте первую!</p>
+        <p style={{ color: "#a8a29e" }}>Нет транзакций. Добавьте первую!</p>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
-              <tr style={{ background: "#f8fafc" }}>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Дата</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Тип</th>
-                <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>Сумма</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Счёт</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Категория</th>
-                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Описание</th>
+              <tr style={{ background: "#faf8f3" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Дата</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Тип</th>
+                <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#78716c" }}>Сумма</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Счёт</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Категория</th>
+                <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Описание</th>
                 <th style={{ padding: "10px 12px" }}></th>
               </tr>
             </thead>
             <tbody>
               {transactions.map(tx => (
-                <tr key={tx.id} style={{ borderTop: "1px solid #f1f5f9" }}>
-                  <td style={{ padding: "10px 12px", color: "#94a3b8", fontSize: 13, whiteSpace: "nowrap" }}>{formatDate(tx.date)}</td>
+                <tr key={tx.id} style={{ borderTop: "1px solid #ede9df" }}>
+                  <td style={{ padding: "10px 12px", color: "#a8a29e", fontSize: 13, whiteSpace: "nowrap" }}>{formatDate(tx.date)}</td>
                   <td style={{ padding: "10px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>{TYPE_LABEL[tx.type]}</td>
                   <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: TYPE_COLOR[tx.type], whiteSpace: "nowrap" }}>
                     {tx.type === "expense" ? "−" : "+"}{tx.amount.toLocaleString("ru-RU")} {currencySymbol(tx.currency)}
                   </td>
                   <td style={{ padding: "10px 12px", fontSize: 13 }}>{accountName(tx.account_id)}</td>
                   <td style={{ padding: "10px 12px", fontSize: 13 }}>{tx.category_id ? categoryName(tx.category_id) : "—"}</td>
-                  <td style={{ padding: "10px 12px", color: "#64748b", fontSize: 13 }}>{tx.description || "—"}</td>
+                  <td style={{ padding: "10px 12px", color: "#78716c", fontSize: 13 }}>{tx.description || "—"}</td>
                   <td style={{ padding: "10px 12px" }}>
                     <button className="btn-danger" style={{ padding: "4px 10px", fontSize: 13 }} onClick={() => handleDelete(tx.id)}>
                       Удалить

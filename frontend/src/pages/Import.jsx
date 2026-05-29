@@ -35,7 +35,7 @@ export default function Import() {
   return (
     <div className="page" style={{ maxWidth: 900 }}>
       <h1 style={{ marginBottom: 8 }}>Импорт</h1>
-      <p style={{ color: "#64748b", marginBottom: 24, fontSize: 14 }}>
+      <p style={{ color: "#78716c", marginBottom: 24, fontSize: 14 }}>
         Выберите источник, из которого хотите загрузить транзакции.
       </p>
 
@@ -56,15 +56,15 @@ function SourceCard({ to, title, icon, description, available }) {
   const content = (
     <>
       <div style={{ fontSize: 32, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#0f172a", marginBottom: 6 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#1c1917", marginBottom: 6 }}>
         {title}
       </div>
-      <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.4 }}>
+      <div style={{ fontSize: 13, color: "#78716c", lineHeight: 1.4 }}>
         {description}
       </div>
       {!available && (
         <div style={{
-          marginTop: 10, fontSize: 11, color: "#94a3b8",
+          marginTop: 10, fontSize: 11, color: "#a8a29e",
           textTransform: "uppercase", letterSpacing: 0.5,
         }}>
           В разработке
@@ -76,7 +76,7 @@ function SourceCard({ to, title, icon, description, available }) {
   const baseStyle = {
     display: "block",
     background: "#fff",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e7e5e0",
     borderRadius: 10,
     padding: 18,
     textDecoration: "none",
@@ -96,11 +96,11 @@ function SourceCard({ to, title, icon, description, available }) {
       to={to}
       style={baseStyle}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "#6366f1";
-        e.currentTarget.style.boxShadow = "0 4px 12px rgba(99,102,241,0.1)";
+        e.currentTarget.style.borderColor = "#9f1239";
+        e.currentTarget.style.boxShadow = "0 4px 12px rgba(159, 18, 57, 0.1)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "#e2e8f0";
+        e.currentTarget.style.borderColor = "#e7e5e0";
         e.currentTarget.style.boxShadow = "none";
       }}
     >

@@ -6,8 +6,8 @@ import { COMMON_CURRENCIES, formatMoneyWithCurrency } from "../utils/money";
 export const TX_ADDED_EVENT = "casemoney:tx-added";
 
 const TYPE_OPTIONS = [
-  { value: "expense", label: "Расход", color: "#ef4444" },
-  { value: "income", label: "Доход", color: "#22c55e" },
+  { value: "expense", label: "Расход", color: "#b91c1c" },
+  { value: "income", label: "Доход", color: "#15803d" },
 ];
 
 export default function QuickAddFab() {
@@ -126,9 +126,9 @@ export default function QuickAddFab() {
           right: 20,
           bottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
           width: 56, height: 56, borderRadius: "50%",
-          background: "#6366f1", color: "#fff", border: "none",
+          background: "#9f1239", color: "#fff", border: "none",
           fontSize: 28, lineHeight: 1, cursor: "pointer",
-          boxShadow: "0 6px 16px rgba(99,102,241,0.4)",
+          boxShadow: "0 6px 16px rgba(159, 18, 57, 0.4)",
           zIndex: 90, padding: 0, display: "flex",
           alignItems: "center", justifyContent: "center",
         }}
@@ -162,7 +162,7 @@ export default function QuickAddFab() {
           >
             <div style={{
               width: 40, height: 4, borderRadius: 2,
-              background: "#cbd5e1", margin: "0 auto 12px",
+              background: "#d6d3d1", margin: "0 auto 12px",
             }} />
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -188,9 +188,9 @@ export default function QuickAddFab() {
                       onClick={() => setForm({ ...form, type: opt.value, category_id: "" })}
                       style={{
                         flex: 1, padding: "10px", borderRadius: 10,
-                        border: `2px solid ${active ? opt.color : "#e2e8f0"}`,
+                        border: `2px solid ${active ? opt.color : "#e7e5e0"}`,
                         background: active ? opt.color : "#fff",
-                        color: active ? "#fff" : "#475569",
+                        color: active ? "#fff" : "#57534e",
                         fontWeight: 600, fontSize: 14, cursor: "pointer",
                       }}
                     >
@@ -203,7 +203,7 @@ export default function QuickAddFab() {
               {/* Сумма + валюта */}
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <label style={{ flex: 1 }}>
-                  <span style={{ fontSize: 12, color: "#64748b" }}>Сумма</span>
+                  <span style={{ fontSize: 12, color: "#78716c" }}>Сумма</span>
                   <input
                     type="number" inputMode="decimal" min="0.01" step="0.01"
                     placeholder="0"
@@ -217,7 +217,7 @@ export default function QuickAddFab() {
                   />
                 </label>
                 <label style={{ width: 110 }}>
-                  <span style={{ fontSize: 12, color: "#64748b" }}>Валюта</span>
+                  <span style={{ fontSize: 12, color: "#78716c" }}>Валюта</span>
                   <select
                     value={form.currency}
                     onChange={e => setForm({ ...form, currency: e.target.value })}
@@ -235,7 +235,7 @@ export default function QuickAddFab() {
 
               {/* Счёт */}
               <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Счёт</span>
+                <span style={{ fontSize: 12, color: "#78716c" }}>Счёт</span>
                 <select
                   value={form.account_id}
                   onChange={e => setForm({ ...form, account_id: e.target.value })}
@@ -257,7 +257,7 @@ export default function QuickAddFab() {
 
               {/* Категория */}
               <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Категория</span>
+                <span style={{ fontSize: 12, color: "#78716c" }}>Категория</span>
                 <select
                   value={form.category_id}
                   onChange={e => setForm({ ...form, category_id: e.target.value })}
@@ -273,7 +273,7 @@ export default function QuickAddFab() {
               </label>
 
               <label style={{ display: "block", marginBottom: 16 }}>
-                <span style={{ fontSize: 12, color: "#64748b" }}>Описание (необязательно)</span>
+                <span style={{ fontSize: 12, color: "#78716c" }}>Описание (необязательно)</span>
                 <input
                   type="text"
                   placeholder="Например: Пятёрочка"
@@ -284,7 +284,7 @@ export default function QuickAddFab() {
               </label>
 
               {error && (
-                <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</p>
+                <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{error}</p>
               )}
 
               <button

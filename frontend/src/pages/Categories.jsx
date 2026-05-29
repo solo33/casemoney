@@ -11,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import api from "../api/client";
 
-const TYPE_COLOR = { income: "#22c55e", expense: "#ef4444" };
+const TYPE_COLOR = { income: "#15803d", expense: "#b91c1c" };
 const TYPE_LABEL = { income: "Доходы", expense: "Расходы" };
 
 export default function Categories() {
@@ -20,9 +20,9 @@ export default function Categories() {
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(new Set());
   const [addingTo, setAddingTo] = useState(null); // root.id для которого открыта форма
-  const [subForm, setSubForm] = useState({ name: "", icon: "", color: "#6366f1" });
+  const [subForm, setSubForm] = useState({ name: "", icon: "", color: "#9f1239" });
   const [rootForm, setRootForm] = useState({
-    name: "", type: "expense", color: "#6366f1", icon: "",
+    name: "", type: "expense", color: "#9f1239", icon: "",
   });
   const [activeDrag, setActiveDrag] = useState(null);
 
@@ -59,7 +59,7 @@ export default function Categories() {
       const payload = { ...rootForm };
       if (!payload.icon) delete payload.icon;
       await api.post("/api/categories/", payload);
-      setRootForm({ name: "", type: rootForm.type, color: "#6366f1", icon: "" });
+      setRootForm({ name: "", type: rootForm.type, color: "#9f1239", icon: "" });
       fetchTree();
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка создания");
@@ -78,7 +78,7 @@ export default function Categories() {
       };
       if (subForm.icon) payload.icon = subForm.icon;
       await api.post("/api/categories/", payload);
-      setSubForm({ name: "", icon: "", color: "#6366f1" });
+      setSubForm({ name: "", icon: "", color: "#9f1239" });
       setAddingTo(null);
       setExpanded(prev => new Set(prev).add(parent.id)); // открыть, чтобы было видно
       fetchTree();
@@ -141,7 +141,7 @@ export default function Categories() {
       <h1>Категории</h1>
 
       {error && (
-        <p style={{ color: "#ef4444", marginBottom: 12 }}>
+        <p style={{ color: "#b91c1c", marginBottom: 12 }}>
           {error}{" "}
           <button onClick={() => setError(null)} className="btn-ghost" style={{ fontSize: 12, padding: "2px 8px" }}>×</button>
         </p>
@@ -180,14 +180,14 @@ export default function Categories() {
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <Section
           title="Расходы"
-          color="#ef4444"
+          color="#b91c1c"
           roots={grouped.expense}
           {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag }}
         />
         <div style={{ height: 24 }} />
         <Section
           title="Доходы"
-          color="#22c55e"
+          color="#15803d"
           roots={grouped.income}
           {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag }}
         />
@@ -196,7 +196,7 @@ export default function Categories() {
           {activeDrag ? (
             <div style={{
               background: "#fff",
-              border: "2px solid #6366f1",
+              border: "2px solid #9f1239",
               borderRadius: 8,
               padding: "6px 12px",
               fontSize: 14,
@@ -222,16 +222,16 @@ function Section({
   return (
     <div>
       <h3 style={{
-        fontSize: 13, color: "#64748b", fontWeight: 600,
+        fontSize: 13, color: "#78716c", fontWeight: 600,
         textTransform: "uppercase", letterSpacing: 0.5,
         marginBottom: 10, display: "flex", alignItems: "center", gap: 8,
       }}>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
-        {title} <span style={{ color: "#94a3b8" }}>({roots.length})</span>
+        {title} <span style={{ color: "#a8a29e" }}>({roots.length})</span>
       </h3>
 
       {roots.length === 0 ? (
-        <p style={{ color: "#94a3b8", fontSize: 14 }}>Нет категорий</p>
+        <p style={{ color: "#a8a29e", fontSize: 14 }}>Нет категорий</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {roots.map(root => (
@@ -270,9 +270,9 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
       ref={setNodeRef}
       style={{
         background: "#fff",
-        border: `1px solid ${dropHighlight ? "#6366f1" : "#e2e8f0"}`,
+        border: `1px solid ${dropHighlight ? "#9f1239" : "#e7e5e0"}`,
         borderRadius: 10,
-        outline: dropHighlight ? "2px solid rgba(99,102,241,0.25)" : "none",
+        outline: dropHighlight ? "2px solid rgba(159, 18, 57, 0.25)" : "none",
         transition: "outline 0.1s, border-color 0.1s",
       }}
     >
@@ -289,7 +289,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
         {root.icon && <span style={{ fontSize: 18 }}>{root.icon}</span>}
         <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{root.name}</span>
         {hasChildren && (
-          <span style={{ color: "#94a3b8", fontSize: 13 }}>
+          <span style={{ color: "#a8a29e", fontSize: 13 }}>
             {root.children.length} {isExpanded ? "▾" : "▸"}
           </span>
         )}
@@ -321,7 +321,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
           onClick={(e) => e.stopPropagation()}
           style={{
             display: "flex", gap: 6, padding: "8px 12px 12px 40px", flexWrap: "wrap",
-            borderTop: "1px solid #f1f5f9",
+            borderTop: "1px solid #ede9df",
           }}
         >
           <input
@@ -390,7 +390,7 @@ function ChildNode({ child, onDelete }) {
         display: "flex", alignItems: "center", gap: 8,
         padding: "6px 8px",
         fontSize: 14,
-        background: "#f8fafc",
+        background: "#faf8f3",
         borderRadius: 6,
         cursor: "grab",
       }}
@@ -408,7 +408,7 @@ function ChildNode({ child, onDelete }) {
           type="button"
           onClick={(e) => { e.stopPropagation(); onDelete(child); }}
           className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 12, color: "#ef4444" }}
+          style={{ padding: "2px 8px", fontSize: 12, color: "#b91c1c" }}
           onPointerDown={(e) => e.stopPropagation()}
         >
           ×

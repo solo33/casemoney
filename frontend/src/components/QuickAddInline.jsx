@@ -4,9 +4,9 @@ import { TX_ADDED_EVENT } from "./QuickAddFab";
 import { COMMON_CURRENCIES } from "../utils/money";
 
 const TABS = [
-  { value: "expense",  label: "Расход",  color: "#ef4444" },
-  { value: "transfer", label: "Перевод", color: "#3b82f6" },
-  { value: "income",   label: "Доход",   color: "#22c55e" },
+  { value: "expense",  label: "Расход",  color: "#b91c1c" },
+  { value: "transfer", label: "Перевод", color: "#1d4ed8" },
+  { value: "income",   label: "Доход",   color: "#15803d" },
 ];
 
 function isoToday() {
@@ -78,7 +78,7 @@ export default function QuickAddInline() {
     ? categories
     : categories.filter(c => c.type === type);
 
-  const activeColor = TABS.find(t => t.value === type)?.color || "#6366f1";
+  const activeColor = TABS.find(t => t.value === type)?.color || "#9f1239";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,7 +119,7 @@ export default function QuickAddInline() {
   return (
     <div style={{
       background: "#fff",
-      border: "1px solid #e2e8f0",
+      border: "1px solid #e7e5e0",
       borderRadius: 10,
       overflow: "hidden",
     }}>
@@ -135,8 +135,8 @@ export default function QuickAddInline() {
               style={{
                 flex: 1,
                 padding: "12px 8px",
-                background: active ? t.color : "#f8fafc",
-                color: active ? "#fff" : "#64748b",
+                background: active ? t.color : "#faf8f3",
+                color: active ? "#fff" : "#78716c",
                 border: "none",
                 borderRadius: 0,
                 fontWeight: active ? 700 : 500,
@@ -224,10 +224,10 @@ export default function QuickAddInline() {
 
         {/* Errors + submit */}
         {error && (
-          <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 10 }}>{error}</div>
+          <div style={{ color: "#b91c1c", fontSize: 13, marginBottom: 10 }}>{error}</div>
         )}
         {success && (
-          <div style={{ color: "#22c55e", fontSize: 13, marginBottom: 10 }}>Запись сохранена</div>
+          <div style={{ color: "#15803d", fontSize: 13, marginBottom: 10 }}>Запись сохранена</div>
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -264,6 +264,6 @@ export default function QuickAddInline() {
 
 const lbl = {
   fontSize: 13,
-  color: "#64748b",
+  color: "#78716c",
   whiteSpace: "nowrap",
 };

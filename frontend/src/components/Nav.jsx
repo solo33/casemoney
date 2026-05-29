@@ -36,18 +36,18 @@ export default function Nav() {
   const linkStyle = ({ isActive }) => ({
     textDecoration: "none",
     fontWeight: isActive ? "600" : "400",
-    color: isActive ? "#6366f1" : "#334155",
+    color: isActive ? "#9f1239" : "#44403c",
     fontSize: 14,
     padding: "6px 10px",
     borderRadius: 6,
-    background: isActive ? "rgba(99,102,241,0.08)" : "transparent",
+    background: isActive ? "rgba(159, 18, 57, 0.08)" : "transparent",
     display: "block",
   });
 
   return (
     <nav style={{
       background: "#fff",
-      borderBottom: "1px solid #e2e8f0",
+      borderBottom: "1px solid #e7e5e0",
       position: "sticky",
       top: 0,
       zIndex: 100,
@@ -61,7 +61,7 @@ export default function Nav() {
         alignItems: "center",
         gap: 8,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 16, color: "#6366f1", marginRight: 8, whiteSpace: "nowrap" }}>
+        <span style={{ fontWeight: 700, fontSize: 16, color: "#9f1239", marginRight: 8, whiteSpace: "nowrap" }}>
           💰 CaseMoney
         </span>
 
@@ -78,8 +78,8 @@ export default function Nav() {
           to="/currencies"
           style={{
             marginLeft: "auto", fontSize: 13, padding: "5px 10px",
-            textDecoration: "none", color: "#475569",
-            border: "1px solid #e2e8f0", borderRadius: 6,
+            textDecoration: "none", color: "#57534e",
+            border: "1px solid #e7e5e0", borderRadius: 6,
             whiteSpace: "nowrap",
           }}
           className="nav-settings-desktop"
@@ -109,7 +109,7 @@ export default function Nav() {
       {open && (
         <div className="nav-mobile-menu" style={{
           background: "#fff",
-          borderTop: "1px solid #e2e8f0",
+          borderTop: "1px solid #e7e5e0",
           padding: "8px 16px 12px",
           display: "flex",
           flexDirection: "column",
@@ -126,7 +126,7 @@ export default function Nav() {
             </NavLink>
           ))}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: "#64748b" }}>Валюта:</span>
+            <span style={{ fontSize: 12, color: "#78716c" }}>Валюта:</span>
             <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>
               {COMMON_CURRENCIES.map(c => (
                 <option key={c} value={c}>{currencySymbol(c)} {c}</option>

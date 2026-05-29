@@ -150,9 +150,9 @@ export default function Reports() {
               style={{
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: `1px solid ${active ? "#6366f1" : "#e2e8f0"}`,
-                background: active ? "#6366f1" : "#fff",
-                color: active ? "#fff" : "#475569",
+                border: `1px solid ${active ? "#9f1239" : "#e7e5e0"}`,
+                background: active ? "#9f1239" : "#fff",
+                color: active ? "#fff" : "#57534e",
                 fontSize: 13,
                 fontWeight: active ? 600 : 500,
                 cursor: "pointer",
@@ -167,7 +167,7 @@ export default function Reports() {
       {/* Поля кастомного периода */}
       {preset === "custom" && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
-          <label style={{ fontSize: 13, color: "#64748b" }}>
+          <label style={{ fontSize: 13, color: "#78716c" }}>
             С{" "}
             <input
               type="date"
@@ -176,7 +176,7 @@ export default function Reports() {
               style={{ padding: "6px 10px" }}
             />
           </label>
-          <label style={{ fontSize: 13, color: "#64748b" }}>
+          <label style={{ fontSize: 13, color: "#78716c" }}>
             по{" "}
             <input
               type="date"
@@ -190,24 +190,24 @@ export default function Reports() {
 
       {/* Заголовок периода */}
       {summary && (
-        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
+        <p style={{ color: "#78716c", fontSize: 14, marginBottom: 20 }}>
           {summary.period_label} · {summary.transactions_count} операций
         </p>
       )}
 
       {loading && <p>Загрузка...</p>}
-      {error && <p style={{ color: "#ef4444" }}>{error}</p>}
+      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
 
       {summary && !loading && (
         <>
           {/* Карточки итогов */}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-            <StatCard label="Доходы" value={summary.total_income} color="#22c55e" sign="+" sym={sym} />
-            <StatCard label="Расходы" value={summary.total_expense} color="#ef4444" sign="−" sym={sym} />
+            <StatCard label="Доходы" value={summary.total_income} color="#15803d" sign="+" sym={sym} />
+            <StatCard label="Расходы" value={summary.total_expense} color="#b91c1c" sign="−" sym={sym} />
             <StatCard
               label="Сальдо"
               value={summary.net}
-              color={summary.net >= 0 ? "#22c55e" : "#ef4444"}
+              color={summary.net >= 0 ? "#15803d" : "#b91c1c"}
               sign={summary.net >= 0 ? "+" : ""}
               sym={sym}
             />
@@ -218,17 +218,17 @@ export default function Reports() {
             {/* Bar — 6 месяцев */}
             <Card title="Доходы и расходы (6 месяцев)" style={{ flex: 2, minWidth: 320 }}>
               {barData.length === 0 ? (
-                <p style={{ color: "#94a3b8" }}>Нет данных</p>
+                <p style={{ color: "#a8a29e" }}>Нет данных</p>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={barData} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ede9df" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v) => formatMoney(v) + " " + sym} />
                     <Legend />
-                    <Bar dataKey="Доходы" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Расходы" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Доходы" fill="#15803d" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Расходы" fill="#b91c1c" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -254,7 +254,7 @@ export default function Reports() {
               style={{ flex: 1, minWidth: 280 }}
             >
               {pieData.length === 0 ? (
-                <p style={{ color: "#94a3b8" }}>Нет расходов за период</p>
+                <p style={{ color: "#a8a29e" }}>Нет расходов за период</p>
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart>
@@ -278,7 +278,7 @@ export default function Reports() {
                 </ResponsiveContainer>
               )}
               {!drillRoot && pieData.some(p => p.drillable) && (
-                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, marginBottom: 0, textAlign: "center" }}>
+                <p style={{ fontSize: 11, color: "#a8a29e", marginTop: 6, marginBottom: 0, textAlign: "center" }}>
                   Кликните на сектор с подкатегориями, чтобы раскрыть
                 </p>
               )}
@@ -291,11 +291,11 @@ export default function Reports() {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr style={{ background: "#f8fafc" }}>
-                      <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b", minWidth: 32 }}></th>
-                      <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#64748b" }}>Категория</th>
-                      <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>Сумма</th>
-                      <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>%</th>
+                    <tr style={{ background: "#faf8f3" }}>
+                      <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c", minWidth: 32 }}></th>
+                      <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#78716c" }}>Категория</th>
+                      <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#78716c" }}>Сумма</th>
+                      <th style={{ padding: "10px 12px", textAlign: "right", fontSize: 13, color: "#78716c" }}>%</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -312,7 +312,7 @@ export default function Reports() {
                         <Fragment key={String(c.category_id)}>
                           <tr
                             style={{
-                              borderTop: "1px solid #f1f5f9",
+                              borderTop: "1px solid #ede9df",
                               cursor: hasChildren ? "pointer" : "default",
                             }}
                             onClick={toggle}
@@ -328,7 +328,7 @@ export default function Reports() {
                               <span style={{ fontSize: 16, marginRight: 8 }}>{c.category_icon || ""}</span>
                               {c.category_name}
                               {hasChildren && (
-                                <span style={{ marginLeft: 6, color: "#94a3b8", fontSize: 12 }}>
+                                <span style={{ marginLeft: 6, color: "#a8a29e", fontSize: 12 }}>
                                   {expanded ? "▾" : "▸"} {c.children.length}
                                 </span>
                               )}
@@ -336,13 +336,13 @@ export default function Reports() {
                             <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
                               {formatMoney(c.total)} {sym}
                             </td>
-                            <td style={{ padding: "10px 12px", textAlign: "right", color: "#64748b" }}>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: "#78716c" }}>
                               {c.percent}%
                             </td>
                           </tr>
                           {expanded && c.children.map(ch => (
                             <tr key={`${c.category_id}-${ch.category_id}`} style={{
-                              borderTop: "1px solid #f8fafc", background: "#fafbfc",
+                              borderTop: "1px solid #faf8f3", background: "#fafbfc",
                             }}>
                               <td style={{ padding: "8px 12px" }}>
                                 <span style={{
@@ -352,15 +352,15 @@ export default function Reports() {
                                   marginLeft: 12,
                                 }} />
                               </td>
-                              <td style={{ padding: "8px 12px", color: "#475569", fontSize: 13 }}>
-                                <span style={{ color: "#94a3b8", marginRight: 6 }}>↳</span>
+                              <td style={{ padding: "8px 12px", color: "#57534e", fontSize: 13 }}>
+                                <span style={{ color: "#a8a29e", marginRight: 6 }}>↳</span>
                                 {ch.category_icon && <span style={{ marginRight: 6 }}>{ch.category_icon}</span>}
                                 {ch.category_name}
                               </td>
                               <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13 }}>
                                 {formatMoney(ch.total)} {sym}
                               </td>
-                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#94a3b8", fontSize: 12 }}>
+                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#a8a29e", fontSize: 12 }}>
                                 {c.total > 0 ? ((ch.total / c.total) * 100).toFixed(1) : 0}% от родителя
                               </td>
                             </tr>
@@ -368,11 +368,11 @@ export default function Reports() {
                           {expanded && c.own_total > 0 && (
                             <tr key={`${c.category_id}-own`} style={{ background: "#fafbfc" }}>
                               <td></td>
-                              <td style={{ padding: "8px 12px", color: "#94a3b8", fontSize: 13, fontStyle: "italic" }}>
-                                <span style={{ color: "#94a3b8", marginRight: 6 }}>↳</span>
+                              <td style={{ padding: "8px 12px", color: "#a8a29e", fontSize: 13, fontStyle: "italic" }}>
+                                <span style={{ color: "#a8a29e", marginRight: 6 }}>↳</span>
                                 напрямую без подкатегории
                               </td>
-                              <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>
+                              <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13, color: "#78716c" }}>
                                 {formatMoney(c.own_total)} {sym}
                               </td>
                               <td></td>
@@ -395,10 +395,10 @@ export default function Reports() {
 function StatCard({ label, value, color, sign = "", sym = "₽" }) {
   return (
     <div style={{
-      flex: 1, minWidth: 140, background: "#fff", border: "1px solid #e2e8f0",
+      flex: 1, minWidth: 140, background: "#fff", border: "1px solid #e7e5e0",
       borderRadius: 12, padding: "14px 18px",
     }}>
-      <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: "#78716c", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color }}>
         {sign}{formatMoney(value)} {sym}
       </div>
@@ -409,11 +409,11 @@ function StatCard({ label, value, color, sign = "", sym = "₽" }) {
 function Card({ title, children, style, right }) {
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18,
+      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 12, padding: 18,
       ...style,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: "#334155" }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 14, color: "#44403c" }}>{title}</h3>
         {right}
       </div>
       {children}
