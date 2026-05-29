@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -53,6 +53,8 @@ function isoDate(d) {
 export default function Reports() {
   const { mainCurrency } = useUser();
   const [preset, setPreset] = useState("current_month");
+  const [drillCatId, setDrillCatId] = useState(null);   // id выбранной корневой для drill-down в pie
+  const [expandedRows, setExpandedRows] = useState(new Set());
   const today = useMemo(() => new Date(), []);
   const monthAgo = useMemo(() => {
     const d = new Date(); d.setDate(d.getDate() - 30); return d;
@@ -88,12 +90,41 @@ export default function Reports() {
 
   const sym = currencySymbol(summary?.main_currency || mainCurrency);
 
-  const pieData = summary ? summary.category_breakdown.map(c => ({
-    name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
-    value: c.total,
-    color: c.category_color,
-    percent: c.percent,
-  })) : [];
+  // Drill-down: если выбрана корневая категория с детьми — показываем её детей,
+  // иначе — корневые. own_total корня тоже добавляем как отдельный сегмент "Прочее".
+  const drillRoot = drillCatId != null && summary
+    ? summary.category_breakdown.find(c => c.category_id === drillCatId)
+    : null;
+
+  const pieData = !summary ? [] : (drillRoot
+    ? [
+        ...drillRoot.children.map(c => ({
+          name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
+          value: c.total,
+          color: c.category_color,
+          percent: drillRoot.total > 0 ? +(c.total / drillRoot.total * 100).toFixed(1) : 0,
+          id: c.category_id,
+          drillable: false,
+        })),
+        ...(drillRoot.own_total > 0
+          ? [{
+              name: `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} (без подкатегории)`,
+              value: drillRoot.own_total,
+              color: drillRoot.category_color,
+              percent: drillRoot.total > 0 ? +(drillRoot.own_total / drillRoot.total * 100).toFixed(1) : 0,
+              id: null,
+              drillable: false,
+            }]
+          : []),
+      ]
+    : summary.category_breakdown.map(c => ({
+        name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
+        value: c.total,
+        color: c.category_color,
+        percent: c.percent,
+        id: c.category_id,
+        drillable: c.children?.length > 0,
+      })));
 
   const barData = trend ? trend.points.map(p => ({
     name: p.label,
@@ -203,8 +234,25 @@ export default function Reports() {
               )}
             </Card>
 
-            {/* Pie — расходы по категориям */}
-            <Card title={`Расходы по категориям · ${summary.period_label}`} style={{ flex: 1, minWidth: 280 }}>
+            {/* Pie — расходы по категориям с drill-down */}
+            <Card
+              title={
+                drillRoot
+                  ? `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} — подкатегории`
+                  : `Расходы по категориям · ${summary.period_label}`
+              }
+              right={drillRoot && (
+                <button
+                  type="button"
+                  onClick={() => setDrillCatId(null)}
+                  className="btn-ghost"
+                  style={{ fontSize: 12, padding: "2px 10px" }}
+                >
+                  ← Назад
+                </button>
+              )}
+              style={{ flex: 1, minWidth: 280 }}
+            >
               {pieData.length === 0 ? (
                 <p style={{ color: "#94a3b8" }}>Нет расходов за период</p>
               ) : (
@@ -219,17 +267,25 @@ export default function Reports() {
                       outerRadius={85}
                       label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""}
                       labelLine={false}
+                      onClick={(d) => { if (d?.drillable) setDrillCatId(d.id); }}
                     >
-                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      {pieData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
+                      ))}
                     </Pie>
                     <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.percent}%)`, props.payload.name]} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
+              {!drillRoot && pieData.some(p => p.drillable) && (
+                <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, marginBottom: 0, textAlign: "center" }}>
+                  Кликните на сектор с подкатегориями, чтобы раскрыть
+                </p>
+              )}
             </Card>
           </div>
 
-          {/* Таблица топ категорий */}
+          {/* Таблица топ категорий с раскрывающимися подкатегориями */}
           {summary.category_breakdown.length > 0 && (
             <Card title="Топ категорий по расходам">
               <div className="table-wrap">
@@ -243,27 +299,88 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody>
-                    {summary.category_breakdown.map(c => (
-                      <tr key={String(c.category_id)} style={{ borderTop: "1px solid #f1f5f9" }}>
-                        <td style={{ padding: "10px 12px" }}>
-                          <span style={{
-                            display: "inline-block",
-                            width: 14, height: 14, borderRadius: 4,
-                            background: c.category_color, verticalAlign: "middle",
-                          }} />
-                        </td>
-                        <td style={{ padding: "10px 12px" }}>
-                          <span style={{ fontSize: 16, marginRight: 8 }}>{c.category_icon || ""}</span>
-                          {c.category_name}
-                        </td>
-                        <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                          {formatMoney(c.total)} {sym}
-                        </td>
-                        <td style={{ padding: "10px 12px", textAlign: "right", color: "#64748b" }}>
-                          {c.percent}%
-                        </td>
-                      </tr>
-                    ))}
+                    {summary.category_breakdown.map(c => {
+                      const hasChildren = c.children && c.children.length > 0;
+                      const expanded = expandedRows.has(c.category_id);
+                      const toggle = () => {
+                        if (!hasChildren) return;
+                        const next = new Set(expandedRows);
+                        if (next.has(c.category_id)) next.delete(c.category_id); else next.add(c.category_id);
+                        setExpandedRows(next);
+                      };
+                      return (
+                        <Fragment key={String(c.category_id)}>
+                          <tr
+                            style={{
+                              borderTop: "1px solid #f1f5f9",
+                              cursor: hasChildren ? "pointer" : "default",
+                            }}
+                            onClick={toggle}
+                          >
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{
+                                display: "inline-block",
+                                width: 14, height: 14, borderRadius: 4,
+                                background: c.category_color, verticalAlign: "middle",
+                              }} />
+                            </td>
+                            <td style={{ padding: "10px 12px" }}>
+                              <span style={{ fontSize: 16, marginRight: 8 }}>{c.category_icon || ""}</span>
+                              {c.category_name}
+                              {hasChildren && (
+                                <span style={{ marginLeft: 6, color: "#94a3b8", fontSize: 12 }}>
+                                  {expanded ? "▾" : "▸"} {c.children.length}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
+                              {formatMoney(c.total)} {sym}
+                            </td>
+                            <td style={{ padding: "10px 12px", textAlign: "right", color: "#64748b" }}>
+                              {c.percent}%
+                            </td>
+                          </tr>
+                          {expanded && c.children.map(ch => (
+                            <tr key={`${c.category_id}-${ch.category_id}`} style={{
+                              borderTop: "1px solid #f8fafc", background: "#fafbfc",
+                            }}>
+                              <td style={{ padding: "8px 12px" }}>
+                                <span style={{
+                                  display: "inline-block",
+                                  width: 10, height: 10, borderRadius: 3,
+                                  background: ch.category_color, verticalAlign: "middle",
+                                  marginLeft: 12,
+                                }} />
+                              </td>
+                              <td style={{ padding: "8px 12px", color: "#475569", fontSize: 13 }}>
+                                <span style={{ color: "#94a3b8", marginRight: 6 }}>↳</span>
+                                {ch.category_icon && <span style={{ marginRight: 6 }}>{ch.category_icon}</span>}
+                                {ch.category_name}
+                              </td>
+                              <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13 }}>
+                                {formatMoney(ch.total)} {sym}
+                              </td>
+                              <td style={{ padding: "8px 12px", textAlign: "right", color: "#94a3b8", fontSize: 12 }}>
+                                {c.total > 0 ? ((ch.total / c.total) * 100).toFixed(1) : 0}% от родителя
+                              </td>
+                            </tr>
+                          ))}
+                          {expanded && c.own_total > 0 && (
+                            <tr key={`${c.category_id}-own`} style={{ background: "#fafbfc" }}>
+                              <td></td>
+                              <td style={{ padding: "8px 12px", color: "#94a3b8", fontSize: 13, fontStyle: "italic" }}>
+                                <span style={{ color: "#94a3b8", marginRight: 6 }}>↳</span>
+                                напрямую без подкатегории
+                              </td>
+                              <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13, color: "#64748b" }}>
+                                {formatMoney(c.own_total)} {sym}
+                              </td>
+                              <td></td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -289,13 +406,16 @@ function StatCard({ label, value, color, sign = "", sym = "₽" }) {
   );
 }
 
-function Card({ title, children, style }) {
+function Card({ title, children, style, right }) {
   return (
     <div style={{
       background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 18,
       ...style,
     }}>
-      <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 14, color: "#334155" }}>{title}</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 8 }}>
+        <h3 style={{ margin: 0, fontSize: 14, color: "#334155" }}>{title}</h3>
+        {right}
+      </div>
       {children}
     </div>
   );

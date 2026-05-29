@@ -34,8 +34,16 @@ class CategoryBreakdown(BaseModel):
     category_name: str
     category_color: str
     category_icon: Optional[str]
-    total: float        # в main_currency
+    total: float                         # в main_currency (свой + дочерние при rollup)
     percent: float
+    own_total: float = 0.0               # сумма транзакций, привязанных непосредственно к этой категории
+    children: List["CategoryBreakdown"] = []  # подкатегории (только при rollup)
+
+    class Config:
+        from_attributes = True
+
+
+CategoryBreakdown.model_rebuild()
 
 
 class SummaryResponse(BaseModel):
@@ -47,8 +55,8 @@ class SummaryResponse(BaseModel):
     total_expense: float   # в main_currency
     net: float             # в main_currency
     transactions_count: int
-    category_breakdown: List[CategoryBreakdown]
-    top_5: List[CategoryBreakdown]
+    category_breakdown: List[CategoryBreakdown]  # rolled-up tree если rollup=true, иначе flat
+    top_5: List[CategoryBreakdown]               # топ-5 корневых
 
 
 class MonthlyTrendPoint(BaseModel):
@@ -128,6 +136,7 @@ def get_summary(
     quarter: Optional[int] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    rollup: bool = Query(True, description="Сворачивать подкатегории под родителя"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -159,18 +168,55 @@ def get_summary(
         c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
     }
 
-    breakdown: List[CategoryBreakdown] = []
-    for cat_id, total in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True):
-        cat = categories_map.get(cat_id)
+    def _node(cat_id: Optional[int], total: float, own: float, children: list) -> CategoryBreakdown:
+        cat = categories_map.get(cat_id) if cat_id else None
         percent = round((total / total_expense * 100), 1) if total_expense > 0 else 0.0
-        breakdown.append(CategoryBreakdown(
+        return CategoryBreakdown(
             category_id=cat_id,
             category_name=cat.name if cat else "Без категории",
             category_color=cat.color if cat else "#94a3b8",
             category_icon=cat.icon if cat else None,
             total=round(total, 2),
+            own_total=round(own, 2),
             percent=percent,
-        ))
+            children=children,
+        )
+
+    if rollup:
+        # Группируем суммы по корневой категории. Каждая корневая хранит:
+        #  - own_total (сумма транзакций на самой корневой)
+        #  - children (агрегаты по подкатегориям)
+        roots: dict[Optional[int], dict] = {}  # root_id -> {"own": x, "children": {child_id: amount}}
+        for cat_id, amount in cat_totals.items():
+            cat = categories_map.get(cat_id) if cat_id else None
+            if cat is None:
+                bucket = roots.setdefault(None, {"own": 0.0, "children": {}})
+                bucket["own"] += amount
+                continue
+            if cat.parent_id and cat.parent_id in categories_map:
+                root_id = cat.parent_id
+                bucket = roots.setdefault(root_id, {"own": 0.0, "children": {}})
+                bucket["children"][cat.id] = bucket["children"].get(cat.id, 0.0) + amount
+            else:
+                bucket = roots.setdefault(cat.id, {"own": 0.0, "children": {}})
+                bucket["own"] += amount
+
+        # Превращаем в CategoryBreakdown-узлы
+        nodes: list[CategoryBreakdown] = []
+        for root_id, data in roots.items():
+            children_amount = sum(data["children"].values())
+            root_total = data["own"] + children_amount
+            child_nodes = []
+            for child_id, child_amount in sorted(data["children"].items(), key=lambda x: x[1], reverse=True):
+                child_nodes.append(_node(child_id, child_amount, child_amount, []))
+            nodes.append(_node(root_id, root_total, data["own"], child_nodes))
+        nodes.sort(key=lambda n: n.total, reverse=True)
+        breakdown = nodes
+    else:
+        breakdown = [
+            _node(cat_id, total, total, [])
+            for cat_id, total in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True)
+        ]
 
     return SummaryResponse(
         main_currency=main,
