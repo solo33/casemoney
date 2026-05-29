@@ -38,14 +38,19 @@ def serialize_account(
     account: Account,
     main_currency: str,
 ) -> AccountResponse:
-    """Готовит AccountResponse со списком balances и total_in_main."""
+    """Готовит AccountResponse со списком balances и total_in_main.
+
+    Использует convert_for_user — учитывает ручные курсы пользователя.
+    """
     balances_out = []
     total_in_main = 0.0
     for b in account.balances:
         try:
-            in_main = exchange_svc.convert(db, b.balance, b.currency, main_currency)
+            in_main = exchange_svc.convert_for_user(
+                db, account.user_id, b.balance, b.currency, main_currency,
+            )
         except exchange_svc.ExchangeError:
-            in_main = 0.0  # если курс недоступен — пропускаем
+            in_main = 0.0
         balances_out.append(
             AccountBalanceResponse(
                 currency=b.currency,

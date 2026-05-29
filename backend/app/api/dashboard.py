@@ -75,10 +75,10 @@ class DashboardResponse(BaseModel):
     recent_transactions: List[RecentTransaction]
 
 
-def _to_main(db: Session, amount: float, currency: str, main: str) -> float:
-    """Безопасная конверсия — если курс недоступен, возвращаем 0."""
+def _to_main(db: Session, user_id: int, amount: float, currency: str, main: str) -> float:
+    """Безопасная конверсия с учётом ручных курсов пользователя."""
     try:
-        return exchange_svc.convert(db, amount, currency, main)
+        return exchange_svc.convert_for_user(db, user_id, amount, currency, main)
     except exchange_svc.ExchangeError:
         return 0.0
 
@@ -120,11 +120,11 @@ def get_dashboard(
     )
 
     month_income = sum(
-        _to_main(db, t.amount, t.currency, main)
+        _to_main(db, user_id, t.amount, t.currency, main)
         for t in month_transactions if t.type == TransactionType.income
     )
     month_expense = sum(
-        _to_main(db, t.amount, t.currency, main)
+        _to_main(db, user_id, t.amount, t.currency, main)
         for t in month_transactions if t.type == TransactionType.expense
     )
 
@@ -140,7 +140,7 @@ def get_dashboard(
     by_category: dict[Optional[int], float] = {}
     for t in expense_tx:
         by_category[t.category_id] = by_category.get(t.category_id, 0.0) + _to_main(
-            db, t.amount, t.currency, main
+            db, user_id, t.amount, t.currency, main
         )
 
     categories_map = {
@@ -167,7 +167,7 @@ def get_dashboard(
         key = f"{t.date.year:04d}-{t.date.month:02d}"
         if key not in monthly_map:
             monthly_map[key] = {"income": 0.0, "expense": 0.0}
-        in_main = _to_main(db, t.amount, t.currency, main)
+        in_main = _to_main(db, user_id, t.amount, t.currency, main)
         if t.type == TransactionType.income:
             monthly_map[key]["income"] += in_main
         elif t.type == TransactionType.expense:

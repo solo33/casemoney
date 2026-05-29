@@ -7,6 +7,7 @@ const links = [
   { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
   { to: "/categories", label: "Категории" },
+  { to: "/currencies", label: "Валюты" },
   { to: "/transactions", label: "Транзакции" },
   { to: "/reports", label: "Отчёты" },
 ];
@@ -14,8 +15,7 @@ const links = [
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const { mainCurrency, updateMainCurrency, user } = useUser();
+  const { mainCurrency, updateMainCurrency } = useUser();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -71,47 +71,20 @@ export default function Nav() {
           ))}
         </div>
 
-        {/* Settings: main currency */}
-        <div style={{ position: "relative", marginLeft: "auto" }} className="nav-settings-desktop">
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(o => !o)}
-            className="btn-ghost"
-            style={{ fontSize: 13, padding: "5px 10px", whiteSpace: "nowrap" }}
-            title="Основная валюта"
-          >
-            ⚙ {currencySymbol(mainCurrency)} {mainCurrency}
-          </button>
-          {settingsOpen && (
-            <div style={{
-              position: "absolute", right: 0, top: "100%", marginTop: 6,
-              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8,
-              boxShadow: "0 8px 16px rgba(0,0,0,0.1)", padding: 12, minWidth: 200,
-              zIndex: 110,
-            }}>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>
-                Основная валюта
-              </div>
-              <select
-                value={mainCurrency}
-                onChange={handleChangeMainCurrency}
-                style={{ width: "100%" }}
-              >
-                {COMMON_CURRENCIES.map(c => (
-                  <option key={c} value={c}>{currencySymbol(c)} {c}</option>
-                ))}
-              </select>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
-                Все суммы в дашбордах конвертируются по текущему курсу.
-              </div>
-              {user && (
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 10, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
-                  {user.username} · {user.email}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Текущая основная валюта — клик ведёт на /currencies */}
+        <NavLink
+          to="/currencies"
+          style={{
+            marginLeft: "auto", fontSize: 13, padding: "5px 10px",
+            textDecoration: "none", color: "#475569",
+            border: "1px solid #e2e8f0", borderRadius: 6,
+            whiteSpace: "nowrap",
+          }}
+          className="nav-settings-desktop"
+          title="Управление валютами"
+        >
+          {currencySymbol(mainCurrency)} {mainCurrency}
+        </NavLink>
 
         <button
           onClick={handleLogout}

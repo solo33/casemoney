@@ -71,9 +71,9 @@ RU_MONTHS = ["", "январь", "февраль", "март", "апрель", "
              "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
 
 
-def _to_main(db: Session, amount: float, currency: str, main: str) -> float:
+def _to_main(db: Session, user_id: int, amount: float, currency: str, main: str) -> float:
     try:
-        return exchange_svc.convert(db, amount, currency, main)
+        return exchange_svc.convert_for_user(db, user_id, amount, currency, main)
     except exchange_svc.ExchangeError:
         return 0.0
 
@@ -148,7 +148,7 @@ def get_summary(
     total_expense = 0.0
     cat_totals: dict[Optional[int], float] = {}
     for t in transactions:
-        amount_main = _to_main(db, t.amount, t.currency, main)
+        amount_main = _to_main(db, user_id, t.amount, t.currency, main)
         if t.type == TransactionType.income:
             total_income += amount_main
         elif t.type == TransactionType.expense:
@@ -232,7 +232,7 @@ def get_monthly_trend(
         key = f"{t.date.year:04d}-{t.date.month:02d}"
         if key not in points_map:
             continue
-        amt = _to_main(db, t.amount, t.currency, main)
+        amt = _to_main(db, user_id, t.amount, t.currency, main)
         if t.type == TransactionType.income:
             points_map[key]["income"] += amt
         elif t.type == TransactionType.expense:

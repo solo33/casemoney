@@ -173,8 +173,73 @@ def get_rate(db: Session, from_currency: str, to_currency: str) -> float:
 
 
 def convert(db: Session, amount: float, from_currency: str, to_currency: str) -> float:
-    """Конвертирует amount из from_currency в to_currency."""
+    """Конвертирует amount из from_currency в to_currency (системный курс)."""
     rate = get_rate(db, from_currency, to_currency)
+    return round(amount * rate, 2)
+
+
+def get_rate_for_user(
+    db: Session,
+    user_id: int,
+    from_currency: str,
+    to_currency: str,
+) -> tuple[float, str]:
+    """Возвращает (rate, source) для конкретного пользователя.
+
+    Если у user_currencies[from_currency] auto=False и manual_rate задан — используем его
+    (manual_rate интерпретируется как 1 from_currency = manual_rate * main_currency).
+    Иначе системный курс через get_rate.
+    """
+    from app.models.user_currency import UserCurrency  # позднее, чтобы не было циклов
+    from app.models.user import User
+
+    from_cur = from_currency.upper()
+    to_cur = to_currency.upper()
+    if from_cur == to_cur:
+        return 1.0, "auto"
+
+    user = db.query(User).filter(User.id == user_id).first()
+    main = (user.main_currency if user and user.main_currency else "RUB").upper()
+
+    def manual_to_main(currency: str) -> Optional[float]:
+        if currency == main:
+            return 1.0
+        uc = db.query(UserCurrency).filter(
+            UserCurrency.user_id == user_id,
+            UserCurrency.currency == currency,
+        ).first()
+        if uc and not uc.auto and uc.manual_rate is not None:
+            return uc.manual_rate
+        return None
+
+    from_to_main = manual_to_main(from_cur)
+    to_to_main = manual_to_main(to_cur)
+    # Если оба ручные — рассчитываем напрямую и помечаем как manual
+    if from_to_main is not None and to_to_main is not None:
+        return from_to_main / to_to_main, "manual"
+
+    # Иначе подставляем системные значения для тех валют, где нет ручного
+    if from_to_main is None:
+        from_to_main = get_rate_to_rub(db, from_cur) / get_rate_to_rub(db, main)
+    if to_to_main is None:
+        to_to_main = get_rate_to_rub(db, to_cur) / get_rate_to_rub(db, main)
+
+    rate = from_to_main / to_to_main
+    src = "manual" if (
+        manual_to_main(from_cur) is not None or manual_to_main(to_cur) is not None
+    ) else "auto"
+    return rate, src
+
+
+def convert_for_user(
+    db: Session,
+    user_id: int,
+    amount: float,
+    from_currency: str,
+    to_currency: str,
+) -> float:
+    """Конверсия с учётом ручных курсов пользователя."""
+    rate, _ = get_rate_for_user(db, user_id, from_currency, to_currency)
     return round(amount * rate, 2)
 
 
