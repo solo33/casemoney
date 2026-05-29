@@ -6,6 +6,7 @@ from app.database import engine, Base
 from app.models.user import User
 from app.models.category import Category
 from app.models.account import Account
+from app.models.account_group import AccountGroup
 from app.models.transaction import Transaction
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router

@@ -16,4 +16,8 @@ class Account(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Группа счетов (опционально). NULL = "Без группы"
+    group_id = Column(Integer, ForeignKey("account_groups.id", ondelete="SET NULL"), nullable=True)
+
     transactions = relationship("Transaction", back_populates="account")
+    group = relationship("AccountGroup", back_populates="accounts")
