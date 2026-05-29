@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { COMMON_CURRENCIES, currencySymbol, formatMoney } from "../utils/money";
@@ -12,6 +13,7 @@ function isoToday() {
 }
 
 export default function Transactions() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState({ items: [], total: 0 });
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -19,16 +21,29 @@ export default function Transactions() {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
 
-  // Фильтры
-  const [filters, setFilters] = useState({
-    account_id: "",
-    category_id: "",
-    type: "",
-    date_from: "",
-    date_to: "",
-    q: "",
-  });
+  // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
+  const [filters, setFilters] = useState(() => ({
+    account_id: searchParams.get("account_id") || "",
+    category_id: searchParams.get("category_id") || "",
+    type: searchParams.get("type") || "",
+    date_from: searchParams.get("date_from") || "",
+    date_to: searchParams.get("date_to") || "",
+    q: searchParams.get("q") || "",
+  }));
   const [page, setPage] = useState(0);
+
+  // При смене URL — обновим фильтры (например, переход с Annual)
+  useEffect(() => {
+    setFilters({
+      account_id: searchParams.get("account_id") || "",
+      category_id: searchParams.get("category_id") || "",
+      type: searchParams.get("type") || "",
+      date_from: searchParams.get("date_from") || "",
+      date_to: searchParams.get("date_to") || "",
+      q: searchParams.get("q") || "",
+    });
+    setPage(0);
+  }, [searchParams]);
 
   // Форма создания
   const [newTx, setNewTx] = useState({
@@ -149,13 +164,19 @@ export default function Transactions() {
   const showingTo = Math.min((page + 1) * PAGE_SIZE, data.total);
 
   const setFilter = (key, value) => {
-    setFilters(f => ({ ...f, [key]: value }));
+    const next = { ...filters, [key]: value };
+    setFilters(next);
     setPage(0);
+    // отражаем активные фильтры в URL
+    const params = {};
+    Object.entries(next).forEach(([k, v]) => { if (v) params[k] = v; });
+    setSearchParams(params, { replace: true });
   };
 
   const resetFilters = () => {
     setFilters({ account_id: "", category_id: "", type: "", date_from: "", date_to: "", q: "" });
     setPage(0);
+    setSearchParams({}, { replace: true });
   };
 
   const hasFilters = Object.values(filters).some(v => v);
