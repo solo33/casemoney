@@ -10,6 +10,7 @@ from app.models.account_group import AccountGroup
 from app.models.transaction import Transaction
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
+from app.api.account_groups import router as account_groups_router
 from app.api.categories import router as categories_router
 from app.api.transactions import router as transactions_router
 from app.api.dashboard import router as dashboard_router
@@ -34,6 +35,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(accounts_router)
+app.include_router(account_groups_router)
 app.include_router(categories_router)
 app.include_router(transactions_router)
 app.include_router(dashboard_router)
