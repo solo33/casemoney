@@ -11,6 +11,7 @@ const links = [
   { to: "/transactions", label: "Транзакции" },
   { to: "/reports", label: "Отчёты" },
   { to: "/import", label: "Импорт" },
+  { to: "/settings", label: "Настройки" },
 ];
 
 export default function Nav() {

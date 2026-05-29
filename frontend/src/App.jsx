@@ -7,7 +7,9 @@ import Accounts from './pages/Accounts'
 import Categories from './pages/Categories'
 import Currencies from './pages/Currencies'
 import Import from './pages/Import'
+import ImportHomeMoney from './pages/ImportHomeMoney'
 import Transactions from './pages/Transactions'
+import Settings from './pages/Settings'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
 import { UserProvider } from './contexts/UserContext'
@@ -91,10 +93,28 @@ export default function App() {
         />
 
         <Route
+          path="/import/homemoney"
+          element={
+            <ProtectedRoute>
+              <ImportHomeMoney />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/transactions"
           element={
             <ProtectedRoute>
               <Transactions />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />

@@ -25,6 +25,13 @@ class UserResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     main_currency: Optional[str] = Field(None, min_length=2, max_length=10)
+    email: Optional[EmailStr] = None
+    username: Optional[str] = Field(None, min_length=1, max_length=64)
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=4)
 
 
 class Token(BaseModel):
