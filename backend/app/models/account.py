@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+
 
 class Account(Base):
     __tablename__ = "accounts"
@@ -9,8 +10,6 @@ class Account(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     type = Column(String, default="cash")        # cash, card, bank, crypto
-    balance = Column(Float, default=0.0)
-    currency = Column(String, default="RUB")
     color = Column(String, nullable=True)
     icon = Column(String, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -21,3 +20,9 @@ class Account(Base):
 
     transactions = relationship("Transaction", back_populates="account")
     group = relationship("AccountGroup", back_populates="accounts")
+    balances = relationship(
+        "AccountBalance",
+        back_populates="account",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

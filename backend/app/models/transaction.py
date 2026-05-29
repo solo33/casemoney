@@ -16,6 +16,7 @@ class Transaction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float, nullable=False)
+    currency = Column(String(10), nullable=False)  # валюта транзакции — определяет, какой balance счёта меняется
     type = Column(Enum(TransactionType), nullable=False)
     description = Column(String, nullable=True)
     date = Column(DateTime(timezone=True), server_default=func.now())

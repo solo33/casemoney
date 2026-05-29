@@ -26,8 +26,10 @@ if config.config_file_name is not None:
 from app.models.user import User
 from app.models.account import Account
 from app.models.account_group import AccountGroup
+from app.models.account_balance import AccountBalance
 from app.models.category import Category
 from app.models.transaction import Transaction
+from app.models.exchange_rate import ExchangeRate
 from app.database import Base
 
 target_metadata = Base.metadata

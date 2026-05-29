@@ -2,12 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
-from app.database import engine, Base
-from app.models.user import User
-from app.models.category import Category
-from app.models.account import Account
-from app.models.account_group import AccountGroup
-from app.models.transaction import Transaction
+# Импорты моделей нужны для регистрации в Base.metadata (используется alembic).
+# Схему БД меняем ТОЛЬКО через alembic, create_all больше не вызываем.
+from app.models.user import User  # noqa: F401
+from app.models.category import Category  # noqa: F401
+from app.models.account import Account  # noqa: F401
+from app.models.account_group import AccountGroup  # noqa: F401
+from app.models.account_balance import AccountBalance  # noqa: F401
+from app.models.transaction import Transaction  # noqa: F401
+from app.models.exchange_rate import ExchangeRate  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -15,8 +18,6 @@ from app.api.categories import router as categories_router
 from app.api.transactions import router as transactions_router
 from app.api.dashboard import router as dashboard_router
 from app.api.reports import router as reports_router
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="CaseMoney API",
