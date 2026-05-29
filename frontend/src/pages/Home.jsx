@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import QuickAddInline from "../components/QuickAddInline";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
 
@@ -165,24 +166,8 @@ export default function Home() {
 
       {/* ============== RIGHT MAIN ============== */}
       <main style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* Quick action banner */}
-        <Card style={{
-          background: "linear-gradient(135deg, #818cf8 0%, #4f46e5 100%)",
-          color: "#fff", border: "none",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>Добавить операцию</div>
-              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>
-                Быстрый ввод дохода или расхода — кнопка <strong>+</strong> в правом нижнем углу
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link to="/transactions" style={pillBtn}>Все операции →</Link>
-              <Link to="/reports" style={pillBtn}>Отчёты →</Link>
-            </div>
-          </div>
-        </Card>
+        {/* Inline quick-add form */}
+        <QuickAddInline />
 
         {/* Records today + чарт */}
         <Card noPadding>
@@ -283,16 +268,6 @@ const sectionTitle = {
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: 0.5,
-};
-
-const pillBtn = {
-  fontSize: 13,
-  padding: "6px 12px",
-  borderRadius: 6,
-  background: "rgba(255,255,255,0.15)",
-  color: "#fff",
-  textDecoration: "none",
-  whiteSpace: "nowrap",
 };
 
 function Card({ children, style, noPadding }) {
