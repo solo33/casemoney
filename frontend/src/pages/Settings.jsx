@@ -163,6 +163,32 @@ export default function Settings() {
         </form>
       </Section>
 
+      {/* Экспорт */}
+      <Section title="Экспорт">
+        <p style={muted}>
+          Скачать все транзакции в CSV (формат совместим с импортом HomeMoney).
+        </p>
+        <div style={{ marginTop: 10 }}>
+          <button type="button" onClick={() => {
+            const token = localStorage.getItem("token");
+            const url = `${import.meta.env.VITE_API_URL}/api/export/csv`;
+            // Скачивание через fetch + blob, чтобы передать Bearer токен
+            fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+              .then(r => r.ok ? r.blob() : Promise.reject(r))
+              .then(blob => {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `casemoney_export_${Date.now()}.csv`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+              })
+              .catch(() => flash("Не удалось скачать", true));
+          }}>
+            Скачать CSV
+          </button>
+        </div>
+      </Section>
+
       {/* Опасная зона */}
       <Section title="Опасная зона" tone="danger">
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
