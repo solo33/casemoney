@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     main_currency: str = "RUB"
     is_premium: bool = False
     premium_until: Optional[datetime] = None
+    is_admin: bool = False
 
     class Config:
         from_attributes = True

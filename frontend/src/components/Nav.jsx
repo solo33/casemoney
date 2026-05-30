@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
 
-const links = [
+const BASE_LINKS = [
   { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
   { to: "/categories", label: "Категории" },
@@ -18,7 +18,10 @@ const links = [
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const { mainCurrency, updateMainCurrency, isPremium } = useUser();
+  const { user, mainCurrency, updateMainCurrency, isPremium } = useUser();
+  const links = user?.is_admin
+    ? [...BASE_LINKS, { to: "/admin", label: "Админка", admin: true }]
+    : BASE_LINKS;
 
   const handleLogout = () => {
     localStorage.removeItem("token");

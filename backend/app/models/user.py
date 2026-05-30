@@ -14,3 +14,4 @@ class User(Base):
     main_currency = Column(String(10), nullable=False, default="RUB")
     is_premium = Column(Boolean, nullable=False, default=False)
     premium_until = Column(DateTime(timezone=True), nullable=True)
+    is_admin = Column(Boolean, nullable=False, default=False)

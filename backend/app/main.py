@@ -26,6 +26,7 @@ from app.api.currencies import router as currencies_router
 from app.api.import_csv import router as import_router
 from app.api.export_csv import router as export_router
 from app.api.goals import router as goals_router
+from app.api.admin import router as admin_router
 
 app = FastAPI(
     title="CaseMoney API",
@@ -55,6 +56,7 @@ app.include_router(currencies_router)
 app.include_router(import_router)
 app.include_router(export_router)
 app.include_router(goals_router)
+app.include_router(admin_router)
 
 def custom_openapi():
     if app.openapi_schema:
