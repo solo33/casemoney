@@ -6,7 +6,11 @@ __pycache__/
 .pytest_cache/
 
 # Переменные окружения - секреты не должны попасть в Git!
+# Покрываем подпапки (.env в корне, backend/.env, frontend/.env.local и т.д.)
 .env
+**/.env
+.env.local
+.env.*.local
 
 # VS Code
 .vscode/
