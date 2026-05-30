@@ -36,6 +36,15 @@ class AdminPasswordReset(BaseModel):
     new_password: str
 
 
+class AdminConfig(BaseModel):
+    require_email_verification: bool
+    smtp_configured: bool
+
+
+class AdminConfigUpdate(BaseModel):
+    require_email_verification: Optional[bool] = None
+
+
 class AdminStats(BaseModel):
     total_users: int
     active_users: int

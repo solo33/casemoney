@@ -11,6 +11,7 @@ from app.services.auth import (
     create_activation_token, verify_activation_token,
 )
 from app.services.email import send_activation_email, app_url, is_smtp_configured
+from app.services.app_config import is_email_verification_required
 from app.seeds import seed_default_categories
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -45,11 +46,14 @@ def register(
     if existing:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
+    require_verification = is_email_verification_required(db)
+
     user = User(
         email=data.email,
         username=data.username,
         hashed_password=hash_password(data.password),
-        email_verified=False,
+        # Если активация отключена админом — сразу считаем email подтверждённым
+        email_verified=not require_verification,
     )
     db.add(user)
     db.commit()
@@ -62,12 +66,15 @@ def register(
     # Дефолтные категории
     seed_default_categories(db, user.id)
 
-    # Письмо отправляем в фоне чтобы не задерживать ответ
-    background.add_task(_send_activation, user)
+    # Письмо отправляем только если активация требуется
+    email_sent = False
+    if require_verification:
+        background.add_task(_send_activation, user)
+        email_sent = True
 
     return RegisterResponse(
         user=user,
-        email_sent=True,
+        email_sent=email_sent,
         smtp_configured=is_smtp_configured(),
     )
 

@@ -13,6 +13,7 @@ from app.models.transaction import Transaction  # noqa: F401
 from app.models.exchange_rate import ExchangeRate  # noqa: F401
 from app.models.user_currency import UserCurrency  # noqa: F401
 from app.models.goal import Goal  # noqa: F401
+from app.models.app_config import AppConfig  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router

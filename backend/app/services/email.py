@@ -15,6 +15,7 @@
 import os
 import smtplib
 import logging
+import html as _html
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -92,6 +93,10 @@ def send_email(to: str, subject: str, text: str, html: str | None = None) -> boo
 
 def send_activation_email(to_email: str, username: str, activation_url: str) -> bool:
     subject = "CaseMoney — подтвердите ваш email"
+    # В plain-text экранирование не нужно. В HTML — обязательно (username и URL
+    # могут содержать спецсимволы; URL также квотим как атрибут).
+    username_html = _html.escape(username)
+    url_html = _html.escape(activation_url, quote=True)
     text = (
         f"Здравствуйте, {username}!\n\n"
         f"Вы зарегистрировались в CaseMoney. "
@@ -112,11 +117,11 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
       Подтвердите email
     </h2>
     <p style="color: #57534e; line-height: 1.5;">
-      Здравствуйте, <strong>{username}</strong>!<br>
+      Здравствуйте, <strong>{username_html}</strong>!<br>
       Вы зарегистрировались в CaseMoney. Нажмите кнопку ниже, чтобы активировать аккаунт.
     </p>
     <p style="margin: 24px 0;">
-      <a href="{activation_url}" style="
+      <a href="{url_html}" style="
         display: inline-block; background: #9f1239; color: #fff;
         text-decoration: none; padding: 12px 24px; border-radius: 6px;
         font-weight: 600;
@@ -126,7 +131,7 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
     </p>
     <p style="color: #78716c; font-size: 13px;">
       Или скопируйте ссылку в браузер:<br>
-      <a href="{activation_url}" style="color: #9f1239; word-break: break-all;">{activation_url}</a>
+      <a href="{url_html}" style="color: #9f1239; word-break: break-all;">{url_html}</a>
     </p>
     <p style="color: #a8a29e; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0;">
       Ссылка действительна 24 часа. Если вы не регистрировались — проигнорируйте это письмо.

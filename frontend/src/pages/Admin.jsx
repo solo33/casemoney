@@ -31,7 +31,7 @@ export default function Admin() {
         borderBottom: "1px solid #e7e5e0",
       }}>
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>Пользователи</TabBtn>
-        <TabBtn active={tab === "stats"} onClick={() => setTab("stats")}>Статистика</TabBtn>
+        <TabBtn active={tab === "stats"} onClick={() => setTab("stats")}>Система</TabBtn>
       </div>
 
       {tab === "users" && <UsersTab adminId={user.id} />}
@@ -384,13 +384,37 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
 
 function StatsTab() {
   const [stats, setStats] = useState(null);
+  const [config, setConfig] = useState(null);
   const [error, setError] = useState(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  const loadConfig = () => {
+    api.get("/api/admin/config")
+      .then(r => setConfig(r.data))
+      .catch(() => {});
+  };
 
   useEffect(() => {
     api.get("/api/admin/stats")
       .then(r => setStats(r.data))
       .catch(e => setError(e.response?.data?.detail || "Ошибка"));
+    loadConfig();
   }, []);
+
+  const toggleEmailVerification = async () => {
+    if (!config) return;
+    setSavingConfig(true);
+    try {
+      const r = await api.patch("/api/admin/config", {
+        require_email_verification: !config.require_email_verification,
+      });
+      setConfig(r.data);
+    } catch (e) {
+      setError(e.response?.data?.detail || "Ошибка");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   if (error) return <p style={{ color: "#b91c1c" }}>{error}</p>;
   if (!stats) return <p>Загрузка...</p>;
@@ -449,6 +473,60 @@ function StatsTab() {
           </div>
         )}
       </div>
+
+      {/* Системные настройки */}
+      {config && (
+        <div style={{
+          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+          padding: 18, marginTop: 20,
+        }}>
+          <h3 style={{ marginTop: 0, fontSize: 14, color: "#57534e", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Системные настройки
+          </h3>
+
+          <div style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            gap: 16, padding: "12px 0", borderBottom: "1px solid #ede9df",
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1917", marginBottom: 4 }}>
+                Требовать подтверждение email
+              </div>
+              <div style={{ fontSize: 12.5, color: "#78716c", lineHeight: 1.5 }}>
+                {config.require_email_verification ? (
+                  <>
+                    <strong style={{ color: "#15803d" }}>Включено.</strong> При регистрации
+                    отправляется письмо со ссылкой активации. До подтверждения юзер видит баннер.
+                  </>
+                ) : (
+                  <>
+                    <strong style={{ color: "#b91c1c" }}>Отключено.</strong> Новые юзеры
+                    активируются автоматически (письма не отправляются).
+                  </>
+                )}
+                {!config.smtp_configured && (
+                  <div style={{
+                    marginTop: 8, padding: "6px 10px",
+                    background: "#fef3c7", border: "1px solid #facc15", borderRadius: 6,
+                    color: "#854d0e", fontSize: 12,
+                  }}>
+                    ⚠ SMTP не настроен — даже при включённой опции письма выводятся только в консоль backend.
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={toggleEmailVerification}
+              disabled={savingConfig}
+              className={config.require_email_verification ? "btn-danger" : ""}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {savingConfig ? "..." :
+                config.require_email_verification ? "Отключить" : "Включить"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,9 +22,11 @@ from app.models.transaction import Transaction
 from app.models.user_currency import UserCurrency
 from app.schemas.admin import (
     AdminUserSummary, AdminUsersPage, AdminUserUpdate,
-    AdminPasswordReset, AdminStats,
+    AdminPasswordReset, AdminStats, AdminConfig, AdminConfigUpdate,
 )
 from app.services.auth import decode_token, hash_password
+from app.services import app_config as app_config_svc
+from app.services.email import is_smtp_configured
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 security = HTTPBearer()
@@ -169,6 +171,37 @@ def delete_user(
     db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
     db.delete(u)
     db.commit()
+
+
+@router.get("/config", response_model=AdminConfig)
+def get_app_config(
+    db: Session = Depends(get_db),
+    _: int = Depends(get_admin_user_id),
+):
+    cfg = app_config_svc.get_config(db)
+    return AdminConfig(
+        require_email_verification=cfg.require_email_verification,
+        smtp_configured=is_smtp_configured(),
+    )
+
+
+@router.patch("/config", response_model=AdminConfig)
+def update_app_config(
+    data: AdminConfigUpdate,
+    db: Session = Depends(get_db),
+    _: int = Depends(get_admin_user_id),
+):
+    cfg = app_config_svc.get_config(db)
+    update = data.model_dump(exclude_unset=True)
+    for k, v in update.items():
+        setattr(cfg, k, v)
+    db.commit()
+    db.refresh(cfg)
+    app_config_svc.invalidate_cache()
+    return AdminConfig(
+        require_email_verification=cfg.require_email_verification,
+        smtp_configured=is_smtp_configured(),
+    )
 
 
 @router.get("/stats", response_model=AdminStats)

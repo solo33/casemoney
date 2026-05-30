@@ -33,6 +33,19 @@ def _format_amount(value: float) -> str:
     return f"{value:.2f}".replace(".", ",")
 
 
+_CSV_INJECT_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_text(value: str) -> str:
+    """Защита от CSV formula injection (OWASP): экранируем значения,
+    начинающиеся с =/+/-/@/таб/CR — Excel и Google Sheets интерпретируют их как формулы."""
+    if not value:
+        return value or ""
+    if value[:1] in _CSV_INJECT_CHARS:
+        return "'" + value
+    return value
+
+
 def _category_path(cat: Optional[Category], by_id: dict[int, Category]) -> str:
     """Возвращает 'Parent\\Child' или просто имя если корневая."""
     if not cat:
@@ -105,12 +118,12 @@ def export_csv(
 
         writer.writerow([
             t.date.strftime("%d.%m.%Y") if t.date else "",
-            acc.name if acc else "",
-            _category_path(cat, categories),
+            _safe_text(acc.name if acc else ""),
+            _safe_text(_category_path(cat, categories)),
             _format_amount(amount),
-            t.currency,
-            (t.description or ""),
-            transfer_to,
+            _safe_text(t.currency or ""),
+            _safe_text(t.description or ""),
+            _safe_text(transfer_to),
         ])
 
     buf.seek(0)

@@ -10,6 +10,19 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+# Защита от запуска без секрета / с тестовыми значениями
+_BANNED_SECRETS = {"supersecretkey123", "secret", "changeme", "test", "changeme_long_random_string"}
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY не задан. Установите переменную окружения SECRET_KEY "
+        "(64+ случайных байта)."
+    )
+if SECRET_KEY.lower() in _BANNED_SECRETS or len(SECRET_KEY) < 32:
+    raise RuntimeError(
+        "SECRET_KEY слишком слабый. Сгенерируйте новый: "
+        "python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+    )
+
 # Контекст для хэширования паролей через bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
