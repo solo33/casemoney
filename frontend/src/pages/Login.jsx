@@ -71,17 +71,15 @@ export default function Login() {
             fontWeight: 500, color: "#1c1917",
             margin: "0 0 20px",
           }}>
-            Личные финансы<br />
-            <span style={{ color: "#9f1239" }}>как редакция,</span><br />
-            а не как игра.
+            Все счета и валюты<br />
+            <span style={{ color: "#9f1239" }}>в одном месте.</span>
           </h1>
           <p style={{
             fontSize: 17, lineHeight: 1.55, color: "#57534e",
             margin: "0 0 32px", maxWidth: 480,
           }}>
-            Учёт счетов в разных валютах с автоматическим курсом ЦБ и CoinGecko.
-            Категории с иерархией. Годовые отчёты с drill-down.
-            Импорт из HomeMoney за минуту.
+            Счета в разных валютах с автоматическим курсом ЦБ и CoinGecko.
+            Категории с иерархией. Годовые отчеты с детализацией по клику.
           </p>
 
           {/* Features */}
@@ -91,16 +89,16 @@ export default function Login() {
             gap: 12, marginBottom: 32,
           }}>
             <Feature icon="💱" title="Мультивалютность">
-              Фиат + крипта. Курсы ЦБ РФ и CoinGecko, обновление каждый час.
+              Фиат и крипта. Курсы ЦБ РФ и CoinGecko, обновление каждый час.
             </Feature>
             <Feature icon="🌳" title="Иерархия категорий">
-              Покупки → Подарки, Еда → Кафе. Drag-and-drop, drill-down в отчётах.
+              Покупки → Подарки, Еда → Кафе. Перетаскивание, детализация в отчетах.
             </Feature>
             <Feature icon="📊" title="Годовой анализ">
-              12 месяцев в одной таблице. Клик по сумме — операции под капотом.
+              12 месяцев в одной таблице. Клик по сумме открывает операции.
             </Feature>
-            <Feature icon="📥" title="Импорт из HomeMoney">
-              CSV экспорт ihomemoney.com загружается за пару кликов с превью.
+            <Feature icon="📥" title="Импорт из CSV">
+              Выгрузки из других сервисов загружаются за пару кликов с превью.
             </Feature>
           </div>
 
@@ -108,7 +106,7 @@ export default function Login() {
           <div style={{
             display: "flex", gap: 12, flexWrap: "wrap",
           }}>
-            <PricingPill plan="Free" desc="3 счёта · 10 категорий · 1 валюта" />
+            <PricingPill plan="Free" desc="3 счета · 10 категорий · 1 валюта" />
             <PricingPill plan="Premium" desc="без лимитов · все валюты · история без срока" highlight />
           </div>
         </div>
@@ -172,7 +170,7 @@ export default function Login() {
           </form>
 
           <p style={{ marginTop: 16, fontSize: 13, color: "#78716c", textAlign: "center" }}>
-            Ещё нет аккаунта?{" "}
+            Еще нет аккаунта?{" "}
             <Link to="/register" style={{ color: "#9f1239", fontWeight: 500 }}>
               Создать
             </Link>
