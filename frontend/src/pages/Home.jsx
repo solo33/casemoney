@@ -26,9 +26,12 @@ function formatDate(iso) {
 
 function aggregateByCurrency(groups) {
   const map = {};
-  groups.forEach(g => g.accounts.forEach(a => (a.balances || []).forEach(b => {
-    map[b.currency] = (map[b.currency] || 0) + b.balance;
-  })));
+  groups.forEach(g => g.accounts.forEach(a => {
+    if (a.include_in_balance === false) return;
+    (a.balances || []).forEach(b => {
+      map[b.currency] = (map[b.currency] || 0) + b.balance;
+    });
+  }));
   return Object.entries(map)
     .map(([currency, balance]) => ({ currency, balance }))
     .filter(x => Math.abs(x.balance) > 0.005)

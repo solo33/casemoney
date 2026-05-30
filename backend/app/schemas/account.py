@@ -30,6 +30,7 @@ class AccountBase(BaseModel):
     color: Optional[str] = None
     icon: Optional[str] = None
     group_id: Optional[int] = None
+    include_in_balance: bool = True
 
 
 class AccountCreate(AccountBase):
@@ -44,6 +45,7 @@ class AccountUpdate(BaseModel):
     color: Optional[str] = None
     icon: Optional[str] = None
     group_id: Optional[int] = None  # передать null чтобы вынести из группы
+    include_in_balance: Optional[bool] = None
 
 
 class AccountResponse(AccountBase):

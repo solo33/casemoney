@@ -36,6 +36,7 @@ export default function Accounts() {
     name: "", type: "cash", color: "", icon: "",
     initial_currency: "RUB", initial_balance: 0,
     group_id: "",
+    include_in_balance: true,
   });
   const [expanded, setExpanded] = useState(new Set());        // account ids with expanded balances
   const [addingCurrencyTo, setAddingCurrencyTo] = useState(null);  // account.id
@@ -117,6 +118,7 @@ export default function Accounts() {
       setNewAccount({
         name: "", type: "cash", color: "", icon: "",
         initial_currency: "RUB", initial_balance: 0, group_id: "",
+        include_in_balance: true,
       });
       fetchGroups();
     } catch (e) {
@@ -131,6 +133,15 @@ export default function Accounts() {
       fetchGroups();
     } catch (e) {
       setError(e.response?.data?.detail || "Не удалось удалить счёт");
+    }
+  };
+
+  const handleToggleInclude = async (acc) => {
+    try {
+      await api.put(`/api/accounts/${acc.id}`, { include_in_balance: !acc.include_in_balance });
+      fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось обновить");
     }
   };
 
@@ -294,6 +305,18 @@ export default function Accounts() {
             onChange={e => setNewAccount({ ...newAccount, icon: e.target.value })}
             style={{ width: 70 }}
           />
+          <label style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontSize: 13, color: "#57534e", cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}>
+            <input
+              type="checkbox"
+              checked={newAccount.include_in_balance}
+              onChange={e => setNewAccount({ ...newAccount, include_in_balance: e.target.checked })}
+            />
+            Учитывать в общем балансе
+          </label>
           <button type="submit">Создать</button>
         </form>
       )}
@@ -312,6 +335,7 @@ export default function Accounts() {
               onToggleExpand={toggleExpand}
               onDeleteGroup={handleDeleteGroup}
               onDeleteAccount={handleDeleteAccount}
+              onToggleInclude={handleToggleInclude}
               addingCurrencyTo={addingCurrencyTo}
               setAddingCurrencyTo={setAddingCurrencyTo}
               currencyForm={currencyForm}
@@ -348,7 +372,7 @@ export default function Accounts() {
 
 function GroupBucket({
   bucket, mainCurrency, expanded, onToggleExpand,
-  onDeleteGroup, onDeleteAccount,
+  onDeleteGroup, onDeleteAccount, onToggleInclude,
   addingCurrencyTo, setAddingCurrencyTo, currencyForm, setCurrencyForm,
   onAddCurrency, onEditBalance, onDeleteCurrency,
   activeDrag,
@@ -416,6 +440,7 @@ function GroupBucket({
             isExpanded={expanded.has(acc.id)}
             onToggleExpand={() => onToggleExpand(acc.id)}
             onDelete={onDeleteAccount}
+            onToggleInclude={onToggleInclude}
             isAddingCurrency={addingCurrencyTo === acc.id}
             setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
             currencyForm={currencyForm}
@@ -433,7 +458,7 @@ function GroupBucket({
 function AccountRow({
   acc, groupId, mainCurrency,
   isExpanded, onToggleExpand,
-  onDelete,
+  onDelete, onToggleInclude,
   isAddingCurrency, setAddingCurrency,
   currencyForm, setCurrencyForm,
   onAddCurrency, onEditBalance, onDeleteCurrency,
@@ -452,6 +477,8 @@ function AccountRow({
   const presentCurrencies = (acc.balances || []).map(b => b.currency);
   const availableCurrencies = COMMON_CURRENCIES.filter(c => !presentCurrencies.includes(c));
 
+  const excluded = !acc.include_in_balance;
+
   return (
     <div ref={setNodeRef} style={{ ...style }}>
       {/* Main row */}
@@ -459,7 +486,8 @@ function AccountRow({
         display: "flex", alignItems: "center", gap: 10,
         padding: "10px 14px",
         borderTop: "1px solid #ede9df",
-        background: "#fff",
+        background: excluded ? "#faf8f3" : "#fff",
+        opacity: excluded ? 0.75 : 1,
       }}>
         <span
           style={{ cursor: "grab", color: "#d6d3d1", fontSize: 16, userSelect: "none" }}
@@ -473,15 +501,38 @@ function AccountRow({
         <span style={{ fontWeight: 500, flex: 1, cursor: multiCurrency ? "pointer" : "default" }}
               onClick={() => multiCurrency && onToggleExpand()}>
           {acc.name}
+          {excluded && (
+            <span style={{
+              marginLeft: 6, fontSize: 10, padding: "1px 6px", borderRadius: 4,
+              background: "#fef3c7", color: "#854d0e",
+              textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600,
+              verticalAlign: "middle",
+            }}>
+              не в балансе
+            </span>
+          )}
           {multiCurrency && (
             <span style={{ marginLeft: 6, color: "#a8a29e", fontSize: 12 }}>
               {isExpanded ? "▾" : "▸"} {acc.balances.length} валют
             </span>
           )}
         </span>
-        <span style={{ fontWeight: 700, fontSize: 15, color: acc.color || "#1c1917" }}>
+        <span style={{
+          fontWeight: 700, fontSize: 15,
+          color: excluded ? "#a8a29e" : (acc.color || "#1c1917"),
+          textDecoration: excluded ? "line-through" : "none",
+        }}>
           {formatMoney(acc.total_in_main)} {currencySymbol(mainCurrency)}
         </span>
+        <button
+          type="button"
+          onClick={() => onToggleInclude(acc)}
+          className="btn-ghost"
+          style={{ padding: "3px 8px", fontSize: 12 }}
+          title={excluded ? "Включить в общий баланс" : "Исключить из общего баланса"}
+        >
+          {excluded ? "↑ в баланс" : "↓ из баланса"}
+        </button>
         <button
           type="button"
           onClick={() => setAddingCurrency(!isAddingCurrency)}

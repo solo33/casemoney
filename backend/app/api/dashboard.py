@@ -98,7 +98,10 @@ def get_dashboard(
     accounts_serialized = [
         accounts_svc.serialize_account(db, a, main) for a in accounts
     ]
-    total_balance = sum(a.total_in_main for a in accounts_serialized)
+    # В общий баланс попадают только счета с include_in_balance=True
+    total_balance = sum(
+        a.total_in_main for a in accounts_serialized if a.include_in_balance
+    )
 
     accounts_summary = [
         AccountSummary(
