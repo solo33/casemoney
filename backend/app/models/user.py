@@ -15,3 +15,4 @@ class User(Base):
     is_premium = Column(Boolean, nullable=False, default=False)
     premium_until = Column(DateTime(timezone=True), nullable=True)
     is_admin = Column(Boolean, nullable=False, default=False)
+    email_verified = Column(Boolean, nullable=False, default=False)

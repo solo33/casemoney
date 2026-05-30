@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Activate from './pages/Activate'
 import Home from './pages/Home'
 import Reports from './pages/Reports'
 import AnnualReport from './pages/AnnualReport'
@@ -15,6 +16,7 @@ import Transactions from './pages/Transactions'
 import Settings from './pages/Settings'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
+import EmailVerifyBanner from './components/EmailVerifyBanner'
 import { UserProvider } from './contexts/UserContext'
 
 function ProtectedRoute({ children }) {
@@ -25,6 +27,7 @@ function ProtectedRoute({ children }) {
   return (
     <UserProvider>
       <Nav />
+      <EmailVerifyBanner />
       {children}
       <QuickAddFab />
     </UserProvider>
@@ -37,6 +40,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/activate" element={<Activate />} />
 
         <Route
           path="/home"

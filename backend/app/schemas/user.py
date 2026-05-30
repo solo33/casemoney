@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     is_premium: bool = False
     premium_until: Optional[datetime] = None
     is_admin: bool = False
+    email_verified: bool = True
 
     class Config:
         from_attributes = True

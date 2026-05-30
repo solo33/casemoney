@@ -39,3 +39,29 @@ def decode_token(token: str) -> dict:
         return payload
     except JWTError:
         return None
+
+
+# === Активация email ===
+
+ACTIVATION_TOKEN_TTL_HOURS = 24
+
+
+def create_activation_token(user_id: int) -> str:
+    """Подписанный JWT для активации email. TTL 24ч."""
+    exp = datetime.utcnow() + timedelta(hours=ACTIVATION_TOKEN_TTL_HOURS)
+    return jwt.encode(
+        {"sub": str(user_id), "purpose": "activate", "exp": exp},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def verify_activation_token(token: str) -> int | None:
+    """Возвращает user_id если токен валидный и для активации, иначе None."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("purpose") != "activate":
+        return None
+    sub = payload.get("sub")
+    return int(sub) if sub else None
