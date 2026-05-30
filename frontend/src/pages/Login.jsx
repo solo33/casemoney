@@ -108,7 +108,7 @@ export default function Login() {
           <div style={{
             display: "flex", gap: 12, flexWrap: "wrap",
           }}>
-            <PricingPill plan="Free" desc="3 счёта · 5 категорий · 1 валюта" />
+            <PricingPill plan="Free" desc="3 счёта · 10 категорий · 1 валюта" />
             <PricingPill plan="Premium" desc="без лимитов · все валюты · история без срока" highlight />
           </div>
         </div>

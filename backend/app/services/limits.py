@@ -2,7 +2,7 @@
 
 Free:
 - 3 счёта
-- 5 категорий (всего, включая дочерние)
+- 10 категорий (= дефолтный набор после регистрации)
 - 1 валюта (=основная)
 
 Premium: лимиты не применяются.
@@ -20,7 +20,7 @@ from app.models.user_currency import UserCurrency
 
 FREE_LIMITS = {
     "accounts": 3,
-    "categories": 5,
+    "categories": 10,
     "user_currencies": 1,
 }
 
