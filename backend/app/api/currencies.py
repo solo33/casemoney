@@ -14,6 +14,7 @@ from app.schemas.user_currency import (
 )
 from app.services.auth import decode_token
 from app.services import exchange as exchange_svc
+from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/currencies", tags=["currencies"])
 security = HTTPBearer()
@@ -90,6 +91,8 @@ def add_currency(
     ).first()
     if exists:
         raise HTTPException(status_code=400, detail=f"Валюта {currency} уже добавлена")
+    # Лимит free-tier (основная валюта уже есть, так что free не сможет добавить вторую)
+    limits_svc.enforce_limit(db, user_id, "user_currencies")
 
     uc = UserCurrency(
         user_id=user_id,

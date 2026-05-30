@@ -18,7 +18,7 @@ const links = [
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const { mainCurrency, updateMainCurrency } = useUser();
+  const { mainCurrency, updateMainCurrency, isPremium } = useUser();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -74,11 +74,34 @@ export default function Nav() {
           ))}
         </div>
 
-        {/* Текущая основная валюта — клик ведёт на /currencies */}
+        {/* Plan badge */}
+        <NavLink
+          to="/settings"
+          className="nav-settings-desktop"
+          style={{
+            marginLeft: "auto", fontSize: 11, padding: "3px 10px",
+            textDecoration: "none",
+            color: isPremium ? "#fff" : "#9f1239",
+            background: isPremium
+              ? "linear-gradient(90deg, #9f1239 0%, #be123c 100%)"
+              : "transparent",
+            border: `1px solid ${isPremium ? "transparent" : "#9f1239"}`,
+            borderRadius: 12,
+            whiteSpace: "nowrap",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+          }}
+          title={isPremium ? "Premium активирован" : "Перейти на Premium"}
+        >
+          {isPremium ? "★ Premium" : "Free"}
+        </NavLink>
+
+        {/* Текущая основная валюта */}
         <NavLink
           to="/currencies"
           style={{
-            marginLeft: "auto", fontSize: 13, padding: "5px 10px",
+            fontSize: 13, padding: "5px 10px",
             textDecoration: "none", color: "#57534e",
             border: "1px solid #e7e5e0", borderRadius: 6,
             whiteSpace: "nowrap",

@@ -5,7 +5,7 @@ import { useUser } from "../contexts/UserContext";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, refresh } = useUser();
+  const { user, refresh, limits, isPremium, upgrade, refreshLimits } = useUser();
   const [emailForm, setEmailForm] = useState({ email: "", username: "" });
   const [pwdForm, setPwdForm] = useState({ current_password: "", new_password: "", repeat: "" });
   const [error, setError] = useState(null);
@@ -94,6 +94,18 @@ export default function Settings() {
 
       {error && <FlashBox color="#b91c1c" bg="#fef2f0" border="#fecdd3">{error}</FlashBox>}
       {msg && <FlashBox color="#15803d" bg="#dcfce7" border="#86efac">{msg}</FlashBox>}
+
+      {/* Тариф */}
+      <PlanCard
+        isPremium={isPremium}
+        until={user?.premium_until}
+        limits={limits}
+        onUpgrade={async () => {
+          try { await upgrade(); flash("Premium активирован на 30 дней!"); }
+          catch (e) { flash(e.response?.data?.detail || "Ошибка", true); }
+        }}
+        refreshLimits={refreshLimits}
+      />
 
       {/* Профиль */}
       <Section title="Профиль">
@@ -288,3 +300,95 @@ function FlashBox({ color, bg, border, children }) {
 }
 
 const muted = { color: "#78716c", fontSize: 13, margin: 0 };
+
+
+function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
+  if (isPremium) {
+    return (
+      <div style={{
+        background: "linear-gradient(135deg, #9f1239 0%, #881337 100%)",
+        color: "#fff",
+        border: "none", borderRadius: 10, padding: 18, marginBottom: 16,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+          <h3 style={{
+            margin: 0, fontFamily: "var(--serif)", fontSize: 20,
+            fontWeight: 600, color: "#fff",
+          }}>
+            ★ Premium активен
+          </h3>
+          {until && (
+            <span style={{ fontSize: 13, opacity: 0.85 }}>
+              до {new Date(until).toLocaleDateString("ru-RU", {
+                day: "2-digit", month: "long", year: "numeric",
+              })}
+            </span>
+          )}
+        </div>
+        <p style={{ margin: "8px 0 0", fontSize: 13, opacity: 0.9 }}>
+          Без лимитов: счета, категории, валюты — без ограничений.
+        </p>
+      </div>
+    );
+  }
+
+  const u = limits?.usage || {};
+  const l = limits?.limits || {};
+  const items = [
+    { key: "accounts",        label: "Счета",     plural: "счетов" },
+    { key: "categories",      label: "Категории", plural: "категорий" },
+    { key: "user_currencies", label: "Валюты",    plural: "валют" },
+  ];
+
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #9f1239", borderRadius: 10,
+      padding: 18, marginBottom: 16,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <h3 style={{
+          margin: 0, fontFamily: "var(--serif)", fontSize: 20,
+          fontWeight: 600, color: "#1c1917",
+        }}>
+          Бесплатный тариф
+        </h3>
+        <button
+          onClick={() => { onUpgrade(); refreshLimits(); }}
+          style={{ fontSize: 13, padding: "8px 18px" }}
+        >
+          ★ Перейти на Premium
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {items.map(it => {
+          const used = u[it.key] ?? 0;
+          const max = l[it.key] ?? 0;
+          const pct = max > 0 ? Math.min(100, (used / max) * 100) : 0;
+          const reached = used >= max;
+          return (
+            <div key={it.key}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                <span style={{ color: "#57534e" }}>{it.label}</span>
+                <span style={{ color: reached ? "#b91c1c" : "#78716c", fontWeight: reached ? 600 : 400 }}>
+                  {used} / {max} {it.plural}
+                </span>
+              </div>
+              <div style={{ height: 6, background: "#f5f3ee", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{
+                  width: `${pct}%`, height: "100%",
+                  background: reached ? "#b91c1c" : "#9f1239",
+                  transition: "width 0.3s",
+                }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ ...muted, marginTop: 12, fontSize: 12 }}>
+        Premium снимает все лимиты. Активация — тестовая (без оплаты), на 30 дней.
+      </p>
+    </div>
+  );
+}

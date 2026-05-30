@@ -12,6 +12,7 @@ from app.schemas.category import (
     CategoryTreeNode,
 )
 from app.services.auth import decode_token
+from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 security = HTTPBearer()
@@ -123,6 +124,7 @@ def create_category(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    limits_svc.enforce_limit(db, user_id, "categories")
     _validate_parent(
         db,
         user_id=user_id,

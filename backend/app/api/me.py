@@ -12,6 +12,8 @@ from app.models.account_group import AccountGroup
 from app.models.user_currency import UserCurrency
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.services.auth import decode_token, hash_password, verify_password
+from app.services import limits as limits_svc
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 security = HTTPBearer()
@@ -122,6 +124,31 @@ def reset_account(
     db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
     db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
     db.commit()
+
+
+@router.get("/limits")
+def get_limits(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Текущее использование + лимиты + статус premium."""
+    return limits_svc.get_limits_status(db, user_id)
+
+
+@router.post("/upgrade", response_model=UserResponse)
+def upgrade_to_premium(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """MOCK: активирует Premium на 30 дней. В проде здесь интеграция с платёжкой."""
+    user = _get_user(db, user_id)
+    now = datetime.now(timezone.utc)
+    base = user.premium_until if (user.premium_until and user.premium_until > now) else now
+    user.is_premium = True
+    user.premium_until = base + timedelta(days=30)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.delete("/", status_code=204)

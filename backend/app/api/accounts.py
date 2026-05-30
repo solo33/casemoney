@@ -19,6 +19,7 @@ from app.schemas.account import (
 )
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
+from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 security = HTTPBearer()
@@ -114,6 +115,7 @@ def create_account(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    limits_svc.enforce_limit(db, user_id, "accounts")
     _validate_group(db, user_id, data.group_id)
     account = Account(
         name=data.name,

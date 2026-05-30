@@ -5,6 +5,7 @@ from app.models.user import User
 from app.schemas.user import UserRegister, UserLogin, UserResponse, Token
 from app.services.auth import hash_password, verify_password, create_access_token
 from app.models.category import Category
+from app.models.user_currency import UserCurrency
 from app.seeds import seed_default_categories
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -25,8 +26,12 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    # Создаём дефолтную user_currency = main_currency (для лимита бесплатной 1 валюты)
+    db.add(UserCurrency(user_id=user.id, currency=user.main_currency, auto=True))
+    db.commit()
+
     # FIN-17: seed дефолтных категорий
-    seed_default_categories(db, user.id) 
+    seed_default_categories(db, user.id)
     return user
 
 @router.post("/login", response_model=Token)
