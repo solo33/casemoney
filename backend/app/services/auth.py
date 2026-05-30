@@ -1,10 +1,14 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+# Явный путь к backend/.env — чтобы load работал независимо от CWD,
+# из которого запущен uvicorn (часто запускают из корня репо).
+_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_ENV_PATH)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"

@@ -1,11 +1,13 @@
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 
-# Загружаем переменные из файла .env
-load_dotenv()
+# Явный путь к backend/.env — работает независимо от CWD uvicorn'а.
+_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_ENV_PATH)
 
 # Читаем адрес базы данных из .env
 DATABASE_URL = os.getenv("DATABASE_URL")
