@@ -224,8 +224,8 @@ export default function Accounts() {
         marginBottom: 20,
       }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 13, color: "#78716c" }}>Общий баланс</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: "#9f1239" }}>
+          <div style={{ fontSize: 13, color: "#7a8590" }}>Общий баланс</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: "#173a54" }}>
             {formatMoney(grandTotal)} {currencySymbol(mainCurrency)}
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function Accounts() {
 
       {error && (
         <div style={{
-          color: "#b91c1c", marginBottom: 12, padding: "8px 12px",
+          color: "#c0432b", marginBottom: 12, padding: "8px 12px",
           background: "#fef2f0", border: "1px solid #fecdd3", borderRadius: 8,
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
@@ -259,7 +259,7 @@ export default function Accounts() {
       {/* Форма создания счёта */}
       {showNewAccount && (
         <form onSubmit={handleCreateAccount} style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           padding: 16, marginBottom: 20,
           display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
         }}>
@@ -307,7 +307,7 @@ export default function Accounts() {
           />
           <label style={{
             display: "flex", alignItems: "center", gap: 6,
-            fontSize: 13, color: "#57534e", cursor: "pointer",
+            fontSize: 13, color: "#515c68", cursor: "pointer",
             whiteSpace: "nowrap",
           }}>
             <input
@@ -324,7 +324,7 @@ export default function Accounts() {
       {/* Группы */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {groups.length === 0 ? (
-          <p style={{ color: "#a8a29e" }}>Нет счетов. Создайте первый!</p>
+          <p style={{ color: "#a6afb8" }}>Нет счетов. Создайте первый!</p>
         ) : (
           groups.map(bucket => (
             <GroupBucket
@@ -351,8 +351,8 @@ export default function Accounts() {
         <DragOverlay>
           {activeDrag ? (
             <div style={{
-              background: "#fff",
-              border: "2px solid #9f1239",
+              background: "#fffdf7",
+              border: "2px solid #173a54",
               borderRadius: 8,
               padding: "8px 12px",
               fontSize: 14,
@@ -390,22 +390,22 @@ function GroupBucket({
   return (
     <div ref={setNodeRef} style={{
       marginBottom: 16,
-      border: `1px solid ${dropHighlight ? "#9f1239" : "#e7e5e0"}`,
-      background: "#fff",
+      border: `1px solid ${dropHighlight ? "#173a54" : "#e4ddcd"}`,
+      background: "#fffdf7",
       borderRadius: 10,
-      outline: dropHighlight ? "2px solid rgba(159, 18, 57, 0.25)" : "none",
+      outline: dropHighlight ? "2px solid rgba(23, 58, 84, 0.25)" : "none",
     }}>
       {/* Group header */}
       <div style={{
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 14px",
-        background: "#faf8f3",
+        background: "#f6f2e9",
         borderRadius: "10px 10px 0 0",
-        borderBottom: bucket.accounts.length ? "1px solid #e7e5e0" : "none",
+        borderBottom: bucket.accounts.length ? "1px solid #e4ddcd" : "none",
       }}>
         <span style={{ fontWeight: 600, color: "#44403c", flex: 1 }}>
           {bucket.group.name}
-          <span style={{ color: "#a8a29e", fontWeight: 400, marginLeft: 8, fontSize: 13 }}>
+          <span style={{ color: "#a6afb8", fontWeight: 400, marginLeft: 8, fontSize: 13 }}>
             ({bucket.accounts.length})
           </span>
         </span>
@@ -417,7 +417,7 @@ function GroupBucket({
             type="button"
             onClick={() => onDeleteGroup(bucket.group)}
             className="btn-ghost"
-            style={{ padding: "2px 8px", fontSize: 12, color: "#b91c1c" }}
+            style={{ padding: "2px 8px", fontSize: 12, color: "#c0432b" }}
             title="Удалить группу"
           >
             ×
@@ -427,7 +427,7 @@ function GroupBucket({
 
       {/* Accounts list */}
       {bucket.accounts.length === 0 ? (
-        <div style={{ padding: 16, color: "#a8a29e", fontSize: 13 }}>
+        <div style={{ padding: 16, color: "#a6afb8", fontSize: 13 }}>
           Перетащите счёт сюда
         </div>
       ) : (
@@ -485,12 +485,12 @@ function AccountRow({
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "10px 14px",
-        borderTop: "1px solid #ede9df",
-        background: excluded ? "#faf8f3" : "#fff",
+        borderTop: "1px solid #ece6d8",
+        background: excluded ? "#f6f2e9" : "#fff",
         opacity: excluded ? 0.75 : 1,
       }}>
         <span
-          style={{ cursor: "grab", color: "#d6d3d1", fontSize: 16, userSelect: "none" }}
+          style={{ cursor: "grab", color: "#c7cdd3", fontSize: 16, userSelect: "none" }}
           {...listeners}
           {...attributes}
           title="Перетащите в другую группу"
@@ -504,7 +504,7 @@ function AccountRow({
           {excluded && (
             <span style={{
               marginLeft: 6, fontSize: 10, padding: "1px 6px", borderRadius: 4,
-              background: "#fef3c7", color: "#854d0e",
+              background: "#f4ead3", color: "#846630",
               textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 600,
               verticalAlign: "middle",
             }}>
@@ -512,14 +512,14 @@ function AccountRow({
             </span>
           )}
           {multiCurrency && (
-            <span style={{ marginLeft: 6, color: "#a8a29e", fontSize: 12 }}>
+            <span style={{ marginLeft: 6, color: "#a6afb8", fontSize: 12 }}>
               {isExpanded ? "▾" : "▸"} {acc.balances.length} валют
             </span>
           )}
         </span>
         <span style={{
           fontWeight: 700, fontSize: 15,
-          color: excluded ? "#a8a29e" : (acc.color || "#1c1917"),
+          color: excluded ? "#a6afb8" : (acc.color || "#1b2531"),
           textDecoration: excluded ? "line-through" : "none",
         }}>
           {formatMoney(acc.total_in_main)} {currencySymbol(mainCurrency)}
@@ -546,7 +546,7 @@ function AccountRow({
           type="button"
           onClick={() => onDelete(acc)}
           className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 14, color: "#b91c1c" }}
+          style={{ padding: "2px 8px", fontSize: 14, color: "#c0432b" }}
           title="Удалить счёт"
         >
           ×
@@ -559,14 +559,14 @@ function AccountRow({
           {acc.balances.map(b => (
             <div key={b.currency} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "4px 0",
-              fontSize: 13, color: "#57534e",
+              fontSize: 13, color: "#515c68",
             }}>
               <span style={{ minWidth: 50, fontWeight: 600 }}>{b.currency}</span>
               <span style={{ flex: 1 }}>
                 {formatMoneyWithCurrency(b.balance, b.currency)}
               </span>
               {b.currency !== mainCurrency && (
-                <span style={{ color: "#a8a29e", fontSize: 12 }}>
+                <span style={{ color: "#a6afb8", fontSize: 12 }}>
                   ≈ {formatMoney(b.balance_in_main)} {currencySymbol(mainCurrency)}
                 </span>
               )}
@@ -583,7 +583,7 @@ function AccountRow({
                   type="button"
                   onClick={() => onDeleteCurrency(acc, b)}
                   className="btn-ghost"
-                  style={{ padding: "1px 6px", fontSize: 11, color: "#b91c1c" }}
+                  style={{ padding: "1px 6px", fontSize: 11, color: "#c0432b" }}
                 >
                   ×
                 </button>

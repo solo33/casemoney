@@ -7,7 +7,7 @@ import { useUser } from "../contexts/UserContext";
 import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
-const TYPE_COLOR = { income: "#15803d", expense: "#b91c1c", transfer: "#1d4ed8" };
+const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
 
 const RU_MONTHS_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 
@@ -92,7 +92,7 @@ export default function Home() {
   }, [dashboard]);
 
   if (loading) return <div className="page">Загрузка...</div>;
-  if (error) return <div className="page" style={{ color: "#b91c1c" }}>{error}</div>;
+  if (error) return <div className="page" style={{ color: "#c0432b" }}>{error}</div>;
 
   const totalBalance = dashboard.total_balance;
   const monthExpenses = summary?.category_breakdown || [];
@@ -123,18 +123,18 @@ export default function Home() {
         <Card>
           <h3 style={sectionTitle}>Баланс</h3>
           <div className="money-hero tabular" style={{
-            fontSize: 42, color: "#1c1917", lineHeight: 1.1, marginTop: 4,
+            fontSize: 42, color: "#1b2531", lineHeight: 1.1, marginTop: 4,
           }}>
-            {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a8a29e", fontWeight: 400 }}>{mainCurrency}</span>
+            {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
           </div>
           {byCurrency.length > 0 && (
             <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 2 }}>
               {byCurrency.map(c => (
                 <div key={c.currency} style={{
                   display: "flex", justifyContent: "flex-end", gap: 6,
-                  fontSize: 13, color: "#78716c",
+                  fontSize: 13, color: "#7a8590",
                 }}>
-                  <span style={{ fontWeight: 500, color: "#57534e" }}>
+                  <span style={{ fontWeight: 500, color: "#515c68" }}>
                     {formatMoney(c.balance, { maxFraction: 2 })}
                   </span>
                   <span>{c.currency}</span>
@@ -153,12 +153,12 @@ export default function Home() {
         <Card noPadding>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Счета</h3>
-            <Link to="/accounts" style={{ fontSize: 12, color: "#9f1239", textDecoration: "none" }}>
+            <Link to="/accounts" style={{ fontSize: 12, color: "#173a54", textDecoration: "none" }}>
               Настроить →
             </Link>
           </div>
           {grouped.length === 0 ? (
-            <p style={{ padding: "10px 16px 16px", color: "#a8a29e", fontSize: 13 }}>
+            <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
               Нет счетов. <Link to="/accounts">Добавить</Link>
             </p>
           ) : (
@@ -176,16 +176,16 @@ export default function Home() {
 
         {/* Records today + чарт */}
         <Card noPadding>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #ede9df", display: "flex", gap: 12, alignItems: "baseline" }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #ece6d8", display: "flex", gap: 12, alignItems: "baseline" }}>
             <h3 style={{ ...sectionTitle, marginBottom: 0 }}>
               Записи за {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
             </h3>
-            <span style={{ color: "#a8a29e", fontSize: 13, marginLeft: "auto" }}>
+            <span style={{ color: "#a6afb8", fontSize: 13, marginLeft: "auto" }}>
               {todayTx.length} {todayTx.length === 1 ? "запись" : "записей"}
             </span>
           </div>
           {todayTx.length === 0 ? (
-            <p style={{ padding: 24, textAlign: "center", color: "#a8a29e", fontSize: 14 }}>
+            <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
               Нет записей за сегодня. Добавьте первую операцию кнопкой <strong>+</strong>.
             </p>
           ) : (
@@ -194,11 +194,11 @@ export default function Home() {
                 <div key={tx.id} style={{
                   display: "flex", alignItems: "center", gap: 12,
                   padding: "10px 16px",
-                  borderTop: idx === 0 ? "none" : "1px solid #ede9df",
+                  borderTop: idx === 0 ? "none" : "1px solid #ece6d8",
                 }}>
                   <div style={{
                     width: 32, height: 32, borderRadius: "50%",
-                    background: "#ede9df", display: "flex",
+                    background: "#ece6d8", display: "flex",
                     alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
                   }}>
                     {tx.category_icon || "💸"}
@@ -207,7 +207,7 @@ export default function Home() {
                     <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {tx.description || tx.category_name || TYPE_LABEL[tx.type]}
                     </div>
-                    <div style={{ fontSize: 12, color: "#a8a29e" }}>
+                    <div style={{ fontSize: 12, color: "#a6afb8" }}>
                       {tx.account_name}
                     </div>
                   </div>
@@ -227,12 +227,12 @@ export default function Home() {
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
             <h3 style={sectionTitle}>Расходы за {monthLabel.toLowerCase()}</h3>
-            <Link to="/reports" style={{ fontSize: 12, color: "#9f1239", textDecoration: "none" }}>
+            <Link to="/reports" style={{ fontSize: 12, color: "#173a54", textDecoration: "none" }}>
               Подробнее →
             </Link>
           </div>
           {monthExpenses.length === 0 ? (
-            <p style={{ color: "#a8a29e", fontSize: 14 }}>Нет расходов за этот месяц</p>
+            <p style={{ color: "#a6afb8", fontSize: 14 }}>Нет расходов за этот месяц</p>
           ) : (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -250,11 +250,11 @@ export default function Home() {
               </div>
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                marginTop: 14, paddingTop: 12, borderTop: "1px solid #ede9df",
+                marginTop: 14, paddingTop: 12, borderTop: "1px solid #ece6d8",
                 fontSize: 14, fontWeight: 600,
               }}>
-                <span style={{ color: "#57534e" }}>Итого</span>
-                <span style={{ color: "#b91c1c" }}>{formatMoney(expenseTotal)} {sym}</span>
+                <span style={{ color: "#515c68" }}>Итого</span>
+                <span style={{ color: "#c0432b" }}>{formatMoney(expenseTotal)} {sym}</span>
               </div>
             </>
           )}
@@ -269,7 +269,7 @@ export default function Home() {
 const sectionTitle = {
   margin: "0 0 10px",
   fontSize: 13,
-  color: "#78716c",
+  color: "#7a8590",
   fontWeight: 600,
   textTransform: "uppercase",
   letterSpacing: 0.5,
@@ -278,8 +278,8 @@ const sectionTitle = {
 function Card({ children, style, noPadding }) {
   return (
     <div style={{
-      background: "#fff",
-      border: "1px solid #e7e5e0",
+      background: "#fffdf7",
+      border: "1px solid #e4ddcd",
       borderRadius: 10,
       padding: noPadding ? 0 : 16,
       ...style,
@@ -291,7 +291,7 @@ function Card({ children, style, noPadding }) {
 
 function MonthBars({ points, sym }) {
   if (!points.length) {
-    return <p style={{ color: "#a8a29e", fontSize: 14 }}>Нет данных</p>;
+    return <p style={{ color: "#a6afb8", fontSize: 14 }}>Нет данных</p>;
   }
   // макс среди всех значений для нормализации длины бара
   const maxVal = Math.max(...points.flatMap(p => [Math.abs(p.income), Math.abs(p.expense)])) || 1;
@@ -308,13 +308,13 @@ function MonthBars({ points, sym }) {
             marginBottom: idx === points.length - 1 ? 0 : 12,
           }}>
             <div style={{
-              fontSize: 12, color: "#78716c", marginBottom: 4,
+              fontSize: 12, color: "#7a8590", marginBottom: 4,
               display: "flex", justifyContent: "space-between",
             }}>
               <span>{label}</span>
             </div>
-            <Bar value={p.income} max={maxVal} color="#15803d" sym={sym} sign="+" />
-            <Bar value={p.expense} max={maxVal} color="#b91c1c" sym={sym} sign="−" />
+            <Bar value={p.income} max={maxVal} color="#167a4a" sym={sym} sign="+" />
+            <Bar value={p.expense} max={maxVal} color="#c0432b" sym={sym} sign="−" />
           </div>
         );
       })}
@@ -330,7 +330,7 @@ function Bar({ value, max, color, sym, sign }) {
       fontSize: 12, marginTop: 3,
     }}>
       <div style={{
-        flex: 1, height: 8, background: "#ede9df", borderRadius: 4, overflow: "hidden",
+        flex: 1, height: 8, background: "#ece6d8", borderRadius: 4, overflow: "hidden",
       }}>
         <div style={{
           width: `${pct}%`, height: "100%", background: color, borderRadius: 4,
@@ -347,7 +347,7 @@ function GroupBlock({ bucket, sym }) {
   return (
     <div style={{
       padding: "10px 16px",
-      borderTop: "1px solid #ede9df",
+      borderTop: "1px solid #ece6d8",
     }}>
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
@@ -356,7 +356,7 @@ function GroupBlock({ bucket, sym }) {
         <span style={{ fontWeight: 600, fontSize: 13, color: "#44403c" }}>
           {bucket.group.name}
         </span>
-        <span style={{ fontWeight: 600, fontSize: 13, color: "#57534e" }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: "#515c68" }}>
           {formatMoney(bucket.total_in_main)} {sym}
         </span>
       </div>
@@ -378,12 +378,12 @@ function AccountBlock({ acc, sym }) {
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
         fontSize: 13,
       }}>
-        <span style={{ color: "#57534e", display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color: "#515c68", display: "flex", alignItems: "center", gap: 6 }}>
           {acc.icon && <span>{acc.icon}</span>}
           {acc.name}
         </span>
         {balances.length === 1 && (
-          <span style={{ color: "#1c1917", fontWeight: 500 }}>
+          <span style={{ color: "#1b2531", fontWeight: 500 }}>
             {formatMoneyWithCurrency(balances[0].balance, balances[0].currency)}
           </span>
         )}
@@ -393,9 +393,9 @@ function AccountBlock({ acc, sym }) {
           {balances.map(b => (
             <div key={b.currency} style={{
               display: "flex", justifyContent: "space-between",
-              fontSize: 12, color: "#78716c", padding: "1px 0",
+              fontSize: 12, color: "#7a8590", padding: "1px 0",
             }}>
-              <span style={{ color: "#a8a29e" }}>{b.currency}</span>
+              <span style={{ color: "#a6afb8" }}>{b.currency}</span>
               <span>{formatMoney(b.balance)}</span>
             </div>
           ))}
@@ -416,13 +416,13 @@ function CategoryBar({ name, icon, color, total, max, sym }) {
     }}>
       <span style={{
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        display: "flex", alignItems: "center", gap: 6, color: "#57534e",
+        display: "flex", alignItems: "center", gap: 6, color: "#515c68",
       }}>
         {icon && <span>{icon}</span>}
         {name}
       </span>
       <div style={{
-        height: 14, background: "#faf8f3", borderRadius: 3, overflow: "hidden",
+        height: 14, background: "#f6f2e9", borderRadius: 3, overflow: "hidden",
       }}>
         <div style={{
           width: `${pct}%`, height: "100%",
@@ -430,7 +430,7 @@ function CategoryBar({ name, icon, color, total, max, sym }) {
           borderRadius: 3,
         }} />
       </div>
-      <span style={{ color: "#57534e", minWidth: 80, textAlign: "right", fontWeight: 500 }}>
+      <span style={{ color: "#515c68", minWidth: 80, textAlign: "right", fontWeight: 500 }}>
         {formatMoney(total)} {sym}
       </span>
     </div>

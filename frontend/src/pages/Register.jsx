@@ -38,35 +38,35 @@ export default function Register() {
   return (
     <div style={{
       minHeight: "100svh",
-      background: "linear-gradient(180deg, #faf8f3 0%, #f5f3ee 100%)",
+      background: "linear-gradient(180deg, #f6f2e9 0%, #efe9db 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 24,
     }}>
       <div style={{
-        background: "#fff", border: "1px solid #e7e5e0", borderRadius: 12,
+        background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 12,
         padding: 32, maxWidth: 460, width: "100%",
       }}>
         <div style={{
           fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600,
-          color: "#9f1239", marginBottom: 20, textAlign: "center",
+          color: "#173a54", marginBottom: 20, textAlign: "center",
         }}>
           ₽ CaseMoney
         </div>
 
         {done ? (
           <>
-            <div style={{ fontSize: 48, color: "#15803d", textAlign: "center", marginBottom: 8 }}>📬</div>
+            <div style={{ fontSize: 48, color: "#167a4a", textAlign: "center", marginBottom: 8 }}>📬</div>
             <h2 style={{
               fontFamily: "var(--serif)", fontWeight: 500, textAlign: "center",
               margin: "0 0 12px",
             }}>
               Проверьте почту
             </h2>
-            <p style={{ color: "#57534e", textAlign: "center", margin: "0 0 16px" }}>
+            <p style={{ color: "#515c68", textAlign: "center", margin: "0 0 16px" }}>
               Мы отправили письмо со ссылкой активации на<br />
-              <strong style={{ color: "#1c1917" }}>{done.email}</strong>
+              <strong style={{ color: "#1b2531" }}>{done.email}</strong>
             </p>
-            <p style={{ fontSize: 13, color: "#78716c", textAlign: "center", margin: "0 0 20px" }}>
+            <p style={{ fontSize: 13, color: "#7a8590", textAlign: "center", margin: "0 0 20px" }}>
               Перейдите по ссылке из письма, чтобы подтвердить email. Проверьте папку Спам.
             </p>
 
@@ -74,7 +74,7 @@ export default function Register() {
               <div style={{
                 background: "#fefce8", border: "1px solid #facc15",
                 borderRadius: 8, padding: 12, marginBottom: 16,
-                fontSize: 12, color: "#78716c",
+                fontSize: 12, color: "#7a8590",
               }}>
                 <strong>Dev-режим:</strong> SMTP не настроен на сервере, письмо выведено в консоль backend.
               </div>
@@ -88,7 +88,7 @@ export default function Register() {
                 to="/login"
                 style={{
                   flex: 1, padding: "10px", borderRadius: 6,
-                  background: "#9f1239", color: "#fff", textDecoration: "none",
+                  background: "#173a54", color: "#fff", textDecoration: "none",
                   textAlign: "center", fontWeight: 500,
                 }}
               >
@@ -96,7 +96,7 @@ export default function Register() {
               </Link>
             </div>
             {resendMsg && (
-              <p style={{ fontSize: 12, color: "#57534e", marginTop: 10, textAlign: "center" }}>
+              <p style={{ fontSize: 12, color: "#515c68", marginTop: 10, textAlign: "center" }}>
                 {resendMsg}
               </p>
             )}
@@ -109,7 +109,7 @@ export default function Register() {
             }}>
               Регистрация
             </h2>
-            <p style={{ color: "#78716c", fontSize: 13, margin: "0 0 20px" }}>
+            <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 20px" }}>
               Бесплатный тариф: 3 счёта · 10 категорий · 1 валюта
             </p>
 
@@ -146,7 +146,7 @@ export default function Register() {
               </label>
 
               {error && (
-                <p style={{ color: "#b91c1c", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
+                <p style={{ color: "#c0432b", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
               )}
 
               <button
@@ -158,9 +158,9 @@ export default function Register() {
               </button>
             </form>
 
-            <p style={{ marginTop: 16, fontSize: 13, color: "#78716c", textAlign: "center" }}>
+            <p style={{ marginTop: 16, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
               Уже есть аккаунт?{" "}
-              <Link to="/login" style={{ color: "#9f1239", fontWeight: 500 }}>
+              <Link to="/login" style={{ color: "#173a54", fontWeight: 500 }}>
                 Войти
               </Link>
             </p>
@@ -174,6 +174,6 @@ export default function Register() {
 const lbl = { display: "block", marginBottom: 14 };
 const lblText = {
   display: "block",
-  fontSize: 12, color: "#78716c",
+  fontSize: 12, color: "#7a8590",
   marginBottom: 4, fontWeight: 500,
 };

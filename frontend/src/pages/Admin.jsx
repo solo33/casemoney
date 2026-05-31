@@ -15,7 +15,7 @@ export default function Admin() {
     return (
       <div className="page" style={{ maxWidth: 600 }}>
         <h1>Доступ запрещён</h1>
-        <p style={{ color: "#78716c" }}>
+        <p style={{ color: "#7a8590" }}>
           Эта страница доступна только администраторам.
         </p>
       </div>
@@ -28,7 +28,7 @@ export default function Admin() {
 
       <div style={{
         display: "flex", gap: 4, marginBottom: 20,
-        borderBottom: "1px solid #e7e5e0",
+        borderBottom: "1px solid #e4ddcd",
       }}>
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>Пользователи</TabBtn>
         <TabBtn active={tab === "stats"} onClick={() => setTab("stats")}>Система</TabBtn>
@@ -47,9 +47,9 @@ function TabBtn({ active, onClick, children }) {
       className="btn-ghost"
       style={{
         border: "none",
-        borderBottom: active ? "3px solid #9f1239" : "3px solid transparent",
+        borderBottom: active ? "3px solid #173a54" : "3px solid transparent",
         background: "transparent",
-        color: active ? "#9f1239" : "#78716c",
+        color: active ? "#173a54" : "#7a8590",
         fontWeight: active ? 600 : 500,
         padding: "10px 16px",
         borderRadius: 0,
@@ -108,7 +108,7 @@ function UsersTab({ adminId }) {
       <div>
         {/* Фильтры */}
         <div style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           padding: 12, marginBottom: 12,
           display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
         }}>
@@ -138,7 +138,7 @@ function UsersTab({ adminId }) {
         {/* Pagination */}
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginBottom: 8, fontSize: 13, color: "#78716c",
+          marginBottom: 8, fontSize: 13, color: "#7a8590",
         }}>
           <span>
             {loading ? "..." : data.total === 0 ? "Нет пользователей" :
@@ -155,11 +155,11 @@ function UsersTab({ adminId }) {
           )}
         </div>
 
-        {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+        {error && <p style={{ color: "#c0432b" }}>{error}</p>}
 
         {/* Таблица */}
         <div className="table-wrap" style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
           <table style={{ fontSize: 13 }}>
             <thead>
@@ -180,7 +180,7 @@ function UsersTab({ adminId }) {
                   key={u.id}
                   onClick={() => setSelected(u)}
                   style={{
-                    borderTop: "1px solid #ede9df",
+                    borderTop: "1px solid #ece6d8",
                     background: selected?.id === u.id ? "#fdf2f4" : "transparent",
                     cursor: "pointer",
                   }}
@@ -193,13 +193,13 @@ function UsersTab({ adminId }) {
                   <td style={td}>
                     <PlanBadge premium={u.is_premium} />
                   </td>
-                  <td style={{ ...td, color: u.is_active ? "#15803d" : "#b91c1c" }}>
+                  <td style={{ ...td, color: u.is_active ? "#167a4a" : "#c0432b" }}>
                     {u.is_active ? "активен" : "заблокирован"}
                   </td>
                   <td style={{ ...td, textAlign: "right" }}>{u.accounts_count}</td>
                   <td style={{ ...td, textAlign: "right" }}>{u.categories_count}</td>
                   <td style={{ ...td, textAlign: "right" }}>{u.transactions_count}</td>
-                  <td style={{ ...td, color: "#a8a29e", fontSize: 12 }}>
+                  <td style={{ ...td, color: "#a6afb8", fontSize: 12 }}>
                     {u.created_at ? new Date(u.created_at).toLocaleDateString("ru-RU") : "—"}
                   </td>
                 </tr>
@@ -271,7 +271,7 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
 
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+      background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 18, position: "sticky", top: 70, alignSelf: "start",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
@@ -279,14 +279,14 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
         <button onClick={onClose} className="btn-ghost" style={{ padding: "2px 8px", fontSize: 16 }}>×</button>
       </div>
 
-      <div style={{ fontSize: 13, color: "#57534e", marginBottom: 16 }}>
-        <div style={{ color: "#1c1917", fontWeight: 500, marginBottom: 4 }}>{user.email}</div>
+      <div style={{ fontSize: 13, color: "#515c68", marginBottom: 16 }}>
+        <div style={{ color: "#1b2531", fontWeight: 500, marginBottom: 4 }}>{user.email}</div>
         <div>ID: {user.id} · {user.main_currency}</div>
         <div>Создан: {user.created_at ? new Date(user.created_at).toLocaleString("ru-RU") : "—"}</div>
       </div>
 
-      {error && <div style={{ ...flashBox, color: "#b91c1c", background: "#fef2f0", border: "1px solid #fecdd3" }}>{error}</div>}
-      {msg && <div style={{ ...flashBox, color: "#15803d", background: "#dcfce7", border: "1px solid #86efac" }}>{msg}</div>}
+      {error && <div style={{ ...flashBox, color: "#c0432b", background: "#fef2f0", border: "1px solid #fecdd3" }}>{error}</div>}
+      {msg && <div style={{ ...flashBox, color: "#167a4a", background: "#dcfce7", border: "1px solid #86efac" }}>{msg}</div>}
 
       {/* План */}
       <Section title="План">
@@ -320,7 +320,7 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
           )}
         </div>
         {user.premium_until && (
-          <div style={{ fontSize: 12, color: "#78716c", marginTop: 6 }}>
+          <div style={{ fontSize: 12, color: "#7a8590", marginTop: 6 }}>
             До {new Date(user.premium_until).toLocaleString("ru-RU")}
           </div>
         )}
@@ -372,7 +372,7 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
           <Row label="Категории" value={user.categories_count} />
           <Row label="Транзакции" value={user.transactions_count} />
         </div>
-        <p style={{ fontSize: 11, color: "#a8a29e", marginTop: 8 }}>
+        <p style={{ fontSize: 11, color: "#a6afb8", marginTop: 8 }}>
           Сами транзакции и счета не доступны из админки.
         </p>
       </Section>
@@ -416,7 +416,7 @@ function StatsTab() {
     }
   };
 
-  if (error) return <p style={{ color: "#b91c1c" }}>{error}</p>;
+  if (error) return <p style={{ color: "#c0432b" }}>{error}</p>;
   if (!stats) return <p>Загрузка...</p>;
 
   const premiumPct = stats.total_users > 0 ? (stats.premium_users / stats.total_users * 100).toFixed(1) : 0;
@@ -431,8 +431,8 @@ function StatsTab() {
         gap: 12, marginBottom: 20,
       }}>
         <Kpi label="Всего юзеров" value={stats.total_users} />
-        <Kpi label="Активных" value={stats.active_users} color="#15803d" />
-        <Kpi label="Premium" value={`${stats.premium_users}`} sub={`${premiumPct}%`} color="#9f1239" />
+        <Kpi label="Активных" value={stats.active_users} color="#167a4a" />
+        <Kpi label="Premium" value={`${stats.premium_users}`} sub={`${premiumPct}%`} color="#173a54" />
         <Kpi label="Админов" value={stats.admin_users} />
         <Kpi label="Регистраций (7д)" value={stats.new_users_last_7d} />
         <Kpi label="Регистраций (30д)" value={stats.new_users_last_30d} />
@@ -442,20 +442,20 @@ function StatsTab() {
         display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
         gap: 12, marginBottom: 20,
       }}>
-        <Kpi label="Всего счетов" value={stats.total_accounts} color="#57534e" />
-        <Kpi label="Всего категорий" value={stats.total_categories} color="#57534e" />
-        <Kpi label="Всего транзакций" value={stats.total_transactions.toLocaleString("ru-RU")} color="#57534e" />
+        <Kpi label="Всего счетов" value={stats.total_accounts} color="#515c68" />
+        <Kpi label="Всего категорий" value={stats.total_categories} color="#515c68" />
+        <Kpi label="Всего транзакций" value={stats.total_transactions.toLocaleString("ru-RU")} color="#515c68" />
       </div>
 
       <div style={{
-        background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+        background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
         padding: 18,
       }}>
-        <h3 style={{ marginTop: 0, fontSize: 14, color: "#57534e", textTransform: "uppercase", letterSpacing: 0.5 }}>
+        <h3 style={{ marginTop: 0, fontSize: 14, color: "#515c68", textTransform: "uppercase", letterSpacing: 0.5 }}>
           Регистрации за 30 дней
         </h3>
         {stats.new_signups_by_day.length === 0 ? (
-          <p style={{ color: "#a8a29e", margin: 0 }}>Нет регистраций</p>
+          <p style={{ color: "#a6afb8", margin: 0 }}>Нет регистраций</p>
         ) : (
           <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 120 }}>
             {stats.new_signups_by_day.map(d => (
@@ -465,7 +465,7 @@ function StatsTab() {
                 style={{
                   flex: 1, minWidth: 6,
                   height: `${(d.count / maxCount) * 100}%`,
-                  background: "#9f1239", borderRadius: "2px 2px 0 0",
+                  background: "#173a54", borderRadius: "2px 2px 0 0",
                   minHeight: 2,
                 }}
               />
@@ -477,38 +477,38 @@ function StatsTab() {
       {/* Системные настройки */}
       {config && (
         <div style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           padding: 18, marginTop: 20,
         }}>
-          <h3 style={{ marginTop: 0, fontSize: 14, color: "#57534e", textTransform: "uppercase", letterSpacing: 0.5 }}>
+          <h3 style={{ marginTop: 0, fontSize: 14, color: "#515c68", textTransform: "uppercase", letterSpacing: 0.5 }}>
             Системные настройки
           </h3>
 
           <div style={{
             display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-            gap: 16, padding: "12px 0", borderBottom: "1px solid #ede9df",
+            gap: 16, padding: "12px 0", borderBottom: "1px solid #ece6d8",
           }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1c1917", marginBottom: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1b2531", marginBottom: 4 }}>
                 Требовать подтверждение email
               </div>
-              <div style={{ fontSize: 12.5, color: "#78716c", lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
                 {config.require_email_verification ? (
                   <>
-                    <strong style={{ color: "#15803d" }}>Включено.</strong> При регистрации
+                    <strong style={{ color: "#167a4a" }}>Включено.</strong> При регистрации
                     отправляется письмо со ссылкой активации. До подтверждения юзер видит баннер.
                   </>
                 ) : (
                   <>
-                    <strong style={{ color: "#b91c1c" }}>Отключено.</strong> Новые юзеры
+                    <strong style={{ color: "#c0432b" }}>Отключено.</strong> Новые юзеры
                     активируются автоматически (письма не отправляются).
                   </>
                 )}
                 {!config.smtp_configured && (
                   <div style={{
                     marginTop: 8, padding: "6px 10px",
-                    background: "#fef3c7", border: "1px solid #facc15", borderRadius: 6,
-                    color: "#854d0e", fontSize: 12,
+                    background: "#f4ead3", border: "1px solid #facc15", borderRadius: 6,
+                    color: "#846630", fontSize: 12,
                   }}>
                     ⚠ SMTP не настроен — даже при включённой опции письма выводятся только в консоль backend.
                   </div>
@@ -536,10 +536,10 @@ function StatsTab() {
 function Section({ title, children, tone }) {
   const danger = tone === "danger";
   return (
-    <div style={{ marginBottom: 14, paddingTop: 12, borderTop: "1px solid #ede9df" }}>
+    <div style={{ marginBottom: 14, paddingTop: 12, borderTop: "1px solid #ece6d8" }}>
       <div style={{
         fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4,
-        color: danger ? "#b91c1c" : "#78716c",
+        color: danger ? "#c0432b" : "#7a8590",
         marginBottom: 8,
       }}>
         {title}
@@ -552,7 +552,7 @@ function Section({ title, children, tone }) {
 function Row({ label, value }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between" }}>
-      <span style={{ color: "#78716c" }}>{label}</span>
+      <span style={{ color: "#7a8590" }}>{label}</span>
       <span style={{ fontWeight: 600 }}>{value}</span>
     </div>
   );
@@ -561,19 +561,19 @@ function Row({ label, value }) {
 function Kpi({ label, value, sub, color }) {
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+      background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 16,
     }}>
-      <div style={{ fontSize: 11, color: "#78716c", textTransform: "uppercase", letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 11, color: "#7a8590", textTransform: "uppercase", letterSpacing: 0.5 }}>
         {label}
       </div>
       <div style={{
         fontFamily: "var(--serif)", fontSize: 30, fontWeight: 500,
-        color: color || "#1c1917", lineHeight: 1.1, marginTop: 4,
+        color: color || "#1b2531", lineHeight: 1.1, marginTop: 4,
       }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#a6afb8", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -583,9 +583,9 @@ function PlanBadge({ premium }) {
     <span style={{
       fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
       textTransform: "uppercase", letterSpacing: 0.5,
-      background: premium ? "linear-gradient(90deg, #9f1239 0%, #be123c 100%)" : "transparent",
-      color: premium ? "#fff" : "#9f1239",
-      border: premium ? "none" : "1px solid #9f1239",
+      background: premium ? "linear-gradient(90deg, #173a54 0%, #be123c 100%)" : "transparent",
+      color: premium ? "#fff" : "#173a54",
+      border: premium ? "none" : "1px solid #173a54",
     }}>
       {premium ? "★ Premium" : "Free"}
     </span>
@@ -604,7 +604,7 @@ const flashBox = {
 };
 const adminBadge = {
   marginLeft: 6, fontSize: 9, padding: "1px 6px",
-  background: "#1c1917", color: "#fff",
+  background: "#1b2531", color: "#fff",
   borderRadius: 4, fontWeight: 700, letterSpacing: 0.5,
   verticalAlign: "middle",
 };

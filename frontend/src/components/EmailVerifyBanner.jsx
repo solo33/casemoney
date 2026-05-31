@@ -23,7 +23,7 @@ export default function EmailVerifyBanner() {
 
   return (
     <div style={{
-      background: "#fef3c7", borderBottom: "1px solid #facc15",
+      background: "#f4ead3", borderBottom: "1px solid #facc15",
       padding: "10px 24px",
       display: "flex", justifyContent: "space-between", alignItems: "center",
       gap: 12, flexWrap: "wrap",
@@ -40,7 +40,7 @@ export default function EmailVerifyBanner() {
           className="btn-ghost"
           style={{
             padding: "4px 12px", fontSize: 12,
-            border: "1px solid #ca8a04", color: "#854d0e",
+            border: "1px solid #ca8a04", color: "#846630",
             background: "rgba(255,255,255,0.5)",
           }}
         >

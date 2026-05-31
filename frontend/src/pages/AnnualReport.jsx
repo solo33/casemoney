@@ -55,12 +55,12 @@ export default function AnnualReport() {
   return (
     <div className="page" style={{ maxWidth: 1280 }}>
       <div style={{ marginBottom: 8 }}>
-        <Link to="/reports" style={{ fontSize: 13, color: "#9f1239", textDecoration: "none" }}>
+        <Link to="/reports" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
           ← К сводке
         </Link>
       </div>
       <h1 style={{ marginBottom: 16 }}>
-        Годовой анализ доходов и расходов, <span style={{ color: "#9f1239" }}>{data?.main_currency || mainCurrency}</span>
+        Годовой анализ доходов и расходов, <span style={{ color: "#173a54" }}>{data?.main_currency || mainCurrency}</span>
       </h1>
 
       {/* Контролы */}
@@ -69,7 +69,7 @@ export default function AnnualReport() {
         marginBottom: 16,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "#57534e" }}>Выберите год:</span>
+          <span style={{ fontSize: 13, color: "#515c68" }}>Выберите год:</span>
           <button
             type="button" className="btn-ghost"
             onClick={() => setYear(y => y - 1)}
@@ -92,7 +92,7 @@ export default function AnnualReport() {
             aria-label="Следующий год"
           >►</button>
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#57534e", cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#515c68", cursor: "pointer" }}>
           <input
             type="checkbox"
             checked={hideEmpty}
@@ -103,11 +103,11 @@ export default function AnnualReport() {
       </div>
 
       {loading && <p>Загрузка...</p>}
-      {error && <p style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p style={{ color: "#c0432b" }}>{error}</p>}
 
       {data && !loading && (
         <div className="table-wrap" style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
           <table style={{ minWidth: 1100, fontSize: 13 }}>
             <colgroup>
@@ -116,7 +116,7 @@ export default function AnnualReport() {
               <col style={{ minWidth: 90 }} />
             </colgroup>
             <thead>
-              <tr style={{ background: "#a8a29e" }}>
+              <tr style={{ background: "#a6afb8" }}>
                 <Th style={{ color: "#fff" }}>Категория</Th>
                 {MONTHS.map(m => <Th key={m} align="right" style={{ color: "#fff" }}>{m}</Th>)}
                 <Th align="right" style={{ color: "#fff" }}>Всего</Th>
@@ -131,7 +131,7 @@ export default function AnnualReport() {
               {incomeRows.map(row => (
                 <RowLine
                   key={`i-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#15803d"
+                  row={row} sym={sym} accent="#167a4a"
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "income" });
@@ -145,7 +145,7 @@ export default function AnnualReport() {
                 monthly={data.income_totals}
                 total={data.income_total}
                 sym={sym}
-                color="#15803d"
+                color="#167a4a"
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
                   navigate(`/transactions?type=income&date_from=${p.from}&date_to=${p.to}`);
@@ -160,7 +160,7 @@ export default function AnnualReport() {
               {expenseRows.map(row => (
                 <RowLine
                   key={`e-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#b91c1c"
+                  row={row} sym={sym} accent="#c0432b"
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "expense" });
@@ -174,7 +174,7 @@ export default function AnnualReport() {
                 monthly={data.expense_totals}
                 total={data.expense_total}
                 sym={sym}
-                color="#b91c1c"
+                color="#c0432b"
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
                   navigate(`/transactions?type=expense&date_from=${p.from}&date_to=${p.to}`);
@@ -218,11 +218,11 @@ function Th({ children, align = "left", style = {} }) {
 
 function SectionHeader({ title, onAll }) {
   return (
-    <tr style={{ background: "#e7e5e0" }}>
+    <tr style={{ background: "#e4ddcd" }}>
       <td colSpan={13} style={{
         padding: "10px 12px",
         fontFamily: "var(--serif)",
-        fontSize: 18, fontWeight: 500, color: "#1c1917",
+        fontSize: 18, fontWeight: 500, color: "#1b2531",
         letterSpacing: -0.01,
       }}>
         {title}
@@ -248,7 +248,7 @@ function RowLine({ row, sym, accent, onCellClick }) {
   const cellStyle = (active) => ({
     padding: "6px 10px",
     textAlign: "right",
-    color: active ? accent : "#d6d3d1",
+    color: active ? accent : "#c7cdd3",
     fontWeight: 400,
     fontVariantNumeric: "tabular-nums",
     cursor: active && onCellClick ? "pointer" : "default",
@@ -261,7 +261,7 @@ function RowLine({ row, sym, accent, onCellClick }) {
   };
   return (
     <tr style={{
-      borderTop: "1px solid #f5f3ee",
+      borderTop: "1px solid #efe9db",
       background: isChild ? "#fafaf9" : "#fff",
     }}>
       <td
@@ -269,7 +269,7 @@ function RowLine({ row, sym, accent, onCellClick }) {
           padding: "6px 12px",
           paddingLeft: isChild ? 36 : 12,
           fontWeight: row.is_parent ? 600 : 400,
-          color: isChild ? "#57534e" : "#1c1917",
+          color: isChild ? "#515c68" : "#1b2531",
           fontSize: isChild ? 12.5 : 13,
           cursor: Math.abs(row.total) > 0.005 && onCellClick ? "pointer" : "default",
         }}
@@ -310,10 +310,10 @@ function RowLine({ row, sym, accent, onCellClick }) {
 
 function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
   return (
-    <tr style={{ background: "#f5f3ee", borderTop: "2px solid #d6d3d1" }}>
+    <tr style={{ background: "#efe9db", borderTop: "2px solid #c7cdd3" }}>
       <td
         style={{
-          padding: "8px 12px", fontWeight: 700, color: "#1c1917",
+          padding: "8px 12px", fontWeight: 700, color: "#1b2531",
           cursor: onCellClick ? "pointer" : "default",
         }}
         onClick={() => onCellClick?.(null)}
@@ -327,7 +327,7 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
             key={i}
             style={{
               padding: "8px 10px", textAlign: "right",
-              fontWeight: 600, color: active ? color : "#a8a29e",
+              fontWeight: 600, color: active ? color : "#a6afb8",
               fontVariantNumeric: "tabular-nums",
               cursor: active && onCellClick ? "pointer" : "default",
             }}
@@ -355,7 +355,7 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
 function NetRow({ label, monthly, total, sym, onCellClick }) {
   const overallColor = total >= 0 ? "#bbf7d0" : "#fecaca";
   return (
-    <tr style={{ background: "#a8a29e" }}>
+    <tr style={{ background: "#a6afb8" }}>
       <td
         style={{
           padding: "10px 12px", fontWeight: 700, color: "#fff",
@@ -366,7 +366,7 @@ function NetRow({ label, monthly, total, sym, onCellClick }) {
         {label}
       </td>
       {monthly.map((v, i) => {
-        const color = Math.abs(v) < 0.005 ? "#e7e5e0" : (v >= 0 ? "#bbf7d0" : "#fecaca");
+        const color = Math.abs(v) < 0.005 ? "#e4ddcd" : (v >= 0 ? "#bbf7d0" : "#fecaca");
         const active = Math.abs(v) > 0.005;
         return (
           <td

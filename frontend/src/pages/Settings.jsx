@@ -92,8 +92,8 @@ export default function Settings() {
     <div className="page" style={{ maxWidth: 760 }}>
       <h1 style={{ marginBottom: 20 }}>Настройки</h1>
 
-      {error && <FlashBox color="#b91c1c" bg="#fef2f0" border="#fecdd3">{error}</FlashBox>}
-      {msg && <FlashBox color="#15803d" bg="#dcfce7" border="#86efac">{msg}</FlashBox>}
+      {error && <FlashBox color="#c0432b" bg="#fef2f0" border="#fecdd3">{error}</FlashBox>}
+      {msg && <FlashBox color="#167a4a" bg="#dcfce7" border="#86efac">{msg}</FlashBox>}
 
       {/* Тариф */}
       <PlanCard
@@ -235,15 +235,15 @@ function Section({ title, tone, children }) {
   const danger = tone === "danger";
   return (
     <div style={{
-      background: "#fff",
-      border: `1px solid ${danger ? "#fecdd3" : "#e7e5e0"}`,
+      background: "#fffdf7",
+      border: `1px solid ${danger ? "#fecdd3" : "#e4ddcd"}`,
       borderRadius: 10,
       padding: 18,
       marginBottom: 16,
     }}>
       <h3 style={{
         marginTop: 0, marginBottom: 14, fontSize: 14,
-        color: danger ? "#991b1b" : "#44403c",
+        color: danger ? "#a53825" : "#44403c",
         textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700,
       }}>
         {title}
@@ -256,7 +256,7 @@ function Section({ title, tone, children }) {
 function Field({ label, children }) {
   return (
     <label style={{ display: "grid", gridTemplateColumns: "minmax(160px, 200px) 1fr", gap: 12, alignItems: "center" }}>
-      <span style={{ fontSize: 13, color: "#78716c" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "#7a8590" }}>{label}</span>
       {children}
     </label>
   );
@@ -266,18 +266,18 @@ function DangerRow({ title, description, label, onClick, destructive }) {
   return (
     <div style={{
       display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap",
-      padding: "10px 0", borderTop: "1px solid #ede9df",
+      padding: "10px 0", borderTop: "1px solid #ece6d8",
     }}>
       <div style={{ flex: 1, minWidth: 240 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{title}</div>
-        <div style={{ fontSize: 12, color: "#78716c", marginTop: 2 }}>{description}</div>
+        <div style={{ fontSize: 12, color: "#7a8590", marginTop: 2 }}>{description}</div>
       </div>
       <button
         onClick={onClick}
         className="btn-danger"
         style={{
-          background: destructive ? "#991b1b" : "#fff",
-          color: destructive ? "#fff" : "#991b1b",
+          background: destructive ? "#a53825" : "#fff",
+          color: destructive ? "#fff" : "#a53825",
           border: destructive ? "none" : "1px solid #fecdd3",
           padding: "6px 14px", fontSize: 13,
         }}
@@ -299,14 +299,14 @@ function FlashBox({ color, bg, border, children }) {
   );
 }
 
-const muted = { color: "#78716c", fontSize: 13, margin: 0 };
+const muted = { color: "#7a8590", fontSize: 13, margin: 0 };
 
 
 function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
   if (isPremium) {
     return (
       <div style={{
-        background: "linear-gradient(135deg, #9f1239 0%, #881337 100%)",
+        background: "linear-gradient(135deg, #173a54 0%, #0f293d 100%)",
         color: "#fff",
         border: "none", borderRadius: 10, padding: 18, marginBottom: 16,
       }}>
@@ -342,13 +342,13 @@ function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
 
   return (
     <div style={{
-      background: "#fff", border: "1px solid #9f1239", borderRadius: 10,
+      background: "#fffdf7", border: "1px solid #173a54", borderRadius: 10,
       padding: 18, marginBottom: 16,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
         <h3 style={{
           margin: 0, fontFamily: "var(--serif)", fontSize: 20,
-          fontWeight: 600, color: "#1c1917",
+          fontWeight: 600, color: "#1b2531",
         }}>
           Бесплатный тариф
         </h3>
@@ -369,15 +369,15 @@ function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
           return (
             <div key={it.key}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: "#57534e" }}>{it.label}</span>
-                <span style={{ color: reached ? "#b91c1c" : "#78716c", fontWeight: reached ? 600 : 400 }}>
+                <span style={{ color: "#515c68" }}>{it.label}</span>
+                <span style={{ color: reached ? "#c0432b" : "#7a8590", fontWeight: reached ? 600 : 400 }}>
                   {used} / {max} {it.plural}
                 </span>
               </div>
-              <div style={{ height: 6, background: "#f5f3ee", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: 6, background: "#efe9db", borderRadius: 3, overflow: "hidden" }}>
                 <div style={{
                   width: `${pct}%`, height: "100%",
-                  background: reached ? "#b91c1c" : "#9f1239",
+                  background: reached ? "#c0432b" : "#173a54",
                   transition: "width 0.3s",
                 }} />
               </div>

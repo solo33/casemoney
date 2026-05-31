@@ -114,7 +114,7 @@ export default function Goals() {
 
       {error && (
         <div style={{
-          color: "#b91c1c", padding: "8px 12px", marginBottom: 12,
+          color: "#c0432b", padding: "8px 12px", marginBottom: 12,
           background: "#fef2f0", border: "1px solid #fecdd3", borderRadius: 8,
         }}>{error}</div>
       )}
@@ -131,8 +131,8 @@ export default function Goals() {
 
       {goals.length === 0 && !adding ? (
         <div style={{
-          background: "#fff", border: "1px dashed #d6d3d1", borderRadius: 10,
-          padding: 32, textAlign: "center", color: "#a8a29e",
+          background: "#fffdf7", border: "1px dashed #c7cdd3", borderRadius: 10,
+          padding: 32, textAlign: "center", color: "#a6afb8",
         }}>
           Нет целей. Например — «Резервный фонд 3 000 000 ₽» или «Машина 2 000 000 ₽».
           <br /><br />
@@ -155,7 +155,7 @@ function GoalCard({ g, onEdit, onDelete }) {
   const reached = pct >= 100;
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+      background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 18,
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
@@ -163,17 +163,17 @@ function GoalCard({ g, onEdit, onDelete }) {
         <div style={{ flex: 1 }}>
           <div style={{
             fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600,
-            color: "#1c1917",
+            color: "#1b2531",
           }}>
             {g.name}
           </div>
           {g.account_name && (
-            <div style={{ fontSize: 12, color: "#a8a29e" }}>
+            <div style={{ fontSize: 12, color: "#a6afb8" }}>
               привязано к счёту: {g.account_name}
             </div>
           )}
           {g.due_date && (
-            <div style={{ fontSize: 12, color: "#a8a29e" }}>
+            <div style={{ fontSize: 12, color: "#a6afb8" }}>
               до {new Date(g.due_date).toLocaleDateString("ru-RU")}
             </div>
           )}
@@ -182,35 +182,35 @@ function GoalCard({ g, onEdit, onDelete }) {
           ✎
         </button>
         <button className="btn-ghost" onClick={onDelete}
-          style={{ padding: "4px 10px", fontSize: 13, color: "#b91c1c" }}>
+          style={{ padding: "4px 10px", fontSize: 13, color: "#c0432b" }}>
           ×
         </button>
       </div>
 
       {/* Progress bar */}
       <div style={{
-        height: 12, background: "#f5f3ee", borderRadius: 6, overflow: "hidden",
+        height: 12, background: "#efe9db", borderRadius: 6, overflow: "hidden",
         marginBottom: 8,
       }}>
         <div style={{
           width: `${Math.min(100, pct)}%`,
           height: "100%",
           background: reached
-            ? "linear-gradient(90deg, #15803d 0%, #4ade80 100%)"
-            : "linear-gradient(90deg, #9f1239 0%, #be123c 100%)",
+            ? "linear-gradient(90deg, #167a4a 0%, #4ade80 100%)"
+            : "linear-gradient(90deg, #173a54 0%, #be123c 100%)",
           transition: "width 0.4s",
         }} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", fontVariantNumeric: "tabular-nums" }}>
-        <span style={{ color: reached ? "#15803d" : "#1c1917", fontWeight: 600, fontSize: 14 }}>
+        <span style={{ color: reached ? "#167a4a" : "#1b2531", fontWeight: 600, fontSize: 14 }}>
           {formatMoney(g.current_amount)} {sym}
         </span>
-        <span style={{ color: "#a8a29e", fontSize: 13 }}>
+        <span style={{ color: "#a6afb8", fontSize: 13 }}>
           из {formatMoney(g.target_amount)} {sym}
         </span>
         <span style={{
-          color: reached ? "#15803d" : "#9f1239",
+          color: reached ? "#167a4a" : "#173a54",
           fontWeight: 600, fontSize: 14, minWidth: 50, textAlign: "right",
         }}>
           {reached ? "✓ 100%" : `${pct}%`}
@@ -224,7 +224,7 @@ function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }) {
   const hasAccount = !!form.account_id;
   return (
     <form onSubmit={onSubmit} style={{
-      background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+      background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 18, marginBottom: 16,
       display: "flex", flexDirection: "column", gap: 12,
     }}>
@@ -304,4 +304,4 @@ function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }) {
   );
 }
 
-const lbl = { fontSize: 13, color: "#57534e", whiteSpace: "nowrap" };
+const lbl = { fontSize: 13, color: "#515c68", whiteSpace: "nowrap" };

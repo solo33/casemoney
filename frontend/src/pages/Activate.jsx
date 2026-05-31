@@ -27,17 +27,17 @@ export default function Activate() {
   return (
     <div style={{
       minHeight: "100svh",
-      background: "linear-gradient(180deg, #faf8f3 0%, #f5f3ee 100%)",
+      background: "linear-gradient(180deg, #f6f2e9 0%, #efe9db 100%)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 24,
     }}>
       <div style={{
-        background: "#fff", border: "1px solid #e7e5e0", borderRadius: 12,
+        background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 12,
         padding: 36, maxWidth: 460, width: "100%", textAlign: "center",
       }}>
         <div style={{
           fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600,
-          color: "#9f1239", marginBottom: 24,
+          color: "#173a54", marginBottom: 24,
         }}>
           ₽ CaseMoney
         </div>
@@ -51,19 +51,19 @@ export default function Activate() {
 
         {state.status === "ok" && (
           <>
-            <div style={{ fontSize: 48, marginBottom: 12, color: "#15803d" }}>✓</div>
+            <div style={{ fontSize: 48, marginBottom: 12, color: "#167a4a" }}>✓</div>
             <h2 style={{
               margin: "0 0 12px", fontFamily: "var(--serif)",
-              color: state.alreadyVerified ? "#57534e" : "#15803d",
+              color: state.alreadyVerified ? "#515c68" : "#167a4a",
             }}>
               {state.alreadyVerified ? "Уже подтверждён" : "Аккаунт активирован"}
             </h2>
-            <p style={{ color: "#78716c", margin: "0 0 24px" }}>{state.message}</p>
+            <p style={{ color: "#7a8590", margin: "0 0 24px" }}>{state.message}</p>
             <Link
               to="/login"
               style={{
                 display: "inline-block",
-                background: "#9f1239", color: "#fff",
+                background: "#173a54", color: "#fff",
                 padding: "10px 24px", borderRadius: 6,
                 textDecoration: "none", fontWeight: 600,
               }}
@@ -75,12 +75,12 @@ export default function Activate() {
 
         {state.status === "error" && (
           <>
-            <div style={{ fontSize: 48, marginBottom: 12, color: "#b91c1c" }}>✕</div>
-            <h2 style={{ margin: "0 0 12px", fontFamily: "var(--serif)", color: "#b91c1c" }}>
+            <div style={{ fontSize: 48, marginBottom: 12, color: "#c0432b" }}>✕</div>
+            <h2 style={{ margin: "0 0 12px", fontFamily: "var(--serif)", color: "#c0432b" }}>
               Ошибка активации
             </h2>
-            <p style={{ color: "#78716c", margin: "0 0 24px" }}>{state.message}</p>
-            <p style={{ fontSize: 13, color: "#a8a29e", marginBottom: 20 }}>
+            <p style={{ color: "#7a8590", margin: "0 0 24px" }}>{state.message}</p>
+            <p style={{ fontSize: 13, color: "#a6afb8", marginBottom: 20 }}>
               Возможно, ссылка истекла (срок 24 часа). Запросите новую — на странице входа.
             </p>
             <Link
@@ -88,9 +88,9 @@ export default function Activate() {
               className="btn-ghost"
               style={{
                 display: "inline-block",
-                border: "1px solid #e7e5e0",
+                border: "1px solid #e4ddcd",
                 padding: "10px 24px", borderRadius: 6,
-                textDecoration: "none", color: "#57534e",
+                textDecoration: "none", color: "#515c68",
               }}
             >
               На главную

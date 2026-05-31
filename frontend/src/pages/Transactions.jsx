@@ -5,7 +5,7 @@ import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { COMMON_CURRENCIES, currencySymbol, formatMoney } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
-const TYPE_COLOR = { income: "#15803d", expense: "#b91c1c", transfer: "#1d4ed8" };
+const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
 const PAGE_SIZE = 50;
 
 function isoToday() {
@@ -195,7 +195,7 @@ export default function Transactions() {
 
       {error && (
         <div style={{
-          color: "#b91c1c", padding: "8px 12px",
+          color: "#c0432b", padding: "8px 12px",
           background: "#fef2f0", border: "1px solid #fecdd3",
           borderRadius: 8, marginBottom: 12,
         }}>
@@ -207,7 +207,7 @@ export default function Transactions() {
       {/* Форма создания */}
       {editing === "new" && (
         <form onSubmit={handleCreate} style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           padding: 14, marginBottom: 16,
           display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
         }}>
@@ -250,7 +250,7 @@ export default function Transactions() {
 
       {/* Фильтры */}
       <div style={{
-        background: "#fff", border: "1px solid #e7e5e0", borderRadius: 10,
+        background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
         padding: 12, marginBottom: 12,
         display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
       }}>
@@ -301,7 +301,7 @@ export default function Transactions() {
       {/* Pagination header */}
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 8, fontSize: 13, color: "#78716c",
+        marginBottom: 8, fontSize: 13, color: "#7a8590",
       }}>
         <div>
           {loading ? "Загрузка..." : (
@@ -317,7 +317,7 @@ export default function Transactions() {
       {/* Таблица */}
       {data.items.length > 0 && (
         <div className="table-wrap" style={{
-          background: "#fff", border: "1px solid #e7e5e0", borderRadius: 8,
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
           <table>
             <thead>
@@ -377,8 +377,8 @@ function Th({ children, align = "left" }) {
 
 function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
   return (
-    <tr style={{ borderTop: "1px solid #ede9df" }}>
-      <td style={{ padding: "8px 12px", color: "#78716c", fontSize: 13, whiteSpace: "nowrap" }}>
+    <tr style={{ borderTop: "1px solid #ece6d8" }}>
+      <td style={{ padding: "8px 12px", color: "#7a8590", fontSize: 13, whiteSpace: "nowrap" }}>
         {formatDate(tx.date)}
       </td>
       <td style={{ padding: "8px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>
@@ -395,7 +395,7 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
         {tx.category_id ? categoryName(tx.category_id) : "—"}
       </td>
       <td style={{
-        padding: "8px 12px", color: "#57534e", fontSize: 13,
+        padding: "8px 12px", color: "#515c68", fontSize: 13,
         maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }} title={tx.description}>
         {tx.description || "—"}
@@ -404,7 +404,7 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
         <button className="btn-ghost" style={{ padding: "3px 8px", fontSize: 12 }} onClick={onEdit}>
           ✎
         </button>
-        <button className="btn-ghost" style={{ padding: "3px 8px", fontSize: 12, color: "#b91c1c", marginLeft: 4 }} onClick={onDelete}>
+        <button className="btn-ghost" style={{ padding: "3px 8px", fontSize: 12, color: "#c0432b", marginLeft: 4 }} onClick={onDelete}>
           ×
         </button>
       </td>
@@ -454,7 +454,7 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
   return (
     <tr style={{ background: "#fefce8", borderTop: "2px solid #facc15" }}>
       <td colSpan={7} style={{ padding: 12 }}>
-        {err && <div style={{ color: "#b91c1c", fontSize: 13, marginBottom: 6 }}>{err}</div>}
+        {err && <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 6 }}>{err}</div>}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
           <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value, category_id: "" })}>
@@ -519,7 +519,7 @@ function Pagination({ page, totalPages, onChange }) {
         const gap = prev !== undefined && p - prev > 1;
         return (
           <span key={p} style={{ display: "flex", gap: 4 }}>
-            {gap && <span style={{ color: "#a8a29e", padding: "0 4px" }}>…</span>}
+            {gap && <span style={{ color: "#a6afb8", padding: "0 4px" }}>…</span>}
             <button
               type="button"
               onClick={() => go(p)}

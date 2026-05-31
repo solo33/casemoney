@@ -28,7 +28,7 @@ export default function Login() {
   return (
     <div style={{
       minHeight: "100svh",
-      background: "linear-gradient(180deg, #faf8f3 0%, #f5f3ee 100%)",
+      background: "linear-gradient(180deg, #f6f2e9 0%, #efe9db 100%)",
     }}>
       {/* Header */}
       <header style={{
@@ -38,7 +38,7 @@ export default function Login() {
       }}>
         <div style={{
           fontFamily: "var(--serif)",
-          fontSize: 22, fontWeight: 600, color: "#9f1239",
+          fontSize: 22, fontWeight: 600, color: "#173a54",
           letterSpacing: -0.01,
         }}>
           ₽ CaseMoney
@@ -47,8 +47,8 @@ export default function Login() {
           to="/register"
           style={{
             fontSize: 13, fontWeight: 500,
-            color: "#9f1239", textDecoration: "none",
-            border: "1px solid #9f1239", padding: "6px 14px", borderRadius: 6,
+            color: "#173a54", textDecoration: "none",
+            border: "1px solid #173a54", padding: "6px 14px", borderRadius: 6,
           }}
         >
           Регистрация
@@ -68,14 +68,14 @@ export default function Login() {
           <h1 style={{
             fontFamily: "var(--serif)",
             fontSize: 56, lineHeight: 1.05, letterSpacing: -0.025,
-            fontWeight: 500, color: "#1c1917",
+            fontWeight: 500, color: "#1b2531",
             margin: "0 0 20px",
           }}>
             Все счета и валюты<br />
-            <span style={{ color: "#9f1239" }}>в одном месте.</span>
+            <span style={{ color: "#173a54" }}>в одном месте.</span>
           </h1>
           <p style={{
-            fontSize: 17, lineHeight: 1.55, color: "#57534e",
+            fontSize: 17, lineHeight: 1.55, color: "#515c68",
             margin: "0 0 32px", maxWidth: 480,
           }}>
             Счета в разных валютах с автоматическим курсом ЦБ и CoinGecko.
@@ -113,8 +113,8 @@ export default function Login() {
 
         {/* Login form */}
         <div style={{
-          background: "#fff",
-          border: "1px solid #e7e5e0",
+          background: "#fffdf7",
+          border: "1px solid #e4ddcd",
           borderRadius: 12,
           padding: 28,
         }}>
@@ -124,7 +124,7 @@ export default function Login() {
           }}>
             Войти
           </h2>
-          <p style={{ color: "#78716c", fontSize: 13, margin: "0 0 20px" }}>
+          <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 20px" }}>
             Используйте свой email и пароль.
           </p>
 
@@ -157,7 +157,7 @@ export default function Login() {
             </label>
 
             {error && (
-              <p style={{ color: "#b91c1c", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
+              <p style={{ color: "#c0432b", fontSize: 13, margin: "0 0 12px" }}>{error}</p>
             )}
 
             <button
@@ -169,9 +169,9 @@ export default function Login() {
             </button>
           </form>
 
-          <p style={{ marginTop: 16, fontSize: 13, color: "#78716c", textAlign: "center" }}>
+          <p style={{ marginTop: 16, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
             Еще нет аккаунта?{" "}
-            <Link to="/register" style={{ color: "#9f1239", fontWeight: 500 }}>
+            <Link to="/register" style={{ color: "#173a54", fontWeight: 500 }}>
               Создать
             </Link>
           </p>
@@ -182,9 +182,9 @@ export default function Login() {
       <footer style={{
         maxWidth: 1200, margin: "0 auto",
         padding: "20px 24px",
-        borderTop: "1px solid #e7e5e0",
+        borderTop: "1px solid #e4ddcd",
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        fontSize: 12, color: "#a8a29e",
+        fontSize: 12, color: "#a6afb8",
       }}>
         <span>© CaseMoney · Личные финансы</span>
         <span>Курсы валют: ЦБ РФ · CoinGecko</span>
@@ -206,16 +206,16 @@ export default function Login() {
 function Feature({ icon, title, children }) {
   return (
     <div style={{
-      background: "#fff",
-      border: "1px solid #e7e5e0",
+      background: "#fffdf7",
+      border: "1px solid #e4ddcd",
       borderRadius: 10,
       padding: 14,
     }}>
       <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
-      <div style={{ fontWeight: 600, fontSize: 14, color: "#1c1917", marginBottom: 4 }}>
+      <div style={{ fontWeight: 600, fontSize: 14, color: "#1b2531", marginBottom: 4 }}>
         {title}
       </div>
-      <div style={{ fontSize: 12.5, color: "#78716c", lineHeight: 1.4 }}>
+      <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.4 }}>
         {children}
       </div>
     </div>
@@ -226,9 +226,9 @@ function PricingPill({ plan, desc, highlight }) {
   return (
     <div style={{
       padding: "10px 16px", borderRadius: 999,
-      background: highlight ? "linear-gradient(90deg, #9f1239 0%, #be123c 100%)" : "#fff",
-      color: highlight ? "#fff" : "#1c1917",
-      border: highlight ? "none" : "1px solid #e7e5e0",
+      background: highlight ? "linear-gradient(90deg, #173a54 0%, #be123c 100%)" : "#fff",
+      color: highlight ? "#fff" : "#1b2531",
+      border: highlight ? "none" : "1px solid #e4ddcd",
       fontSize: 13,
       display: "flex", gap: 10, alignItems: "center",
     }}>
@@ -241,6 +241,6 @@ function PricingPill({ plan, desc, highlight }) {
 const lbl = { display: "block", marginBottom: 14 };
 const lblText = {
   display: "block",
-  fontSize: 12, color: "#78716c",
+  fontSize: 12, color: "#7a8590",
   marginBottom: 4, fontWeight: 500,
 };

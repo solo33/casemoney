@@ -1,0 +1,11 @@
+<svg width="360" height="96" viewBox="0 0 360 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CaseMoney">
+  <defs>
+    
+  </defs>
+  <g transform="translate(8 16)">
+    <rect width="64" height="64" rx="15" fill="#0a1d2c"></rect>
+    <path d="M 45.0 46.5 A 19.5 19.5 0 1 1 45.0 17.5" fill="none" stroke="#c2a05a" stroke-width="6.75" stroke-linecap="round"></path>
+    <circle cx="46.5" cy="32" r="2.5" fill="#c2a05a"></circle>
+  </g>
+  <text x="88" y="62" class="wm"><tspan fill="#f4f1e8">Case</tspan><tspan fill="#c2a05a">Money</tspan></text>
+</svg>

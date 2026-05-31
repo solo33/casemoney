@@ -40,18 +40,18 @@ export default function Nav() {
   const linkStyle = ({ isActive }) => ({
     textDecoration: "none",
     fontWeight: isActive ? "600" : "400",
-    color: isActive ? "#9f1239" : "#44403c",
+    color: isActive ? "#173a54" : "#44403c",
     fontSize: 14,
     padding: "6px 10px",
     borderRadius: 6,
-    background: isActive ? "rgba(159, 18, 57, 0.08)" : "transparent",
+    background: isActive ? "rgba(23, 58, 84, 0.08)" : "transparent",
     display: "block",
   });
 
   return (
     <nav style={{
-      background: "#fff",
-      borderBottom: "1px solid #e7e5e0",
+      background: "#fffdf7",
+      borderBottom: "1px solid #e4ddcd",
       position: "sticky",
       top: 0,
       zIndex: 100,
@@ -65,7 +65,7 @@ export default function Nav() {
         alignItems: "center",
         gap: 8,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 16, color: "#9f1239", marginRight: 8, whiteSpace: "nowrap" }}>
+        <span style={{ fontWeight: 700, fontSize: 16, color: "#173a54", marginRight: 8, whiteSpace: "nowrap" }}>
           💰 CaseMoney
         </span>
 
@@ -84,11 +84,11 @@ export default function Nav() {
           style={{
             marginLeft: "auto", fontSize: 11, padding: "3px 10px",
             textDecoration: "none",
-            color: isPremium ? "#fff" : "#9f1239",
+            color: isPremium ? "#fff" : "#173a54",
             background: isPremium
-              ? "linear-gradient(90deg, #9f1239 0%, #be123c 100%)"
+              ? "linear-gradient(90deg, #173a54 0%, #be123c 100%)"
               : "transparent",
-            border: `1px solid ${isPremium ? "transparent" : "#9f1239"}`,
+            border: `1px solid ${isPremium ? "transparent" : "#173a54"}`,
             borderRadius: 12,
             whiteSpace: "nowrap",
             fontWeight: 600,
@@ -105,8 +105,8 @@ export default function Nav() {
           to="/currencies"
           style={{
             fontSize: 13, padding: "5px 10px",
-            textDecoration: "none", color: "#57534e",
-            border: "1px solid #e7e5e0", borderRadius: 6,
+            textDecoration: "none", color: "#515c68",
+            border: "1px solid #e4ddcd", borderRadius: 6,
             whiteSpace: "nowrap",
           }}
           className="nav-settings-desktop"
@@ -135,8 +135,8 @@ export default function Nav() {
 
       {open && (
         <div className="nav-mobile-menu" style={{
-          background: "#fff",
-          borderTop: "1px solid #e7e5e0",
+          background: "#fffdf7",
+          borderTop: "1px solid #e4ddcd",
           padding: "8px 16px 12px",
           display: "flex",
           flexDirection: "column",
@@ -153,7 +153,7 @@ export default function Nav() {
             </NavLink>
           ))}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: "#78716c" }}>Валюта:</span>
+            <span style={{ fontSize: 12, color: "#7a8590" }}>Валюта:</span>
             <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>
               {COMMON_CURRENCIES.map(c => (
                 <option key={c} value={c}>{currencySymbol(c)} {c}</option>

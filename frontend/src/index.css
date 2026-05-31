@@ -1,55 +1,98 @@
-/* --- Editorial palette: тёплый off-white + бургунди акцент + сериф для заголовков --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* ============================================================
+   CaseMoney — Modern Ledger
+   warm paper · ink navy · brass
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  /* ---------- Font families (canonical) ---------- */
+  --font-display: 'Spectral', Georgia, 'Times New Roman', serif;        /* headings, money */
+  --font-sans:    'Golos Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  /* legacy aliases — старые компоненты ссылаются на --sans/--serif/--mono */
+  --sans:  var(--font-sans);
+  --serif: var(--font-display);
+  --mono:  var(--font-mono);
 
-  /* Backgrounds */
-  --bg: #faf8f3;          /* тёплый off-white фон страницы (светлее) */
-  --surface: #ffffff;     /* карточки (чистый белый — больше контраста с bg) */
-  --surface-2: #f5f3ee;   /* шапки таблиц, subtle divider'ы */
+  /* ---------- Paper & surfaces ---------- */
+  --paper:         #f6f2e9;
+  --surface:       #fffdf7;
+  --surface-2:     #efe9db;
+  --surface-sunken:#ebe4d3;
+  /* legacy */
+  --bg: var(--paper);
 
-  /* Text */
-  --text: #1c1917;
-  --text-2: #57534e;
-  --text-3: #78716c;
-  --text-muted: #a8a29e;
+  /* ---------- Ink / text ---------- */
+  --text:        #1b2531;
+  --text-2:      #515c68;
+  --text-3:      #7a8590;
+  --text-muted:  #a6afb8;
+  --text-on-dark:#f4f1e8;
 
-  /* Lines */
-  --line: #e7e5e0;
-  --line-soft: #ede9df;
+  /* ---------- Hairlines ---------- */
+  --line:        #e4ddcd;
+  --line-soft:   #ece6d8;
+  --line-strong: #d4cbb6;
 
-  /* Accent — burgundy */
-  --accent: #9f1239;
-  --accent-strong: #881337;
-  --accent-soft: rgba(159, 18, 57, 0.08);
+  /* ---------- Brand: ink navy ---------- */
+  --navy:        #173a54;
+  --navy-strong: #0f293d;
+  --navy-deep:   #0a1d2c;
+  --navy-soft:   rgba(23, 58, 84, 0.07);
+  --navy-line:   rgba(23, 58, 84, 0.16);
+  /* legacy aliases — компоненты, где раньше был бургунди */
+  --accent:        var(--navy);
+  --accent-strong: var(--navy-strong);
+  --accent-soft:   var(--navy-soft);
 
-  /* Semantic */
-  --income: #15803d;
-  --expense: #b91c1c;
-  --transfer: #1d4ed8;
+  /* ---------- Brand accent: brass ---------- */
+  --brass:        #9c7b3c;
+  --brass-strong: #846630;
+  --brass-bright: #c2a05a;
+  --brass-soft:   rgba(156, 123, 60, 0.12);
 
-  --income-soft: rgba(21, 128, 61, 0.08);
-  --expense-soft: rgba(185, 28, 28, 0.08);
+  /* ---------- Semantic — transaction types ---------- */
+  --income:        #167a4a;
+  --income-soft:   rgba(22, 122, 74, 0.10);
+  --expense:       #c0432b;
+  --expense-soft:  rgba(192, 67, 43, 0.10);
+  --transfer:      #2f6296;
+  --transfer-soft: rgba(47, 98, 150, 0.10);
+  --warn:          #b7791f;
+  --warn-soft:     rgba(183, 121, 31, 0.12);
 
-  font: 16px/150% var(--sans);
+  /* ---------- Radii ---------- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* ---------- Elevation (soft, paper-like) ---------- */
+  --shadow-xs: 0 1px 2px rgba(15, 30, 45, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 30, 45, 0.06), 0 1px 2px rgba(15, 30, 45, 0.04);
+  --shadow-md: 0 6px 18px -6px rgba(15, 30, 45, 0.14);
+  --shadow-lg: 0 20px 44px -16px rgba(15, 30, 45, 0.22);
+  --shadow-inset: inset 0 1px 2px rgba(15, 30, 45, 0.06);
+
+  /* ---------- Motion ---------- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 280ms;
+
+  font: 16px/150% var(--font-sans);
   color: var(--text);
-  background: var(--bg);
+  background: var(--paper);
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
-body {
-  margin: 0;
-  background: var(--bg);
-}
+body { margin: 0; background: var(--paper); }
 
 #root {
   min-height: 100svh;
@@ -57,38 +100,52 @@ body {
   flex-direction: column;
 }
 
-/* Заголовки — серифные, элегантные */
+/* Заголовки — серифом Spectral */
 h1, h2, h3 {
-  font-family: var(--serif);
+  font-family: var(--font-display);
   font-weight: 500;
   color: var(--text);
   margin: 0 0 8px;
   letter-spacing: -0.02em;
 }
 
-h1 { font-size: 36px; line-height: 1.15; }
-h2 { font-size: 26px; line-height: 1.2; }
-h3 { font-size: 18px; font-weight: 600; line-height: 1.3; }
+h1 { font-size: 34px; line-height: 1.12; }
+h2 { font-size: 26px; line-height: 1.18; }
+h3 { font-size: 18px; line-height: 1.3; font-family: var(--font-sans); font-weight: 600; letter-spacing: -0.01em; }
 
 p { margin: 0; }
 
-/* Большие денежные числа — серифом */
-.money-hero {
-  font-family: var(--serif);
+/* Большие денежные числа — серифом, табличные */
+.money-hero,
+.cm-money {
+  font-family: var(--font-display);
   font-weight: 500;
-  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
-/* Цифры в таблицах/строках — табличные пропорции */
-.tabular {
+.tabular { font-variant-numeric: tabular-nums; }
+.cm-mono {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
+.cm-eyebrow {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+.cm-pos { color: var(--income); }
+.cm-neg { color: var(--expense); }
+.cm-xfer { color: var(--transfer); }
 
 /* Таблицы */
-.table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 table {
   border-collapse: collapse;
@@ -98,9 +155,9 @@ table {
 }
 
 th {
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   font-size: 11px;
   color: var(--text-3);
   background: var(--surface-2);
@@ -108,39 +165,40 @@ th {
 
 /* Формы */
 input, select, textarea, button {
-  font-family: var(--sans);
+  font-family: var(--font-sans);
   font-size: 14px;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
   outline: none;
   font-variant-numeric: tabular-nums;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px var(--navy-soft);
 }
 
-input::placeholder {
-  color: var(--text-muted);
-}
+input::placeholder { color: var(--text-muted); }
 
 button {
   cursor: pointer;
-  background: var(--accent);
-  color: #fff;
-  border: 1px solid var(--accent);
+  background: var(--navy);
+  color: var(--text-on-dark);
+  border: 1px solid var(--navy);
   font-weight: 500;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  letter-spacing: 0.005em;
 }
 
 button:hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  background: var(--navy-strong);
+  border-color: var(--navy-strong);
 }
+
+button:active { transform: translateY(1px); }
 
 button:disabled {
   background: var(--text-muted);
@@ -153,8 +211,8 @@ button.btn-danger {
   border-color: var(--expense);
 }
 button.btn-danger:hover {
-  background: #991b1b;
-  border-color: #991b1b;
+  background: #a53825;
+  border-color: #a53825;
 }
 
 button.btn-ghost {
@@ -169,7 +227,7 @@ button.btn-ghost:hover {
 
 button.btn-link {
   background: transparent;
-  color: var(--accent);
+  color: var(--brass);
   border: none;
   padding: 4px 0;
   font-weight: 500;
@@ -177,16 +235,27 @@ button.btn-link {
 button.btn-link:hover {
   background: transparent;
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-/* Ссылки */
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
+button.btn-premium {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: #fff;
+}
+button.btn-premium:hover {
+  background: var(--brass-strong);
+  border-color: var(--brass-strong);
+}
+
+/* Ссылки на бумаге — латунные */
+a { color: var(--brass); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Страница */
 .page {
   padding: 32px 24px 56px;
-  max-width: 1120px;
+  max-width: 1180px;
   margin: 0 auto;
   width: 100%;
 }
@@ -195,32 +264,20 @@ a:hover { text-decoration: underline; }
   h1 { font-size: 28px; }
   h2 { font-size: 22px; }
   h3 { font-size: 16px; }
-
-  .page {
-    padding: 20px 16px 40px;
-  }
+  .page { padding: 20px 16px 40px; }
 }
 
-/* Тонкая горизонтальная линия — для разделителей */
 hr {
   border: none;
   border-top: 1px solid var(--line);
   margin: 24px 0;
 }
 
-/* Скроллбар — немного приглушённый */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--line);
   border-radius: 5px;
-  border: 2px solid var(--bg);
+  border: 2px solid var(--paper);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
