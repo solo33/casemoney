@@ -401,19 +401,21 @@ function StatsTab() {
     loadConfig();
   }, []);
 
-  const toggleEmailVerification = async () => {
-    if (!config) return;
+  const patchConfig = async (patch) => {
     setSavingConfig(true);
     try {
-      const r = await api.patch("/api/admin/config", {
-        require_email_verification: !config.require_email_verification,
-      });
+      const r = await api.patch("/api/admin/config", patch);
       setConfig(r.data);
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка");
     } finally {
       setSavingConfig(false);
     }
+  };
+
+  const toggleEmailVerification = () => {
+    if (!config) return;
+    patchConfig({ require_email_verification: !config.require_email_verification });
   };
 
   if (error) return <p style={{ color: "#c0432b" }}>{error}</p>;
@@ -524,6 +526,62 @@ function StatsTab() {
               {savingConfig ? "..." :
                 config.require_email_verification ? "Отключить" : "Включить"}
             </button>
+          </div>
+
+          {/* Стартовый тариф нового пользователя */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            gap: 16, padding: "12px 0",
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1b2531", marginBottom: 4 }}>
+                Стартовый тариф нового пользователя
+              </div>
+              <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
+                {config.default_plan === "premium" ? (
+                  <>
+                    <strong style={{ color: "#173a54" }}>Premium.</strong> Новые юзеры
+                    получают premium сразу при регистрации
+                    {config.default_premium_days > 0
+                      ? <> на <strong>{config.default_premium_days}</strong> дней.</>
+                      : <> бессрочно.</>}
+                  </>
+                ) : (
+                  <>
+                    <strong style={{ color: "#167a4a" }}>Free.</strong> Новые юзеры
+                    стартуют на бесплатном тарифе с лимитами.
+                  </>
+                )}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+              <select
+                value={config.default_plan}
+                disabled={savingConfig}
+                onChange={e => patchConfig({ default_plan: e.target.value })}
+              >
+                <option value="free">Free</option>
+                <option value="premium">Premium</option>
+              </select>
+              {config.default_plan === "premium" && (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#7a8590" }}>
+                  дней
+                  <input
+                    type="number"
+                    min="0"
+                    defaultValue={config.default_premium_days}
+                    disabled={savingConfig}
+                    onBlur={e => {
+                      const v = parseInt(e.target.value, 10);
+                      const days = Number.isNaN(v) || v < 0 ? 0 : v;
+                      if (days !== config.default_premium_days) patchConfig({ default_premium_days: days });
+                    }}
+                    style={{ width: 70 }}
+                    title="0 = бессрочно"
+                  />
+                </label>
+              )}
+            </div>
           </div>
         </div>
       )}

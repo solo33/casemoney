@@ -39,10 +39,14 @@ class AdminPasswordReset(BaseModel):
 class AdminConfig(BaseModel):
     require_email_verification: bool
     smtp_configured: bool
+    default_plan: str                 # "free" | "premium"
+    default_premium_days: int         # 0 = бессрочно
 
 
 class AdminConfigUpdate(BaseModel):
     require_email_verification: Optional[bool] = None
+    default_plan: Optional[str] = None
+    default_premium_days: Optional[int] = None
 
 
 class AdminStats(BaseModel):

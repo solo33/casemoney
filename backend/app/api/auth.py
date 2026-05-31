@@ -11,8 +11,9 @@ from app.services.auth import (
     create_activation_token, verify_activation_token,
 )
 from app.services.email import send_activation_email, app_url, is_smtp_configured
-from app.services.app_config import is_email_verification_required
+from app.services.app_config import is_email_verification_required, get_config
 from app.seeds import seed_default_categories
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -46,7 +47,8 @@ def register(
     if existing:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    require_verification = is_email_verification_required(db)
+    cfg = get_config(db)
+    require_verification = cfg.require_email_verification
 
     user = User(
         email=data.email,
@@ -55,6 +57,16 @@ def register(
         # Если активация отключена админом — сразу считаем email подтверждённым
         email_verified=not require_verification,
     )
+
+    # Стартовый тариф задаётся админом в системных настройках.
+    if cfg.default_plan == "premium":
+        user.is_premium = True
+        days = cfg.default_premium_days or 0
+        user.premium_until = (
+            None if days <= 0
+            else datetime.now(timezone.utc) + timedelta(days=days)
+        )
+
     db.add(user)
     db.commit()
     db.refresh(user)

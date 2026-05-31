@@ -173,16 +173,21 @@ def delete_user(
     db.commit()
 
 
+def _config_out(cfg) -> AdminConfig:
+    return AdminConfig(
+        require_email_verification=cfg.require_email_verification,
+        smtp_configured=is_smtp_configured(),
+        default_plan=cfg.default_plan,
+        default_premium_days=cfg.default_premium_days,
+    )
+
+
 @router.get("/config", response_model=AdminConfig)
 def get_app_config(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    cfg = app_config_svc.get_config(db)
-    return AdminConfig(
-        require_email_verification=cfg.require_email_verification,
-        smtp_configured=is_smtp_configured(),
-    )
+    return _config_out(app_config_svc.get_config(db))
 
 
 @router.patch("/config", response_model=AdminConfig)
@@ -193,15 +198,20 @@ def update_app_config(
 ):
     cfg = app_config_svc.get_config(db)
     update = data.model_dump(exclude_unset=True)
+
+    if "default_plan" in update and update["default_plan"] not in ("free", "premium"):
+        raise HTTPException(status_code=400, detail="default_plan должен быть 'free' или 'premium'")
+    if "default_premium_days" in update:
+        days = update["default_premium_days"]
+        if days is None or days < 0:
+            raise HTTPException(status_code=400, detail="default_premium_days должен быть >= 0")
+
     for k, v in update.items():
         setattr(cfg, k, v)
     db.commit()
     db.refresh(cfg)
     app_config_svc.invalidate_cache()
-    return AdminConfig(
-        require_email_verification=cfg.require_email_verification,
-        smtp_configured=is_smtp_configured(),
-    )
+    return _config_out(cfg)
 
 
 @router.get("/stats", response_model=AdminStats)
