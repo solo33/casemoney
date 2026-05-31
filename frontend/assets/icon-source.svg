@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CaseMoney app icon — Modern Ledger
+     Ink navy field, brass coin-loop monogram (C-shape + accent dot).
+     Square 1024×1024, scale-faithful copy of .claude/skills/casemoney-design/assets/app-icon.svg. -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CaseMoney">
+  <rect width="1024" height="1024" rx="232" fill="#173a54"/>
+  <rect x="12" y="12" width="1000" height="1000" rx="220" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="4"/>
+  <!-- Brass open ring — the "Case" coin -->
+  <path d="M 720.8 743.8 A 312 312 0 1 1 720.8 280.2" fill="none" stroke="#c2a05a" stroke-width="108" stroke-linecap="round"/>
+  <!-- Inner ghost ring for depth -->
+  <path d="M 684 660 A 192 192 0 1 1 684 364" fill="none" stroke="#c2a05a" stroke-opacity="0.32" stroke-width="20" stroke-linecap="round"/>
+  <!-- Accent dot — the "Money" -->
+  <circle cx="744" cy="512" r="40" fill="#c2a05a"/>
+</svg>

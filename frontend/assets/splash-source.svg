@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CaseMoney splash — Modern Ledger
+     Warm paper background, navy lockup centered. 2732×2732 square,
+     @capacitor/assets crops by orientation. -->
+<svg width="2732" height="2732" viewBox="0 0 2732 2732" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="CaseMoney">
+  <rect width="2732" height="2732" fill="#f6f2e9"/>
+  <g transform="translate(1366 1366)">
+    <!-- Coin mark, navy rounded square + brass ring + dot -->
+    <g transform="translate(-300 -240)">
+      <rect width="600" height="600" rx="140" fill="#173a54"/>
+      <path d="M 422 437 A 183 183 0 1 1 422 163" fill="none" stroke="#c2a05a" stroke-width="64" stroke-linecap="round"/>
+      <circle cx="438" cy="300" r="24" fill="#c2a05a"/>
+    </g>
+    <!-- Wordmark CaseMoney -->
+    <text x="0" y="500" font-family="Spectral, Georgia, serif" font-size="180" font-weight="500" text-anchor="middle" letter-spacing="-4">
+      <tspan fill="#173a54">Case</tspan><tspan fill="#9c7b3c">Money</tspan>
+    </text>
+    <text x="0" y="600" font-family="Golos Text, system-ui, sans-serif" font-size="56" font-weight="500" fill="#7a8590" text-anchor="middle" letter-spacing="6" text-transform="uppercase">
+      ЛИЧНАЯ БУХГАЛТЕРИЯ
+    </text>
+  </g>
+</svg>

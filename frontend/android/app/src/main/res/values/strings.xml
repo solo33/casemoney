@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CaseMoney</string>
+    <string name="title_activity_main">CaseMoney</string>
+    <string name="package_name">ru.casemoney.app</string>
+    <string name="custom_url_scheme">ru.casemoney.app</string>
+</resources>
