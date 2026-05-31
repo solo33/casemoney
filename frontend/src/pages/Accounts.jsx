@@ -5,10 +5,17 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  useDraggable,
   useDroppable,
+  closestCenter,
   DragOverlay,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
@@ -195,20 +202,52 @@ export default function Accounts() {
     setActiveDrag(event.active.data.current);
   };
 
+  const bucketKey = (b) => (b.group.id ?? UNGROUPED_KEY);
+
   const handleDragEnd = async (event) => {
     setActiveDrag(null);
     const { active, over } = event;
     if (!over) return;
-    const dragged = active.data.current;
-    const target = over.data.current;
-    if (!dragged || !target) return;
-    const targetGroupId = target.groupId === UNGROUPED_KEY ? null : target.groupId;
-    if (dragged.groupId === targetGroupId) return;
+    const dragged = active.data.current;        // { type:'account', accountId, groupKey }
+    const overData = over.data.current;
+    if (!dragged || !overData) return;
+
+    // Целевая группа: либо группа счёта-цели, либо сам droppable группы
+    const targetKey = overData.type === "group" ? overData.groupKey : overData.groupKey;
+    const sameGroup = dragged.groupKey === targetKey;
+
+    const targetBucket = groups.find(b => bucketKey(b) === targetKey);
+    if (!targetBucket) return;
+    const targetIds = targetBucket.accounts.map(a => a.id);
+
+    // Индекс вставки
+    let insertIdx;
+    if (overData.type === "account") {
+      insertIdx = targetIds.indexOf(overData.accountId);
+      if (insertIdx < 0) insertIdx = targetIds.length;
+    } else {
+      insertIdx = targetIds.length; // дроп на пустую область группы → в конец
+    }
+
+    let newOrder;
+    if (sameGroup) {
+      const oldIdx = targetIds.indexOf(dragged.accountId);
+      if (oldIdx < 0 || oldIdx === insertIdx) return;
+      newOrder = arrayMove(targetIds, oldIdx, insertIdx);
+    } else {
+      newOrder = [...targetIds];
+      newOrder.splice(insertIdx, 0, dragged.accountId);
+    }
+
+    const body = { account_ids: newOrder };
+    if (!sameGroup) body.group_id = targetKey === UNGROUPED_KEY ? null : targetKey;
+
     try {
-      await api.put(`/api/accounts/${dragged.accountId}`, { group_id: targetGroupId });
+      await api.post("/api/accounts/reorder", body);
       fetchGroups();
     } catch (e) {
-      setError(e.response?.data?.detail || "Не удалось переместить счёт");
+      setError(e.response?.data?.detail || "Не удалось изменить порядок");
+      fetchGroups();
     }
   };
 
@@ -322,7 +361,7 @@ export default function Accounts() {
       )}
 
       {/* Группы */}
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {groups.length === 0 ? (
           <p style={{ color: "#a6afb8" }}>Нет счетов. Создайте первый!</p>
         ) : (
@@ -381,11 +420,12 @@ function GroupBucket({
   const groupKey = groupId === null ? UNGROUPED_KEY : groupId;
   const { setNodeRef, isOver } = useDroppable({
     id: `group-${groupKey}`,
-    data: { groupId: groupKey },
+    data: { type: "group", groupKey },
   });
 
-  const canAccept = activeDrag && activeDrag.groupId !== groupId;
+  const canAccept = activeDrag && activeDrag.groupKey !== groupKey;
   const dropHighlight = isOver && canAccept;
+  const accountIds = bucket.accounts.map(a => a.id);
 
   return (
     <div ref={setNodeRef} style={{
@@ -431,46 +471,51 @@ function GroupBucket({
           Перетащите счёт сюда
         </div>
       ) : (
-        bucket.accounts.map(acc => (
-          <AccountRow
-            key={acc.id}
-            acc={acc}
-            groupId={groupId}
-            mainCurrency={mainCurrency}
-            isExpanded={expanded.has(acc.id)}
-            onToggleExpand={() => onToggleExpand(acc.id)}
-            onDelete={onDeleteAccount}
-            onToggleInclude={onToggleInclude}
-            isAddingCurrency={addingCurrencyTo === acc.id}
-            setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
-            currencyForm={currencyForm}
-            setCurrencyForm={setCurrencyForm}
-            onAddCurrency={onAddCurrency}
-            onEditBalance={onEditBalance}
-            onDeleteCurrency={onDeleteCurrency}
-          />
-        ))
+        <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
+          {bucket.accounts.map(acc => (
+            <AccountRow
+              key={acc.id}
+              acc={acc}
+              groupKey={groupKey}
+              mainCurrency={mainCurrency}
+              isExpanded={expanded.has(acc.id)}
+              onToggleExpand={() => onToggleExpand(acc.id)}
+              onDelete={onDeleteAccount}
+              onToggleInclude={onToggleInclude}
+              isAddingCurrency={addingCurrencyTo === acc.id}
+              setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
+              currencyForm={currencyForm}
+              setCurrencyForm={setCurrencyForm}
+              onAddCurrency={onAddCurrency}
+              onEditBalance={onEditBalance}
+              onDeleteCurrency={onDeleteCurrency}
+            />
+          ))}
+        </SortableContext>
       )}
     </div>
   );
 }
 
 function AccountRow({
-  acc, groupId, mainCurrency,
+  acc, groupKey, mainCurrency,
   isExpanded, onToggleExpand,
   onDelete, onToggleInclude,
   isAddingCurrency, setAddingCurrency,
   currencyForm, setCurrencyForm,
   onAddCurrency, onEditBalance, onDeleteCurrency,
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `acc-${acc.id}`,
-    data: { accountId: acc.id, groupId, name: acc.name, icon: acc.icon },
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: acc.id,
+    data: { type: "account", accountId: acc.id, groupKey, name: acc.name, icon: acc.icon },
   });
 
   const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.3 : 1,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: "relative",
+    zIndex: isDragging ? 10 : "auto",
   };
 
   const multiCurrency = (acc.balances || []).length > 1;
@@ -493,7 +538,7 @@ function AccountRow({
           style={{ cursor: "grab", color: "#c7cdd3", fontSize: 16, userSelect: "none" }}
           {...listeners}
           {...attributes}
-          title="Перетащите в другую группу"
+          title="Перетащите, чтобы изменить порядок или перенести в другую группу"
         >
           ⋮⋮
         </span>

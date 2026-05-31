@@ -18,6 +18,9 @@ class Account(Base):
     # Группа счетов (опционально). NULL = "Без группы"
     group_id = Column(Integer, ForeignKey("account_groups.id", ondelete="SET NULL"), nullable=True)
 
+    # Порядок счёта внутри своей группы (для drag-сортировки)
+    sort_order = Column(Integer, nullable=False, default=0)
+
     # Учитывать ли в общем балансе. По умолчанию TRUE.
     # Если FALSE — счёт виден, но не суммируется в total_balance дашборда/группы.
     include_in_balance = Column(Boolean, nullable=False, default=True)

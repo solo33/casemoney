@@ -48,6 +48,9 @@ export default function Home() {
   const [grouped, setGrouped] = useState([]);
   const [summary, setSummary] = useState(null);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
+  const [recordsTab, setRecordsTab] = useState("today"); // today | changed
+  const [categories, setCategories] = useState([]);
+  const [editingTx, setEditingTx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,20 +64,37 @@ export default function Home() {
         month: now.getMonth() + 1,
         breakdown_type: breakdownType,
       };
-      const [d, g, s] = await Promise.all([
+      const [d, g, s, c] = await Promise.all([
         api.get("/api/dashboard/"),
         api.get("/api/accounts/grouped"),
         api.get("/api/reports/summary", { params }),
+        api.get("/api/categories/"),
       ]);
       setDashboard(d.data);
       setGrouped(g.data);
       setSummary(s.data);
+      setCategories(c.data);
     } catch {
       setError("Ошибка загрузки");
     } finally {
       setLoading(false);
     }
   }, [breakdownType]);
+
+  const flatAccounts = useMemo(
+    () => grouped.flatMap(b => b.accounts || []),
+    [grouped]
+  );
+
+  const handleDeleteTx = async (tx) => {
+    if (!confirm("Удалить запись?")) return;
+    try {
+      await api.delete(`/api/transactions/${tx.id}`);
+      fetchAll();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось удалить");
+    }
+  };
 
   useEffect(() => {
     fetchAll();
@@ -219,48 +239,58 @@ export default function Home() {
         {/* Inline quick-add form */}
         <QuickAddInline />
 
-        {/* Records today */}
+        {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #ece6d8", display: "flex", gap: 12, alignItems: "baseline" }}>
-            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>
+          <div style={{
+            display: "flex", alignItems: "stretch",
+            borderBottom: "1px solid #ece6d8",
+          }}>
+            <TabHead
+              active={recordsTab === "today"}
+              onClick={() => setRecordsTab("today")}
+            >
               Записи за {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
-            </h3>
-            <span style={{ color: "#a6afb8", fontSize: 13, marginLeft: "auto" }}>
-              {todayTx.length} {todayTx.length === 1 ? "запись" : "записей"}
-            </span>
-          </div>
-          {todayTx.length === 0 ? (
-            <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
-              Нет записей за сегодня. Добавьте первую операцию кнопкой <strong>+</strong>.
-            </p>
-          ) : (
-            <div>
-              {todayTx.map((tx, idx) => (
-                <TxRow key={tx.id} tx={tx} first={idx === 0} onClick={() => goToAccount(tx.account_id)} />
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* Последние изменённые */}
-        <Card noPadding>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #ece6d8", display: "flex", gap: 12, alignItems: "baseline" }}>
-            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Последние изменения</h3>
-            <Link to="/transactions" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none", marginLeft: "auto" }}>
+            </TabHead>
+            <TabHead
+              active={recordsTab === "changed"}
+              onClick={() => setRecordsTab("changed")}
+            >
+              Последние изменённые
+            </TabHead>
+            <Link to="/transactions" style={{
+              fontSize: 12, color: "#9c7b3c", textDecoration: "none",
+              marginLeft: "auto", alignSelf: "center", padding: "0 16px",
+            }}>
               Все записи →
             </Link>
           </div>
-          {recentlyChanged.length === 0 ? (
-            <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
-              Пока нет записей.
-            </p>
-          ) : (
-            <div>
-              {recentlyChanged.map((tx, idx) => (
-                <TxRow key={tx.id} tx={tx} first={idx === 0} showDate onClick={() => goToAccount(tx.account_id)} />
-              ))}
-            </div>
-          )}
+
+          {(() => {
+            const list = recordsTab === "today" ? todayTx : recentlyChanged;
+            if (list.length === 0) {
+              return (
+                <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
+                  {recordsTab === "today"
+                    ? <>Нет записей за сегодня. Добавьте первую операцию кнопкой <strong>+</strong>.</>
+                    : "Пока нет записей."}
+                </p>
+              );
+            }
+            return (
+              <div>
+                {list.map((tx, idx) => (
+                  <TxRow
+                    key={tx.id}
+                    tx={tx}
+                    first={idx === 0}
+                    showDate={recordsTab === "changed"}
+                    onEdit={() => setEditingTx(tx)}
+                    onDelete={() => handleDeleteTx(tx)}
+                  />
+                ))}
+              </div>
+            );
+          })()}
         </Card>
 
         {/* Разбивка по категориям с переключателем Расходы/Доходы */}
@@ -309,11 +339,45 @@ export default function Home() {
           )}
         </Card>
       </main>
+
+      {editingTx && (
+        <TxEditModal
+          tx={editingTx}
+          accounts={flatAccounts}
+          categories={categories}
+          onClose={() => setEditingTx(null)}
+          onSaved={() => { setEditingTx(null); fetchAll(); }}
+        />
+      )}
     </div>
   );
 }
 
 // =============== components ===============
+
+function TabHead({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: active ? "#fffdf7" : "transparent",
+        border: "none",
+        borderBottom: active ? "2px solid #173a54" : "2px solid transparent",
+        color: active ? "#1b2531" : "#7a8590",
+        fontWeight: active ? 700 : 500,
+        fontSize: 13,
+        padding: "12px 16px",
+        cursor: "pointer",
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 const sectionTitle = {
   margin: "0 0 10px",
@@ -359,17 +423,16 @@ function ToggleBtn({ active, onClick, children }) {
   );
 }
 
-function TxRow({ tx, first, showDate, onClick }) {
+function TxRow({ tx, first, showDate, onEdit, onDelete }) {
   const dateStr = new Date(tx.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
   return (
     <div
-      onClick={onClick}
       style={{
         display: "flex", alignItems: "center", gap: 12,
         padding: "10px 16px",
         borderTop: first ? "none" : "1px solid #ece6d8",
-        cursor: onClick ? "pointer" : "default",
       }}
+      className="tx-row"
     >
       <div style={{
         width: 32, height: 32, borderRadius: "50%",
@@ -392,6 +455,154 @@ function TxRow({ tx, first, showDate, onClick }) {
       }}>
         {tx.type === "expense" ? "−" : "+"}{formatMoneyWithCurrency(tx.amount, tx.currency)}
       </div>
+      <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="btn-ghost"
+          style={{ padding: "3px 7px", fontSize: 12, border: "none", background: "transparent", color: "#7a8590" }}
+          title="Изменить"
+        >
+          ✎
+        </button>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="btn-ghost"
+          style={{ padding: "3px 7px", fontSize: 14, border: "none", background: "transparent", color: "#c0432b" }}
+          title="Удалить"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const TYPE_TABS = [
+  { value: "expense", label: "Расход", color: "#c0432b" },
+  { value: "transfer", label: "Перевод", color: "#2f6296" },
+  { value: "income", label: "Доход", color: "#167a4a" },
+];
+
+function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    amount: String(tx.amount),
+    type: tx.type,
+    currency: tx.currency,
+    account_id: String(tx.account_id),
+    category_id: tx.category_id ? String(tx.category_id) : "",
+    description: tx.description || "",
+    date: new Date(tx.date).toISOString().slice(0, 10),
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const acc = accounts.find(a => String(a.id) === form.account_id);
+  const accCurrencies = (acc?.balances || []).map(b => b.currency);
+  const cats = form.type === "transfer"
+    ? [] : categories.filter(c => c.type === form.type);
+
+  const catLabel = (c) => {
+    const p = c.parent_id ? categories.find(x => x.id === c.parent_id) : null;
+    return p ? `${p.name} → ${c.name}` : c.name;
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setErr(null);
+    try {
+      await api.patch(`/api/transactions/${tx.id}`, {
+        amount: parseFloat(form.amount),
+        type: form.type,
+        currency: form.currency,
+        account_id: parseInt(form.account_id),
+        category_id: form.category_id ? parseInt(form.category_id) : null,
+        description: form.description || null,
+        date: new Date(form.date).toISOString(),
+      });
+      onSaved();
+    } catch (e2) {
+      setErr(e2.response?.data?.detail || "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,30,45,0.45)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, padding: 16,
+      }}
+    >
+      <form
+        onClick={e => e.stopPropagation()}
+        onSubmit={save}
+        style={{
+          background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 12,
+          padding: 20, width: "100%", maxWidth: 460, boxShadow: "0 20px 44px -16px rgba(15,30,45,0.4)",
+          display: "flex", flexDirection: "column", gap: 12,
+        }}
+      >
+        <h3 style={{ margin: 0, fontFamily: "var(--font-display)" }}>Изменить запись</h3>
+
+        <div style={{ display: "flex", gap: 6 }}>
+          {TYPE_TABS.map(t => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setForm(f => ({ ...f, type: t.value, category_id: "" }))}
+              style={{
+                flex: 1, padding: "8px", border: "none", borderRadius: 6,
+                background: form.type === t.value ? t.color : "#f6f2e9",
+                color: form.type === t.value ? "#fff" : "#7a8590",
+                fontWeight: form.type === t.value ? 700 : 500, cursor: "pointer", fontSize: 13,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="number" step="0.01" min="0.01" value={form.amount}
+            onChange={e => setForm({ ...form, amount: e.target.value })}
+            required style={{ flex: 1, textAlign: "right", fontWeight: 600, fontSize: 16 }}
+          />
+          <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} style={{ width: 90 }}>
+            {(accCurrencies.length ? accCurrencies : [form.currency]).map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })} required>
+          <option value="">— Счёт —</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
+        </select>
+
+        <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })} disabled={form.type === "transfer"}>
+          <option value="">{form.type === "transfer" ? "— перевод —" : "— Без категории —"}</option>
+          {cats.map(c => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
+        </select>
+
+        <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+
+        <input
+          placeholder="Примечание" value={form.description}
+          onChange={e => setForm({ ...form, description: e.target.value })}
+        />
+
+        {err && <div style={{ color: "#c0432b", fontSize: 13 }}>{err}</div>}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+          <button type="button" onClick={onClose} className="btn-ghost">Отмена</button>
+          <button type="submit" disabled={saving}>{saving ? "Сохраняем..." : "Сохранить"}</button>
+        </div>
+      </form>
     </div>
   );
 }

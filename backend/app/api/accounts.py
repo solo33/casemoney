@@ -81,7 +81,12 @@ def get_accounts_grouped(
         .order_by(AccountGroup.sort_order, AccountGroup.id)
         .all()
     )
-    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.sort_order, Account.id)
+        .all()
+    )
 
     by_group: dict[Optional[int], list[Account]] = {}
     for a in accounts:
@@ -145,6 +150,40 @@ def create_account(
 
     main = accounts_svc.get_user_main_currency(db, user_id)
     return accounts_svc.serialize_account(db, account, main)
+
+
+@router.post("/reorder", status_code=204)
+def reorder_accounts(
+    payload: dict,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Задать порядок счетов. body: {"account_ids": [id, id, ...]} —
+    sort_order назначается по позиции в списке. Опционально {"group_id": X}
+    одновременно переносит все эти счета в указанную группу."""
+    account_ids = payload.get("account_ids") or []
+    if not isinstance(account_ids, list):
+        raise HTTPException(status_code=400, detail="account_ids должен быть списком")
+
+    target_group = payload.get("group_id", "__keep__")
+    if target_group != "__keep__":
+        _validate_group(db, user_id, target_group)
+
+    # Берём только счета этого пользователя
+    owned = {
+        a.id: a for a in db.query(Account).filter(
+            Account.user_id == user_id,
+            Account.id.in_([int(x) for x in account_ids]),
+        ).all()
+    }
+    for idx, aid in enumerate(account_ids):
+        acc = owned.get(int(aid))
+        if not acc:
+            continue
+        acc.sort_order = idx
+        if target_group != "__keep__":
+            acc.group_id = target_group
+    db.commit()
 
 
 @router.put("/{account_id}", response_model=AccountResponse)
