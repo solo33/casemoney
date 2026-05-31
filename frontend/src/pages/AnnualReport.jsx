@@ -59,9 +59,14 @@ export default function AnnualReport() {
           ← К сводке
         </Link>
       </div>
-      <h1 style={{ marginBottom: 16 }}>
-        Годовой анализ доходов и расходов, <span style={{ color: "#173a54" }}>{data?.main_currency || mainCurrency}</span>
+      <h1 style={{ marginBottom: 6 }}>
+        Денежный поток, <span style={{ color: "#173a54" }}>{data?.main_currency || mainCurrency}</span>
       </h1>
+      <p style={{ color: "#7a8590", fontSize: 13.5, marginBottom: 16, maxWidth: 760 }}>
+        Доходы и расходы по категориям, помесячно за год. Внизу — сальдо
+        (доходы минус расходы): сколько денег реально прибавилось или убавилось
+        за каждый месяц и за год в целом.
+      </p>
 
       {/* Контролы */}
       <div style={{

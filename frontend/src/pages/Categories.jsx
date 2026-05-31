@@ -21,6 +21,8 @@ export default function Categories() {
   const [expanded, setExpanded] = useState(new Set());
   const [addingTo, setAddingTo] = useState(null); // root.id для которого открыта форма
   const [subForm, setSubForm] = useState({ name: "", icon: "", color: "#173a54" });
+  const [editingId, setEditingId] = useState(null);   // id редактируемой категории
+  const [editForm, setEditForm] = useState({ name: "", icon: "", color: "#173a54" });
   const [rootForm, setRootForm] = useState({
     name: "", type: "expense", color: "#173a54", icon: "",
   });
@@ -84,6 +86,31 @@ export default function Categories() {
       fetchTree();
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка создания подкатегории");
+    }
+  };
+
+  const startEdit = (cat) => {
+    setEditingId(cat.id);
+    setEditForm({ name: cat.name, icon: cat.icon || "", color: cat.color || "#173a54" });
+    setAddingTo(null);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = async (e, cat) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const payload = {
+        name: editForm.name,
+        color: editForm.color,
+        icon: editForm.icon || null,
+      };
+      await api.put(`/api/categories/${cat.id}`, payload);
+      setEditingId(null);
+      fetchTree();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось сохранить");
     }
   };
 
@@ -182,14 +209,14 @@ export default function Categories() {
           title="Расходы"
           color="#c0432b"
           roots={grouped.expense}
-          {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag }}
+          {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }}
         />
         <div style={{ height: 24 }} />
         <Section
           title="Доходы"
           color="#167a4a"
           roots={grouped.income}
-          {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag }}
+          {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }}
         />
 
         <DragOverlay>
@@ -218,6 +245,7 @@ function Section({
   addingTo, setAddingTo, subForm, setSubForm,
   handleCreateSubcategory, handleDelete,
   activeDrag,
+  editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit,
 }) {
   return (
     <div>
@@ -247,6 +275,12 @@ function Section({
               onSubmitSub={(e) => handleCreateSubcategory(e, root)}
               onDelete={handleDelete}
               activeDrag={activeDrag}
+              editingId={editingId}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              startEdit={startEdit}
+              cancelEdit={cancelEdit}
+              saveEdit={saveEdit}
             />
           ))}
         </div>
@@ -255,7 +289,7 @@ function Section({
   );
 }
 
-function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, setSubForm, onSubmitSub, onDelete, activeDrag }) {
+function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, setSubForm, onSubmitSub, onDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `root-${root.id}`,
     data: { id: root.id, type: root.type },
@@ -264,6 +298,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
   const hasChildren = root.children && root.children.length > 0;
   const canAccept = activeDrag && activeDrag.type === root.type && activeDrag.parent_id !== root.id;
   const dropHighlight = isOver && canAccept;
+  const isEditing = editingId === root.id;
 
   return (
     <div
@@ -276,7 +311,34 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
         transition: "outline 0.1s, border-color 0.1s",
       }}
     >
-      {/* Header */}
+      {/* Header / edit form */}
+      {isEditing ? (
+        <form onSubmit={(e) => saveEdit(e, root)} style={{
+          display: "flex", gap: 6, padding: "10px 12px", flexWrap: "wrap", alignItems: "center",
+        }}>
+          <input
+            autoFocus
+            value={editForm.name}
+            onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+            required
+            style={{ fontSize: 14, padding: "6px 10px", flex: 1, minWidth: 140 }}
+          />
+          <input
+            placeholder="Иконка"
+            value={editForm.icon}
+            onChange={e => setEditForm({ ...editForm, icon: e.target.value })}
+            style={{ width: 70, fontSize: 14, padding: "6px 10px" }}
+          />
+          <input
+            type="color"
+            value={editForm.color}
+            onChange={e => setEditForm({ ...editForm, color: e.target.value })}
+            style={{ width: 40, padding: 2, cursor: "pointer" }}
+          />
+          <button type="submit" style={{ fontSize: 13, padding: "6px 14px" }}>Сохранить</button>
+          <button type="button" onClick={cancelEdit} className="btn-ghost" style={{ fontSize: 13, padding: "6px 12px" }}>Отмена</button>
+        </form>
+      ) : (
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "10px 12px",
@@ -295,6 +357,15 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
         )}
         <button
           type="button"
+          onClick={(e) => { e.stopPropagation(); startEdit(root); }}
+          className="btn-ghost"
+          style={{ padding: "4px 8px", fontSize: 13, lineHeight: 1 }}
+          title="Редактировать"
+        >
+          ✎
+        </button>
+        <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); setAdding(!isAdding); }}
           className="btn-ghost"
           style={{ padding: "4px 8px", fontSize: 14, lineHeight: 1 }}
@@ -311,6 +382,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
           Удалить
         </button>
       </div>
+      )}
 
       {/* Subcategory inline form */}
       {isAdding && (
@@ -361,7 +433,17 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
           padding: "0 12px 12px 40px",
         }}>
           {root.children.map(child => (
-            <ChildNode key={child.id} child={child} onDelete={onDelete} />
+            <ChildNode
+              key={child.id}
+              child={child}
+              onDelete={onDelete}
+              editingId={editingId}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              startEdit={startEdit}
+              cancelEdit={cancelEdit}
+              saveEdit={saveEdit}
+            />
           ))}
         </div>
       )}
@@ -369,16 +451,52 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
   );
 }
 
-function ChildNode({ child, onDelete }) {
+function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }) {
+  const isEditing = editingId === child.id;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `child-${child.id}`,
     data: { id: child.id, type: child.type, name: child.name, icon: child.icon, parent_id: child.parent_id },
+    disabled: isEditing,
   });
 
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.3 : 1,
   };
+
+  if (isEditing) {
+    return (
+      <form
+        onSubmit={(e) => saveEdit(e, child)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "6px 8px", background: "#f6f2e9", borderRadius: 6, flexWrap: "wrap",
+        }}
+      >
+        <input
+          autoFocus
+          value={editForm.name}
+          onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+          required
+          style={{ fontSize: 13, padding: "5px 10px", flex: 1, minWidth: 120 }}
+        />
+        <input
+          placeholder="🛒"
+          value={editForm.icon}
+          onChange={e => setEditForm({ ...editForm, icon: e.target.value })}
+          style={{ width: 56, fontSize: 13, padding: "5px 10px" }}
+        />
+        <input
+          type="color"
+          value={editForm.color}
+          onChange={e => setEditForm({ ...editForm, color: e.target.value })}
+          style={{ width: 34, padding: 2, cursor: "pointer" }}
+        />
+        <button type="submit" style={{ fontSize: 13, padding: "5px 12px" }}>OK</button>
+        <button type="button" onClick={cancelEdit} className="btn-ghost" style={{ fontSize: 13, padding: "5px 10px" }}>Отмена</button>
+      </form>
+    );
+  }
 
   return (
     <div
@@ -401,6 +519,16 @@ function ChildNode({ child, onDelete }) {
       }} />
       {child.icon && <span style={{ fontSize: 14 }}>{child.icon}</span>}
       <span style={{ flex: 1 }}>{child.name}</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); startEdit(child); }}
+        className="btn-ghost"
+        style={{ padding: "2px 8px", fontSize: 12 }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="Редактировать"
+      >
+        ✎
+      </button>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onDelete(child); }}

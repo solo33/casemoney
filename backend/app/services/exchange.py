@@ -4,6 +4,7 @@
 и кэшируются в таблице exchange_rates с TTL = 1 час.
 Все конверсии проходят через RUB как pivot.
 """
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -13,6 +14,23 @@ from sqlalchemy.orm import Session
 from app.models.exchange_rate import ExchangeRate
 
 CACHE_TTL = timedelta(hours=1)
+
+# --- Memo-кэш пользовательских курсов ---
+# get_rate_for_user раньше делал 3-5 SQL-запросов (User, UserCurrency x2-4,
+# ExchangeRate) на КАЖДУЮ конвертацию. Дашборд/отчёты конвертируют тысячи
+# транзакций → десятки тысяч запросов и секунды задержки. Кэшируем результат
+# по (user_id, from, to) на короткий TTL — внутри запроса это даёт O(1).
+_USER_RATE_TTL = 45  # секунд
+_user_rate_cache: dict[tuple[int, str, str], tuple[float, str, float]] = {}
+
+
+def invalidate_user_rates(user_id: Optional[int] = None) -> None:
+    """Сбросить memo-кэш курсов. Вызывать при смене основной валюты или ручного курса."""
+    if user_id is None:
+        _user_rate_cache.clear()
+        return
+    for key in [k for k in _user_rate_cache if k[0] == user_id]:
+        _user_rate_cache.pop(key, None)
 CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
 COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -198,6 +216,12 @@ def get_rate_for_user(
     if from_cur == to_cur:
         return 1.0, "auto"
 
+    # memo-кэш: одна и та же пара валют конвертируется тысячи раз за запрос
+    cache_key = (user_id, from_cur, to_cur)
+    hit = _user_rate_cache.get(cache_key)
+    if hit is not None and (time.time() - hit[2]) < _USER_RATE_TTL:
+        return hit[0], hit[1]
+
     user = db.query(User).filter(User.id == user_id).first()
     main = (user.main_currency if user and user.main_currency else "RUB").upper()
 
@@ -212,22 +236,21 @@ def get_rate_for_user(
             return uc.manual_rate
         return None
 
-    from_to_main = manual_to_main(from_cur)
-    to_to_main = manual_to_main(to_cur)
+    from_manual = manual_to_main(from_cur)
+    to_manual = manual_to_main(to_cur)
     # Если оба ручные — рассчитываем напрямую и помечаем как manual
-    if from_to_main is not None and to_to_main is not None:
-        return from_to_main / to_to_main, "manual"
+    if from_manual is not None and to_manual is not None:
+        result = (from_manual / to_manual, "manual")
+        _user_rate_cache[cache_key] = (result[0], result[1], time.time())
+        return result
 
     # Иначе подставляем системные значения для тех валют, где нет ручного
-    if from_to_main is None:
-        from_to_main = get_rate_to_rub(db, from_cur) / get_rate_to_rub(db, main)
-    if to_to_main is None:
-        to_to_main = get_rate_to_rub(db, to_cur) / get_rate_to_rub(db, main)
+    from_to_main = from_manual if from_manual is not None else get_rate_to_rub(db, from_cur) / get_rate_to_rub(db, main)
+    to_to_main = to_manual if to_manual is not None else get_rate_to_rub(db, to_cur) / get_rate_to_rub(db, main)
 
     rate = from_to_main / to_to_main
-    src = "manual" if (
-        manual_to_main(from_cur) is not None or manual_to_main(to_cur) is not None
-    ) else "auto"
+    src = "manual" if (from_manual is not None or to_manual is not None) else "auto"
+    _user_rate_cache[cache_key] = (rate, src, time.time())
     return rate, src
 
 

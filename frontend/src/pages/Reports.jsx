@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -51,8 +51,18 @@ function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// Палитра для секторов пирога. Цвета категорий в базе часто одинаковые
+// (дефолт при импорте), поэтому для наглядности раскрашиваем сектора по
+// порядку из фиксированной палитры в духе Modern Ledger.
+const PIE_PALETTE = [
+  "#173a54", "#9c7b3c", "#2f6296", "#167a4a", "#c0432b", "#7a8590",
+  "#0f766e", "#b45309", "#6d28d9", "#be123c", "#0e7490", "#4d7c0f",
+  "#9333ea", "#a16207", "#1d4ed8", "#15803d",
+];
+
 export default function Reports() {
   const { mainCurrency } = useUser();
+  const navigate = useNavigate();
   const [preset, setPreset] = useState("current_month");
   const [drillCatId, setDrillCatId] = useState(null);   // id выбранной корневой для drill-down в pie
   const [expandedRows, setExpandedRows] = useState(new Set());
@@ -137,12 +147,24 @@ export default function Reports() {
     Расходы: p.expense,
   })) : [];
 
+  // Клик по сумме категории → Записи с фильтром (категория + расход + период)
+  const goToCategory = (catId) => {
+    if (!summary) return;
+    const params = new URLSearchParams({
+      type: "expense",
+      date_from: summary.date_from,
+      date_to: summary.date_to,
+    });
+    if (catId != null) params.set("category_id", String(catId));
+    navigate(`/transactions?${params.toString()}`);
+  };
+
   return (
     <div className="page">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ margin: 0 }}>Анализ</h1>
         <Link to="/reports/annual" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
-          Годовой анализ →
+          Денежный поток за год →
         </Link>
       </div>
 
@@ -266,24 +288,30 @@ export default function Reports() {
               {pieData.length === 0 ? (
                 <p style={{ color: "#a6afb8" }}>Нет расходов за период</p>
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={pieData}
                       dataKey="value"
                       nameKey="name"
                       cx="50%"
-                      cy="50%"
-                      outerRadius={85}
+                      cy="45%"
+                      outerRadius={80}
                       label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""}
                       labelLine={false}
                       onClick={(d) => { if (d?.drillable) setDrillCatId(d.id); }}
                     >
                       {pieData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
+                        <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.share}%)`, props.payload.name]} />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={36}
+                      wrapperStyle={{ fontSize: 12 }}
+                      formatter={(value) => value.length > 22 ? value.slice(0, 21) + "…" : value}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -344,7 +372,13 @@ export default function Reports() {
                               )}
                             </td>
                             <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
-                              {formatMoney(c.total)} {sym}
+                              <span
+                                onClick={(e) => { e.stopPropagation(); goToCategory(c.category_id); }}
+                                style={{ color: "#9c7b3c", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+                                title="Открыть записи по этой категории"
+                              >
+                                {formatMoney(c.total)} {sym}
+                              </span>
                             </td>
                             <td style={{ padding: "10px 12px", textAlign: "right", color: "#7a8590" }}>
                               {c.percent}%
@@ -368,7 +402,13 @@ export default function Reports() {
                                 {ch.category_name}
                               </td>
                               <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 13 }}>
-                                {formatMoney(ch.total)} {sym}
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); goToCategory(ch.category_id); }}
+                                  style={{ color: "#9c7b3c", cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+                                  title="Открыть записи по этой подкатегории"
+                                >
+                                  {formatMoney(ch.total)} {sym}
+                                </span>
                               </td>
                               <td style={{ padding: "8px 12px", textAlign: "right", color: "#a6afb8", fontSize: 12 }}>
                                 {c.total > 0 ? ((ch.total / c.total) * 100).toFixed(1) : 0}%

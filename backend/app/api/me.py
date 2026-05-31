@@ -71,6 +71,9 @@ def update_me(
         setattr(user, k, v)
     db.commit()
     db.refresh(user)
+    if "main_currency" in update_fields:
+        from app.services import exchange as exchange_svc
+        exchange_svc.invalidate_user_rates(user_id)
     return user
 
 

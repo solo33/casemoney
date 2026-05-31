@@ -109,6 +109,7 @@ export default function Home() {
   const totalBalance = dashboard.total_balance;
   const monthIncome = dashboard.month_income || 0;
   const monthExpense = dashboard.month_expense || 0;
+  const maxMonthFlow = Math.max(Math.abs(monthIncome), Math.abs(monthExpense)) || 1;
   const thisMonthLabel = RU_MONTHS_FULL[new Date().getMonth()];
 
   const breakdownItems = summary?.category_breakdown || [];
@@ -161,27 +162,13 @@ export default function Home() {
             {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
           </div>
 
-          {/* Доходы и расходы за текущий месяц */}
-          <div style={{
-            display: "flex", gap: 10, marginTop: 14,
-            paddingTop: 12, borderTop: "1px solid #ece6d8",
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 2 }}>
-                Доходы за {thisMonthLabel}
-              </div>
-              <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: "#167a4a" }}>
-                +{formatMoney(monthIncome)} {sym}
-              </div>
+          {/* Доходы и расходы за текущий месяц — гистограмма */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #ece6d8" }}>
+            <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
+              Доходы и расходы за {thisMonthLabel}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 2 }}>
-                Расходы за {thisMonthLabel}
-              </div>
-              <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: "#c0432b" }}>
-                −{formatMoney(monthExpense)} {sym}
-              </div>
-            </div>
+            <Bar value={monthIncome} max={maxMonthFlow} color="#167a4a" sym={sym} sign="+" />
+            <Bar value={monthExpense} max={maxMonthFlow} color="#c0432b" sym={sym} sign="−" />
           </div>
 
           {byCurrency.length > 0 && (
@@ -199,11 +186,6 @@ export default function Home() {
               ))}
             </div>
           )}
-        </Card>
-
-        {/* 3 months mini stat */}
-        <Card>
-          <MonthBars points={last3} sym={sym} />
         </Card>
 
         {/* Accounts grouped — только учитываемые в балансе */}

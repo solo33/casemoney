@@ -127,6 +127,7 @@ def update_currency(
         setattr(uc, k, v)
     db.commit()
     db.refresh(uc)
+    exchange_svc.invalidate_user_rates(user_id)
 
     main = _get_main(db, user_id)
     return _serialize(uc, db, user_id, main)

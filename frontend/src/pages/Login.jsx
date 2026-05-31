@@ -36,12 +36,15 @@ export default function Login() {
         padding: "20px 24px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <div style={{
-          fontFamily: "var(--serif)",
-          fontSize: 22, fontWeight: 600, color: "#173a54",
-          letterSpacing: -0.01,
-        }}>
-          ₽ CaseMoney
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src="/icon.svg" alt="" width={36} height={36} style={{ borderRadius: 10 }} />
+          <span style={{
+            fontFamily: "var(--serif)",
+            fontSize: 22, fontWeight: 600, color: "#173a54",
+            letterSpacing: -0.01,
+          }}>
+            CaseMoney
+          </span>
         </div>
         <Link
           to="/register"
