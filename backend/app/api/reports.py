@@ -10,6 +10,9 @@ from calendar import monthrange
 from app.database import get_db
 from app.models.transaction import Transaction, TransactionType
 from app.models.category import Category
+from app.models.account import Account
+from app.models.account_balance import AccountBalance
+from app.models.account_group import AccountGroup
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
@@ -57,6 +60,27 @@ class SummaryResponse(BaseModel):
     transactions_count: int
     category_breakdown: List[CategoryBreakdown]  # rolled-up tree если rollup=true, иначе flat
     top_5: List[CategoryBreakdown]               # топ-5 корневых
+
+
+class BalanceAccountRow(BaseModel):
+    account_id: int
+    name: str
+    icon: Optional[str]
+    monthly: List[float]   # остаток на конец каждого из 12 месяцев, в main
+
+
+class BalanceGroupRow(BaseModel):
+    group_id: Optional[int]
+    group_name: str
+    monthly: List[float]   # сумма остатков счетов группы по месяцам
+    accounts: List[BalanceAccountRow]
+
+
+class AnnualBalancesResponse(BaseModel):
+    main_currency: str
+    year: int
+    groups: List[BalanceGroupRow]
+    total_monthly: List[float]   # остаток по всем счетам на конец каждого месяца
 
 
 class MonthlyTrendPoint(BaseModel):
@@ -407,6 +431,128 @@ def get_annual(
         expense_total=round(sum(exp_totals), 2),
         net_monthly=net_monthly,
         net_total=round(sum(net_monthly), 2),
+    )
+
+
+@router.get("/annual-balances", response_model=AnnualBalancesResponse)
+def get_annual_balances(
+    year: int = Query(..., ge=1900, le=2100),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Остаток каждого счёта на конец каждого месяца года, в основной валюте.
+
+    На баланс влияют только доходы (+) и расходы (−); переводы — ноль.
+    Остаток на конец месяца M = текущий баланс − эффект всех операций после конца M.
+    """
+    main = accounts_svc.get_user_main_currency(db, user_id)
+
+    accounts = (
+        db.query(Account)
+        .filter(Account.user_id == user_id)
+        .order_by(Account.sort_order, Account.id)
+        .all()
+    )
+    if not accounts:
+        return AnnualBalancesResponse(main_currency=main, year=year, groups=[], total_monthly=[0.0] * 12)
+
+    account_ids = [a.id for a in accounts]
+
+    # Текущие балансы по (account_id, currency)
+    balances = db.query(AccountBalance).filter(AccountBalance.account_id.in_(account_ids)).all()
+    current: dict[tuple[int, str], float] = {}
+    currencies_by_acc: dict[int, set[str]] = {}
+    for b in balances:
+        current[(b.account_id, b.currency)] = b.balance
+        currencies_by_acc.setdefault(b.account_id, set()).add(b.currency)
+
+    # Эффекты операций: помесячно внутри года + суммарно «после года»
+    # effect = +amount (доход), -amount (расход), 0 (перевод)
+    month_eff: dict[tuple[int, str], list[float]] = {}   # (acc,cur) -> [12]
+    future_eff: dict[tuple[int, str], float] = {}        # (acc,cur) -> сумма после 31.12.year
+
+    year_start = date(year, 1, 1)
+    txs = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            func.date(Transaction.date) >= year_start,
+        )
+        .all()
+    )
+    for t in txs:
+        if t.type == TransactionType.income:
+            eff = t.amount
+        elif t.type == TransactionType.expense:
+            eff = -t.amount
+        else:
+            continue  # перевод не меняет баланс
+        key = (t.account_id, t.currency)
+        currencies_by_acc.setdefault(t.account_id, set()).add(t.currency)
+        if t.date.year == year:
+            arr = month_eff.setdefault(key, [0.0] * 12)
+            arr[t.date.month - 1] += eff
+        else:  # год больше запрошенного → «будущее» относительно конца года
+            future_eff[key] = future_eff.get(key, 0.0) + eff
+
+    def eom_series_in_currency(acc_id: int, cur: str) -> list[float]:
+        """12 значений остатка (в валюте cur) на конец каждого месяца."""
+        cur_balance = current.get((acc_id, cur), 0.0)
+        meff = month_eff.get((acc_id, cur), [0.0] * 12)
+        feff = future_eff.get((acc_id, cur), 0.0)
+        out = [0.0] * 12
+        out[11] = cur_balance - feff               # конец декабря
+        for m in range(10, -1, -1):                # ноябрь ... январь
+            out[m] = out[m + 1] - meff[m + 1]
+        return out
+
+    # Группы (для порядка и названий)
+    groups = (
+        db.query(AccountGroup)
+        .filter(AccountGroup.user_id == user_id)
+        .order_by(AccountGroup.sort_order, AccountGroup.id)
+        .all()
+    )
+    group_order: list[tuple[Optional[int], str]] = [(g.id, g.name) for g in groups]
+    group_order.append((None, "Без группы"))
+
+    accounts_by_group: dict[Optional[int], list[Account]] = {}
+    for a in accounts:
+        accounts_by_group.setdefault(a.group_id, []).append(a)
+
+    total_monthly = [0.0] * 12
+    group_rows: list[BalanceGroupRow] = []
+
+    for gid, gname in group_order:
+        bucket = accounts_by_group.get(gid, [])
+        if not bucket:
+            continue
+        acc_rows: list[BalanceAccountRow] = []
+        group_monthly = [0.0] * 12
+        for a in bucket:
+            monthly_main = [0.0] * 12
+            for cur in currencies_by_acc.get(a.id, set()):
+                series = eom_series_in_currency(a.id, cur)
+                for m in range(12):
+                    monthly_main[m] += _to_main(db, user_id, series[m], cur, main)
+            monthly_main = [round(v, 2) for v in monthly_main]
+            acc_rows.append(BalanceAccountRow(
+                account_id=a.id, name=a.name, icon=a.icon, monthly=monthly_main,
+            ))
+            for m in range(12):
+                group_monthly[m] += monthly_main[m]
+        group_monthly = [round(v, 2) for v in group_monthly]
+        for m in range(12):
+            total_monthly[m] += group_monthly[m]
+        group_rows.append(BalanceGroupRow(
+            group_id=gid, group_name=gname, monthly=group_monthly, accounts=acc_rows,
+        ))
+
+    return AnnualBalancesResponse(
+        main_currency=main,
+        year=year,
+        groups=group_rows,
+        total_monthly=[round(v, 2) for v in total_monthly],
     )
 
 

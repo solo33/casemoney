@@ -163,9 +163,14 @@ export default function Reports() {
     <div className="page">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ margin: 0 }}>Анализ</h1>
-        <Link to="/reports/annual" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
-          Денежный поток за год →
-        </Link>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <Link to="/reports/annual" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
+            Денежный поток за год →
+          </Link>
+          <Link to="/reports/balances" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
+            Годовые балансы →
+          </Link>
+        </div>
       </div>
 
       {/* Переключатель периода */}

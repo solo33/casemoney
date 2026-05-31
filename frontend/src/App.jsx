@@ -5,6 +5,7 @@ import Activate from './pages/Activate'
 import Home from './pages/Home'
 import Reports from './pages/Reports'
 import AnnualReport from './pages/AnnualReport'
+import AnnualBalances from './pages/AnnualBalances'
 import Goals from './pages/Goals'
 import Admin from './pages/Admin'
 import Accounts from './pages/Accounts'
@@ -65,6 +66,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AnnualReport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/balances"
+          element={
+            <ProtectedRoute>
+              <AnnualBalances />
             </ProtectedRoute>
           }
         />
