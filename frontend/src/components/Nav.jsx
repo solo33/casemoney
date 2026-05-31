@@ -37,39 +37,57 @@ export default function Nav() {
     }
   };
 
+  // Ссылки на navy-фоне: приглушённо-светлые, активная — белая на полупрозрачной заливке
   const linkStyle = ({ isActive }) => ({
     textDecoration: "none",
-    fontWeight: isActive ? "600" : "400",
-    color: isActive ? "#173a54" : "#44403c",
-    fontSize: 14,
-    padding: "6px 10px",
+    fontWeight: isActive ? 600 : 400,
+    color: isActive ? "#ffffff" : "rgba(244,241,232,0.70)",
+    fontSize: 13.5,
+    padding: "7px 11px",
     borderRadius: 6,
-    background: isActive ? "rgba(23, 58, 84, 0.08)" : "transparent",
+    background: isActive ? "rgba(255,255,255,0.11)" : "transparent",
     display: "block",
+    whiteSpace: "nowrap",
+    transition: "color 180ms, background 180ms",
+  });
+
+  const mobileLinkStyle = ({ isActive }) => ({
+    ...linkStyle({ isActive }),
+    fontSize: 15,
   });
 
   return (
     <nav style={{
-      background: "#fffdf7",
-      borderBottom: "1px solid #e4ddcd",
+      background: "#173a54",
       position: "sticky",
       top: 0,
       zIndex: 100,
     }}>
       <div style={{
-        maxWidth: 1100,
+        maxWidth: 1180,
         margin: "0 auto",
-        padding: "0 16px",
-        height: 52,
+        padding: "0 20px",
+        height: 58,
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        gap: 4,
       }}>
-        <span style={{ fontWeight: 700, fontSize: 16, color: "#173a54", marginRight: 8, whiteSpace: "nowrap" }}>
-          💰 CaseMoney
-        </span>
+        {/* Бренд */}
+        <NavLink to="/home" style={{
+          display: "flex", alignItems: "center", gap: 9,
+          marginRight: 16, textDecoration: "none", flexShrink: 0,
+        }}>
+          <img src="/icon.svg" alt="" width={32} height={32} style={{ borderRadius: 9 }} />
+          <span style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 600, fontSize: 19, letterSpacing: "-0.01em",
+            color: "var(--text-on-dark)", whiteSpace: "nowrap",
+          }}>
+            CaseMoney
+          </span>
+        </NavLink>
 
-        <div style={{ display: "flex", gap: 4, flex: 1 }} className="nav-links-desktop">
+        <div style={{ display: "flex", gap: 2, flex: 1 }} className="nav-links-desktop">
           {links.map(l => (
             <NavLink key={l.to} to={l.to} style={linkStyle}>
               {l.label}
@@ -82,14 +100,14 @@ export default function Nav() {
           to="/settings"
           className="nav-settings-desktop"
           style={{
-            marginLeft: "auto", fontSize: 11, padding: "3px 10px",
+            marginLeft: "auto", fontSize: 11, padding: "4px 11px",
             textDecoration: "none",
-            color: isPremium ? "#fff" : "#173a54",
+            color: isPremium ? "var(--navy-deep)" : "rgba(244,241,232,0.82)",
             background: isPremium
-              ? "linear-gradient(90deg, #173a54 0%, #be123c 100%)"
+              ? "linear-gradient(95deg, #9c7b3c, #c2a05a)"
               : "transparent",
-            border: `1px solid ${isPremium ? "transparent" : "#173a54"}`,
-            borderRadius: 12,
+            border: `1px solid ${isPremium ? "transparent" : "rgba(255,255,255,0.18)"}`,
+            borderRadius: 999,
             whiteSpace: "nowrap",
             fontWeight: 600,
             textTransform: "uppercase",
@@ -104,9 +122,10 @@ export default function Nav() {
         <NavLink
           to="/currencies"
           style={{
-            fontSize: 13, padding: "5px 10px",
-            textDecoration: "none", color: "#515c68",
-            border: "1px solid #e4ddcd", borderRadius: 6,
+            fontFamily: "var(--font-mono)",
+            fontSize: 12, padding: "5px 10px",
+            textDecoration: "none", color: "rgba(244,241,232,0.82)",
+            border: "1px solid rgba(255,255,255,0.18)", borderRadius: 6,
             whiteSpace: "nowrap",
           }}
           className="nav-settings-desktop"
@@ -117,16 +136,24 @@ export default function Nav() {
 
         <button
           onClick={handleLogout}
-          className="btn-ghost"
-          style={{ fontSize: 13, padding: "5px 12px", whiteSpace: "nowrap" }}
+          className="nav-settings-desktop"
+          style={{
+            fontSize: 13, padding: "5px 10px", whiteSpace: "nowrap",
+            background: "transparent", border: "none",
+            color: "rgba(244,241,232,0.72)",
+          }}
         >
           Выйти
         </button>
 
         <button
           onClick={() => setOpen(o => !o)}
-          className="btn-ghost nav-burger"
-          style={{ padding: "5px 10px", fontSize: 18, lineHeight: 1 }}
+          className="nav-burger"
+          style={{
+            padding: "5px 10px", fontSize: 18, lineHeight: 1,
+            background: "transparent", border: "1px solid rgba(255,255,255,0.18)",
+            color: "var(--text-on-dark)",
+          }}
           aria-label="Меню"
         >
           {open ? "✕" : "☰"}
@@ -135,8 +162,8 @@ export default function Nav() {
 
       {open && (
         <div className="nav-mobile-menu" style={{
-          background: "#fffdf7",
-          borderTop: "1px solid #e4ddcd",
+          background: "#0f293d",
+          borderTop: "1px solid rgba(255,255,255,0.10)",
           padding: "8px 16px 12px",
           display: "flex",
           flexDirection: "column",
@@ -146,14 +173,14 @@ export default function Nav() {
             <NavLink
               key={l.to}
               to={l.to}
-              style={linkStyle}
+              style={mobileLinkStyle}
               onClick={() => setOpen(false)}
             >
               {l.label}
             </NavLink>
           ))}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: "#7a8590" }}>Валюта:</span>
+            <span style={{ fontSize: 12, color: "rgba(244,241,232,0.6)" }}>Валюта:</span>
             <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>
               {COMMON_CURRENCIES.map(c => (
                 <option key={c} value={c}>{currencySymbol(c)} {c}</option>
@@ -162,8 +189,11 @@ export default function Nav() {
           </div>
           <button
             onClick={handleLogout}
-            className="btn-ghost"
-            style={{ marginTop: 8, textAlign: "left" }}
+            style={{
+              marginTop: 8, textAlign: "left",
+              background: "transparent", border: "1px solid rgba(255,255,255,0.18)",
+              color: "var(--text-on-dark)",
+            }}
           >
             Выйти
           </button>
@@ -174,7 +204,7 @@ export default function Nav() {
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
         .nav-burger { display: none !important; }
-        @media (max-width: 600px) {
+        @media (max-width: 720px) {
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
           .nav-burger { display: block !important; }
