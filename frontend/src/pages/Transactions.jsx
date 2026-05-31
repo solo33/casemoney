@@ -184,7 +184,7 @@ export default function Transactions() {
   return (
     <div className="page" style={{ maxWidth: 1200 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ margin: 0 }}>Транзакции</h1>
+        <h1 style={{ margin: 0 }}>Записи</h1>
         <button
           type="button"
           onClick={() => setEditing(editing === "new" ? null : "new")}

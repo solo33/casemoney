@@ -132,10 +132,31 @@ export default function Settings() {
         </form>
       </Section>
 
+      {/* Персональные справочники */}
+      <Section title="Персональные">
+        <p style={{ ...muted, marginBottom: 12 }}>
+          Личные справочники: категории доходов и расходов и список валют с курсами.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <NavRow
+            to="/categories"
+            icon="🗂"
+            title="Категории"
+            description="Иерархия доходов и расходов, цвета и иконки"
+          />
+          <NavRow
+            to="/currencies"
+            icon="💱"
+            title="Валюты"
+            description="Список валют, ручные курсы, основная валюта"
+          />
+        </div>
+      </Section>
+
       {/* Основная валюта */}
       <Section title="Основная валюта">
         <p style={muted}>
-          В этой валюте показываются все суммы и итоги. Управление списком валют и курсами — на странице <Link to="/currencies">Валюты</Link>.
+          В этой валюте показываются все суммы и итоги. Управление списком валют и курсами — в разделе <Link to="/currencies">Валюты</Link>.
         </p>
         <div style={{ fontSize: 18, fontWeight: 600, marginTop: 8 }}>
           {user.main_currency}
@@ -250,6 +271,27 @@ function Section({ title, tone, children }) {
       </h3>
       {children}
     </div>
+  );
+}
+
+function NavRow({ to, icon, title, description }) {
+  return (
+    <Link
+      to={to}
+      style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "12px 14px", borderRadius: 8,
+        border: "1px solid #e4ddcd", background: "#f6f2e9",
+        textDecoration: "none", color: "inherit",
+      }}
+    >
+      <span style={{ fontSize: 20 }}>{icon}</span>
+      <span style={{ flex: 1 }}>
+        <span style={{ display: "block", fontWeight: 600, fontSize: 14, color: "#1b2531" }}>{title}</span>
+        <span style={{ display: "block", fontSize: 12, color: "#7a8590", marginTop: 2 }}>{description}</span>
+      </span>
+      <span style={{ color: "#9c7b3c", fontSize: 18 }}>→</span>
+    </Link>
   );
 }
 

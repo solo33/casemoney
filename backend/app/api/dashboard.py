@@ -59,6 +59,7 @@ class RecentTransaction(BaseModel):
     type: str
     description: Optional[str]
     date: datetime
+    account_id: int
     account_name: str
     category_name: Optional[str]
     category_icon: Optional[str]
@@ -73,6 +74,7 @@ class DashboardResponse(BaseModel):
     top_categories: List[CategoryStat]
     monthly_stats: List[MonthStat]
     recent_transactions: List[RecentTransaction]
+    recently_changed: List[RecentTransaction]  # последние изменённые (по updated_at)
 
 
 def _to_main(db: Session, user_id: int, amount: float, currency: str, main: str) -> float:
@@ -190,23 +192,36 @@ def get_dashboard(
         .all()
     )
     accounts_map = {a.id: a for a in accounts}
-    recent_transactions = []
-    for t in recent_rows:
+
+    def _serialize_tx(t) -> RecentTransaction:
         acc = accounts_map.get(t.account_id)
         cat = categories_map.get(t.category_id) if t.category_id else None
-        recent_transactions.append(
-            RecentTransaction(
-                id=t.id,
-                amount=t.amount,
-                currency=t.currency,
-                type=t.type.value,
-                description=t.description,
-                date=t.date,
-                account_name=acc.name if acc else "—",
-                category_name=cat.name if cat else None,
-                category_icon=cat.icon if cat else None,
-            )
+        return RecentTransaction(
+            id=t.id,
+            amount=t.amount,
+            currency=t.currency,
+            type=t.type.value,
+            description=t.description,
+            date=t.date,
+            account_id=t.account_id,
+            account_name=acc.name if acc else "—",
+            category_name=cat.name if cat else None,
+            category_icon=cat.icon if cat else None,
         )
+
+    recent_transactions = [_serialize_tx(t) for t in recent_rows]
+
+    # 6. Последние изменённые — по updated_at (fallback на date через coalesce)
+    changed_rows = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id)
+        .order_by(
+            func.coalesce(Transaction.updated_at, Transaction.date).desc()
+        )
+        .limit(8)
+        .all()
+    )
+    recently_changed = [_serialize_tx(t) for t in changed_rows]
 
     return DashboardResponse(
         main_currency=main,
@@ -217,4 +232,5 @@ def get_dashboard(
         top_categories=top_categories,
         monthly_stats=monthly_stats,
         recent_transactions=recent_transactions,
+        recently_changed=recently_changed,
     )

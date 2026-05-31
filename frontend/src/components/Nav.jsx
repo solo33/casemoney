@@ -6,10 +6,8 @@ import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
 const BASE_LINKS = [
   { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
-  { to: "/categories", label: "Категории" },
-  { to: "/currencies", label: "Валюты" },
-  { to: "/transactions", label: "Транзакции" },
-  { to: "/reports", label: "Отчёты" },
+  { to: "/transactions", label: "Записи" },
+  { to: "/reports", label: "Анализ" },
   { to: "/goals", label: "Цели" },
   { to: "/import", label: "Импорт" },
   { to: "/settings", label: "Настройки" },

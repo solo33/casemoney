@@ -17,6 +17,7 @@ function isoToday() {
 
 export default function QuickAddInline() {
   const [accounts, setAccounts] = useState([]);
+  const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);
   const [type, setType] = useState("expense");
   const [form, setForm] = useState({
@@ -33,16 +34,19 @@ export default function QuickAddInline() {
 
   const loadOptions = useCallback(async () => {
     try {
-      const [acc, cat] = await Promise.all([
-        api.get("/api/accounts/"),
+      const [grp, cat] = await Promise.all([
+        api.get("/api/accounts/grouped"),
         api.get("/api/categories/"),
       ]);
-      setAccounts(acc.data);
+      const buckets = grp.data || [];
+      const flat = buckets.flatMap(b => b.accounts || []);
+      setAccountGroups(buckets);
+      setAccounts(flat);
       setCategories(cat.data);
       // подставим первый счёт + его первую валюту, если ещё не выбраны
       setForm(f => {
         if (f.account_id) return f;
-        const first = acc.data[0];
+        const first = flat[0];
         if (!first) return f;
         return {
           ...f,
@@ -51,7 +55,7 @@ export default function QuickAddInline() {
         };
       });
     } catch {
-      setError("Не удалось загрузить счета/категории");
+      setError("Не удалось загрузить счета и категории");
     }
   }, []);
 
@@ -162,10 +166,14 @@ export default function QuickAddInline() {
             required
           >
             <option value="">— выбрать —</option>
-            {accounts.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.icon ? `${a.icon} ` : ""}{a.name}
-              </option>
+            {accountGroups.map(b => (
+              <optgroup key={b.group.id ?? "ungrouped"} label={b.group.name}>
+                {b.accounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.icon ? `${a.icon} ` : ""}{a.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <input
@@ -218,7 +226,7 @@ export default function QuickAddInline() {
             type="text"
             value={form.description}
             onChange={e => setForm({ ...form, description: e.target.value })}
-            placeholder="Например: Пятёрочка"
+            placeholder="Например: Пятерочка"
           />
         </div>
 

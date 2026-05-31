@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import QuickAddInline from "../components/QuickAddInline";
@@ -11,17 +11,20 @@ const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" 
 
 const RU_MONTHS_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 
-function todayKey() {
-  const d = new Date(); return d.toISOString().slice(0, 10);
-}
-
 function isToday(iso) {
   return new Date(iso).toDateString() === new Date().toDateString();
 }
 
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+// Границы текущего месяца в формате YYYY-MM-DD
+function currentMonthRange() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const pad = (n) => String(n).padStart(2, "0");
+  const from = `${y}-${pad(m + 1)}-01`;
+  const last = new Date(y, m + 1, 0).getDate();
+  const to = `${y}-${pad(m + 1)}-${pad(last)}`;
+  return { from, to };
 }
 
 function aggregateByCurrency(groups) {
@@ -40,9 +43,11 @@ function aggregateByCurrency(groups) {
 
 export default function Home() {
   const { mainCurrency } = useUser();
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [grouped, setGrouped] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -50,7 +55,12 @@ export default function Home() {
     setError(null);
     try {
       const now = new Date();
-      const params = { period: "month", year: now.getFullYear(), month: now.getMonth() + 1 };
+      const params = {
+        period: "month",
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        breakdown_type: breakdownType,
+      };
       const [d, g, s] = await Promise.all([
         api.get("/api/dashboard/"),
         api.get("/api/accounts/grouped"),
@@ -64,7 +74,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [breakdownType]);
 
   useEffect(() => {
     fetchAll();
@@ -76,7 +86,7 @@ export default function Home() {
 
   const sym = currencySymbol(mainCurrency);
 
-  // breakdown сумм по валютам по всем счетам
+  // breakdown сумм по валютам по всем счетам (только учитываемые в балансе)
   const byCurrency = useMemo(() => aggregateByCurrency(grouped), [grouped]);
 
   // последние 3 месяца из dashboard.monthly_stats
@@ -91,15 +101,38 @@ export default function Home() {
     return dashboard.recent_transactions.filter(t => isToday(t.date));
   }, [dashboard]);
 
+  const recentlyChanged = dashboard?.recently_changed || [];
+
   if (loading) return <div className="page">Загрузка...</div>;
   if (error) return <div className="page" style={{ color: "#c0432b" }}>{error}</div>;
 
   const totalBalance = dashboard.total_balance;
-  const monthExpenses = summary?.category_breakdown || [];
-  const expenseTotal = summary?.total_expense || 0;
-  const maxCatTotal = monthExpenses.length ? monthExpenses[0].total : 0;
+  const monthIncome = dashboard.month_income || 0;
+  const monthExpense = dashboard.month_expense || 0;
+  const thisMonthLabel = RU_MONTHS_FULL[new Date().getMonth()];
+
+  const breakdownItems = summary?.category_breakdown || [];
+  const breakdownTotal = breakdownType === "income"
+    ? (summary?.total_income || 0)
+    : (summary?.total_expense || 0);
+  const maxCatTotal = breakdownItems.length ? breakdownItems[0].total : 0;
   const monthLabel = summary?.period_label ||
     `${RU_MONTHS_FULL[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const breakdownColor = breakdownType === "income" ? "#167a4a" : "#c0432b";
+  const breakdownWord = breakdownType === "income" ? "Доходы" : "Расходы";
+
+  // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
+  const goToCategory = (catId) => {
+    const { from, to } = currentMonthRange();
+    const params = new URLSearchParams({ type: breakdownType, date_from: from, date_to: to });
+    if (catId != null) params.set("category_id", String(catId));
+    navigate(`/transactions?${params.toString()}`);
+  };
+
+  // Клик по счёту → Записи по этому счёту
+  const goToAccount = (accId) => {
+    navigate(`/transactions?account_id=${accId}`);
+  };
 
   return (
     <div className="home-layout" style={{
@@ -127,8 +160,32 @@ export default function Home() {
           }}>
             {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
           </div>
+
+          {/* Доходы и расходы за текущий месяц */}
+          <div style={{
+            display: "flex", gap: 10, marginTop: 14,
+            paddingTop: 12, borderTop: "1px solid #ece6d8",
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 2 }}>
+                Доходы за {thisMonthLabel}
+              </div>
+              <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: "#167a4a" }}>
+                +{formatMoney(monthIncome)} {sym}
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 2 }}>
+                Расходы за {thisMonthLabel}
+              </div>
+              <div className="tabular" style={{ fontSize: 16, fontWeight: 600, color: "#c0432b" }}>
+                −{formatMoney(monthExpense)} {sym}
+              </div>
+            </div>
+          </div>
+
           {byCurrency.length > 0 && (
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 2 }}>
               {byCurrency.map(c => (
                 <div key={c.currency} style={{
                   display: "flex", justifyContent: "flex-end", gap: 6,
@@ -149,11 +206,11 @@ export default function Home() {
           <MonthBars points={last3} sym={sym} />
         </Card>
 
-        {/* Accounts grouped */}
+        {/* Accounts grouped — только учитываемые в балансе */}
         <Card noPadding>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Счета</h3>
-            <Link to="/accounts" style={{ fontSize: 12, color: "#173a54", textDecoration: "none" }}>
+            <Link to="/accounts" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none" }}>
               Настроить →
             </Link>
           </div>
@@ -162,9 +219,15 @@ export default function Home() {
               Нет счетов. <Link to="/accounts">Добавить</Link>
             </p>
           ) : (
-            grouped.map(bucket => (
-              <GroupBlock key={bucket.group.id ?? "ungrouped"} bucket={bucket} sym={sym} />
-            ))
+            grouped
+              .map(bucket => ({
+                ...bucket,
+                accounts: (bucket.accounts || []).filter(a => a.include_in_balance !== false),
+              }))
+              .filter(bucket => bucket.accounts.length > 0)
+              .map(bucket => (
+                <GroupBlock key={bucket.group.id ?? "ungrouped"} bucket={bucket} sym={sym} onAccountClick={goToAccount} />
+              ))
           )}
         </Card>
       </aside>
@@ -174,7 +237,7 @@ export default function Home() {
         {/* Inline quick-add form */}
         <QuickAddInline />
 
-        {/* Records today + чарт */}
+        {/* Records today */}
         <Card noPadding>
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #ece6d8", display: "flex", gap: 12, alignItems: "baseline" }}>
             <h3 style={{ ...sectionTitle, marginBottom: 0 }}>
@@ -191,52 +254,55 @@ export default function Home() {
           ) : (
             <div>
               {todayTx.map((tx, idx) => (
-                <div key={tx.id} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 16px",
-                  borderTop: idx === 0 ? "none" : "1px solid #ece6d8",
-                }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    background: "#ece6d8", display: "flex",
-                    alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
-                  }}>
-                    {tx.category_icon || "💸"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {tx.description || tx.category_name || TYPE_LABEL[tx.type]}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#a6afb8" }}>
-                      {tx.account_name}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontWeight: 600, fontSize: 14,
-                    color: TYPE_COLOR[tx.type], whiteSpace: "nowrap",
-                  }}>
-                    {tx.type === "expense" ? "−" : "+"}{formatMoneyWithCurrency(tx.amount, tx.currency)}
-                  </div>
-                </div>
+                <TxRow key={tx.id} tx={tx} first={idx === 0} onClick={() => goToAccount(tx.account_id)} />
               ))}
             </div>
           )}
         </Card>
 
-        {/* Expenses by category (horizontal bars) */}
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
-            <h3 style={sectionTitle}>Расходы за {monthLabel.toLowerCase()}</h3>
-            <Link to="/reports" style={{ fontSize: 12, color: "#173a54", textDecoration: "none" }}>
-              Подробнее →
+        {/* Последние изменённые */}
+        <Card noPadding>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #ece6d8", display: "flex", gap: 12, alignItems: "baseline" }}>
+            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Последние изменения</h3>
+            <Link to="/transactions" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none", marginLeft: "auto" }}>
+              Все записи →
             </Link>
           </div>
-          {monthExpenses.length === 0 ? (
-            <p style={{ color: "#a6afb8", fontSize: 14 }}>Нет расходов за этот месяц</p>
+          {recentlyChanged.length === 0 ? (
+            <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
+              Пока нет записей.
+            </p>
+          ) : (
+            <div>
+              {recentlyChanged.map((tx, idx) => (
+                <TxRow key={tx.id} tx={tx} first={idx === 0} showDate onClick={() => goToAccount(tx.account_id)} />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Разбивка по категориям с переключателем Расходы/Доходы */}
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
+            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>
+              {breakdownWord} за {monthLabel.toLowerCase()}
+            </h3>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <ToggleBtn active={breakdownType === "expense"} onClick={() => setBreakdownType("expense")}>Расходы</ToggleBtn>
+              <ToggleBtn active={breakdownType === "income"} onClick={() => setBreakdownType("income")}>Доходы</ToggleBtn>
+              <Link to="/reports" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none", marginLeft: 4 }}>
+                Анализ →
+              </Link>
+            </div>
+          </div>
+          {breakdownItems.length === 0 ? (
+            <p style={{ color: "#a6afb8", fontSize: 14 }}>
+              Нет {breakdownType === "income" ? "доходов" : "расходов"} за этот месяц
+            </p>
           ) : (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {monthExpenses.slice(0, 12).map(c => (
+                {breakdownItems.slice(0, 12).map(c => (
                   <CategoryBar
                     key={String(c.category_id)}
                     name={c.category_name}
@@ -245,6 +311,7 @@ export default function Home() {
                     total={c.total}
                     max={maxCatTotal}
                     sym={sym}
+                    onClick={() => goToCategory(c.category_id)}
                   />
                 ))}
               </div>
@@ -254,7 +321,7 @@ export default function Home() {
                 fontSize: 14, fontWeight: 600,
               }}>
                 <span style={{ color: "#515c68" }}>Итого</span>
-                <span style={{ color: "#c0432b" }}>{formatMoney(expenseTotal)} {sym}</span>
+                <span style={{ color: breakdownColor }}>{formatMoney(breakdownTotal)} {sym}</span>
               </div>
             </>
           )}
@@ -289,11 +356,68 @@ function Card({ children, style, noPadding }) {
   );
 }
 
+function ToggleBtn({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "4px 12px",
+        borderRadius: 999,
+        border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
+        background: active ? "#173a54" : "transparent",
+        color: active ? "#fff" : "#515c68",
+        fontSize: 12,
+        fontWeight: active ? 600 : 500,
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TxRow({ tx, first, showDate, onClick }) {
+  const dateStr = new Date(tx.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 12,
+        padding: "10px 16px",
+        borderTop: first ? "none" : "1px solid #ece6d8",
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
+      <div style={{
+        width: 32, height: 32, borderRadius: "50%",
+        background: "#ece6d8", display: "flex",
+        alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
+      }}>
+        {tx.category_icon || "💸"}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {tx.description || tx.category_name || TYPE_LABEL[tx.type]}
+        </div>
+        <div style={{ fontSize: 12, color: "#a6afb8" }}>
+          {showDate ? `${dateStr} · ` : ""}{tx.account_name}
+        </div>
+      </div>
+      <div style={{
+        fontWeight: 600, fontSize: 14,
+        color: TYPE_COLOR[tx.type], whiteSpace: "nowrap",
+      }}>
+        {tx.type === "expense" ? "−" : "+"}{formatMoneyWithCurrency(tx.amount, tx.currency)}
+      </div>
+    </div>
+  );
+}
+
 function MonthBars({ points, sym }) {
   if (!points.length) {
     return <p style={{ color: "#a6afb8", fontSize: 14 }}>Нет данных</p>;
   }
-  // макс среди всех значений для нормализации длины бара
   const maxVal = Math.max(...points.flatMap(p => [Math.abs(p.income), Math.abs(p.expense)])) || 1;
 
   return (
@@ -343,7 +467,7 @@ function Bar({ value, max, color, sym, sign }) {
   );
 }
 
-function GroupBlock({ bucket, sym }) {
+function GroupBlock({ bucket, sym, onAccountClick }) {
   return (
     <div style={{
       padding: "10px 16px",
@@ -361,19 +485,24 @@ function GroupBlock({ bucket, sym }) {
         </span>
       </div>
       {bucket.accounts.map(acc => (
-        <AccountBlock key={acc.id} acc={acc} sym={sym} />
+        <AccountBlock key={acc.id} acc={acc} sym={sym} onClick={() => onAccountClick(acc.id)} />
       ))}
     </div>
   );
 }
 
-function AccountBlock({ acc, sym }) {
+function AccountBlock({ acc, sym, onClick }) {
   const balances = acc.balances || [];
   return (
-    <div style={{
-      marginTop: 6,
-      paddingLeft: 4,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        marginTop: 6,
+        paddingLeft: 4,
+        cursor: onClick ? "pointer" : "default",
+        borderRadius: 6,
+      }}
+    >
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
         fontSize: 13,
@@ -405,15 +534,19 @@ function AccountBlock({ acc, sym }) {
   );
 }
 
-function CategoryBar({ name, icon, color, total, max, sym }) {
+function CategoryBar({ name, icon, color, total, max, sym, onClick }) {
   const pct = max > 0 ? Math.min(100, (total / max) * 100) : 0;
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "minmax(120px, 1fr) 2fr auto",
-      gap: 10, alignItems: "center",
-      fontSize: 13,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(120px, 1fr) 2fr auto",
+        gap: 10, alignItems: "center",
+        fontSize: 13,
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
       <span style={{
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
         display: "flex", alignItems: "center", gap: 6, color: "#515c68",
@@ -426,7 +559,7 @@ function CategoryBar({ name, icon, color, total, max, sym }) {
       }}>
         <div style={{
           width: `${pct}%`, height: "100%",
-          background: color || "#f59e0b",
+          background: color || "#9c7b3c",
           borderRadius: 3,
         }} />
       </div>

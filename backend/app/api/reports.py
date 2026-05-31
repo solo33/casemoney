@@ -159,6 +159,9 @@ def get_summary(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     rollup: bool = Query(True, description="Сворачивать подкатегории под родителя"),
+    breakdown_type: Literal["expense", "income"] = Query(
+        "expense", description="По какому типу строить разбивку по категориям"
+    ),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -175,6 +178,10 @@ def get_summary(
         .all()
     )
 
+    breakdown_enum = (
+        TransactionType.income if breakdown_type == "income" else TransactionType.expense
+    )
+
     total_income = 0.0
     total_expense = 0.0
     cat_totals: dict[Optional[int], float] = {}
@@ -184,7 +191,12 @@ def get_summary(
             total_income += amount_main
         elif t.type == TransactionType.expense:
             total_expense += amount_main
+        # Разбивка по категориям — по выбранному типу (доход или расход)
+        if t.type == breakdown_enum:
             cat_totals[t.category_id] = cat_totals.get(t.category_id, 0.0) + amount_main
+
+    # Знаменатель для процентов — сумма по выбранному типу
+    breakdown_total = total_income if breakdown_type == "income" else total_expense
 
     categories_map = {
         c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
@@ -192,7 +204,7 @@ def get_summary(
 
     def _node(cat_id: Optional[int], total: float, own: float, children: list) -> CategoryBreakdown:
         cat = categories_map.get(cat_id) if cat_id else None
-        percent = round((total / total_expense * 100), 1) if total_expense > 0 else 0.0
+        percent = round((total / breakdown_total * 100), 1) if breakdown_total > 0 else 0.0
         return CategoryBreakdown(
             category_id=cat_id,
             category_name=cat.name if cat else "Без категории",

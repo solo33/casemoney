@@ -21,6 +21,11 @@ class Transaction(Base):
     description = Column(String, nullable=True)
     date = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Технические метки: когда запись создана / последний раз изменена.
+    # updated_at обновляется автоматически при любом изменении строки (onupdate).
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

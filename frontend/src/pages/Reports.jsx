@@ -76,7 +76,7 @@ export default function Reports() {
       api.get("/api/reports/monthly-trend", { params: { months: 6 } }),
     ])
       .then(([s, t]) => { setSummary(s.data); setTrend(t.data); })
-      .catch(() => setError("Ошибка загрузки отчёта"))
+      .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
   }, [preset, custom]);
 
@@ -97,13 +97,17 @@ export default function Reports() {
     ? summary.category_breakdown.find(c => c.category_id === drillCatId)
     : null;
 
+  // ВАЖНО: поле доли называем `share`, а не `percent`. Recharts в label/tooltip
+  // подставляет в payload своё вычисленное поле `percent` (доля 0..1), и если
+  // в данных уже есть `percent` в процентах (0..100), оно перетирает расчёт и
+  // даёт значения вроде 2720%. Поэтому держим своё значение под другим именем.
   const pieData = !summary ? [] : (drillRoot
     ? [
         ...drillRoot.children.map(c => ({
           name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
           value: c.total,
           color: c.category_color,
-          percent: drillRoot.total > 0 ? +(c.total / drillRoot.total * 100).toFixed(1) : 0,
+          share: drillRoot.total > 0 ? +(c.total / drillRoot.total * 100).toFixed(1) : 0,
           id: c.category_id,
           drillable: false,
         })),
@@ -112,7 +116,7 @@ export default function Reports() {
               name: `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} (без подкатегории)`,
               value: drillRoot.own_total,
               color: drillRoot.category_color,
-              percent: drillRoot.total > 0 ? +(drillRoot.own_total / drillRoot.total * 100).toFixed(1) : 0,
+              share: drillRoot.total > 0 ? +(drillRoot.own_total / drillRoot.total * 100).toFixed(1) : 0,
               id: null,
               drillable: false,
             }]
@@ -122,7 +126,7 @@ export default function Reports() {
         name: `${c.category_icon ? c.category_icon + " " : ""}${c.category_name}`,
         value: c.total,
         color: c.category_color,
-        percent: c.percent,
+        share: c.percent,
         id: c.category_id,
         drillable: c.children?.length > 0,
       })));
@@ -136,7 +140,7 @@ export default function Reports() {
   return (
     <div className="page">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ margin: 0 }}>Отчёты</h1>
+        <h1 style={{ margin: 0 }}>Анализ</h1>
         <Link to="/reports/annual" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
           Годовой анализ →
         </Link>
@@ -279,7 +283,7 @@ export default function Reports() {
                         <Cell key={i} fill={entry.color} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.percent}%)`, props.payload.name]} />
+                    <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.share}%)`, props.payload.name]} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
@@ -367,7 +371,7 @@ export default function Reports() {
                                 {formatMoney(ch.total)} {sym}
                               </td>
                               <td style={{ padding: "8px 12px", textAlign: "right", color: "#a6afb8", fontSize: 12 }}>
-                                {c.total > 0 ? ((ch.total / c.total) * 100).toFixed(1) : 0}% от родителя
+                                {c.total > 0 ? ((ch.total / c.total) * 100).toFixed(1) : 0}%
                               </td>
                             </tr>
                           ))}
