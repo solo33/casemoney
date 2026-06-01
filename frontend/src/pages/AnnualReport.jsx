@@ -54,7 +54,7 @@ export default function AnnualReport() {
   const expenseRows = useMemo(() => data ? filterRows(data.expense) : [], [data, hideEmpty]);
 
   return (
-    <div className="page" style={{ maxWidth: 1280 }}>
+    <div className="page" style={{ maxWidth: 1680 }}>
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
       <AnalysisNav />
       <h1 style={{ marginBottom: 6, fontSize: 26 }}>
@@ -112,11 +112,11 @@ export default function AnnualReport() {
         <div className="table-wrap" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
-          <table style={{ minWidth: 1100, fontSize: 13 }}>
+          <table style={{ minWidth: 980, fontSize: 12.5 }}>
             <colgroup>
-              <col style={{ minWidth: 220 }} />
-              {MONTHS.map((_, i) => <col key={i} style={{ minWidth: 70 }} />)}
-              <col style={{ minWidth: 90 }} />
+              <col style={{ minWidth: 170 }} />
+              {MONTHS.map((_, i) => <col key={i} style={{ minWidth: 60 }} />)}
+              <col style={{ minWidth: 78 }} />
             </colgroup>
             <thead>
               <tr style={{ background: "#a6afb8" }}>
@@ -290,7 +290,7 @@ function RowLine({ row, sym, accent, onCellClick }) {
             onClick={() => handleMonthClick(i, v)}
             title={active ? `Транзакции за ${MONTHS[i]}` : ""}
           >
-            {active ? formatMoney(v) : ""}
+            {active ? formatMoney(v, { maxFraction: 0 }) : ""}
           </td>
         );
       })}
@@ -305,7 +305,7 @@ function RowLine({ row, sym, accent, onCellClick }) {
           cursor: Math.abs(row.total) > 0.005 && onCellClick ? "pointer" : "default",
         }}
       >
-        {Math.abs(row.total) > 0.005 ? `${formatMoney(row.total)} ${sym}` : ""}
+        {Math.abs(row.total) > 0.005 ? `${formatMoney(row.total, { maxFraction: 0 })} ${sym}` : ""}
       </td>
     </tr>
   );
@@ -336,7 +336,7 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
             }}
             onClick={() => { if (active && onCellClick) onCellClick(i); }}
           >
-            {active ? formatMoney(v) : ""}
+            {active ? formatMoney(v, { maxFraction: 0 }) : ""}
           </td>
         );
       })}
@@ -349,7 +349,7 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
         }}
         onClick={() => onCellClick?.(null)}
       >
-        {Math.abs(total) > 0.005 ? `${formatMoney(total)} ${sym}` : ""}
+        {Math.abs(total) > 0.005 ? `${formatMoney(total, { maxFraction: 0 })} ${sym}` : ""}
       </td>
     </tr>
   );
@@ -382,7 +382,7 @@ function NetRow({ label, monthly, total, sym, onCellClick }) {
             }}
             onClick={() => { if (active && onCellClick) onCellClick(i); }}
           >
-            {active ? `${v >= 0 ? "" : "−"}${formatMoney(Math.abs(v))}` : ""}
+            {active ? `${v >= 0 ? "" : "−"}${formatMoney(Math.abs(v), { maxFraction: 0 })}` : ""}
           </td>
         );
       })}
@@ -395,7 +395,7 @@ function NetRow({ label, monthly, total, sym, onCellClick }) {
         }}
         onClick={() => onCellClick?.(null)}
       >
-        {total >= 0 ? "" : "−"}{formatMoney(Math.abs(total))} {sym}
+        {total >= 0 ? "" : "−"}{formatMoney(Math.abs(total), { maxFraction: 0 })} {sym}
       </td>
     </tr>
   );
