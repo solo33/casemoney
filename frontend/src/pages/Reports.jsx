@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect, useMemo, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import AnalysisNav from "../components/AnalysisNav";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -9,46 +10,52 @@ import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol, formatMoney } from "../utils/money";
 
-// Пресеты периодов → query params для /api/reports/summary
-function buildPresetParams(preset, custom) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1; // 1..12
-  switch (preset) {
-    case "current_month":
-      return { period: "month", year: y, month: m };
-    case "prev_month": {
-      let py = y, pm = m - 1;
-      if (pm < 1) { pm = 12; py -= 1; }
-      return { period: "month", year: py, month: pm };
-    }
-    case "current_quarter": {
-      const q = Math.floor((m - 1) / 3) + 1;
-      return { period: "quarter", year: y, quarter: q };
-    }
-    case "current_year":
-      return { period: "year", year: y };
-    case "custom":
-      return {
-        period: "custom",
-        date_from: custom.from,
-        date_to: custom.to,
-      };
-    default:
-      return { period: "month", year: y, month: m };
-  }
-}
-
-const PRESETS = [
-  { key: "current_month", label: "Этот месяц" },
-  { key: "prev_month", label: "Прошлый месяц" },
-  { key: "current_quarter", label: "Квартал" },
-  { key: "current_year", label: "Год" },
-  { key: "custom", label: "Период" },
+const GRANULARITIES = [
+  { key: "day", label: "День" },
+  { key: "month", label: "Месяц" },
+  { key: "year", label: "Год" },
 ];
 
+const RU_MONTHS_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
+
 function isoDate(d) {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// granularity + опорная дата → query-параметры для /api/reports/summary
+function buildPeriodParams(gran, anchor) {
+  const y = anchor.getFullYear();
+  const m = anchor.getMonth() + 1;
+  if (gran === "day") {
+    const d = isoDate(anchor);
+    return { period: "custom", date_from: d, date_to: d };
+  }
+  if (gran === "year") {
+    return { period: "year", year: y };
+  }
+  return { period: "month", year: y, month: m };
+}
+
+// Человекочитаемый заголовок периода
+function periodLabel(gran, anchor) {
+  const y = anchor.getFullYear();
+  if (gran === "day") {
+    return anchor.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  }
+  if (gran === "year") return `${y} год`;
+  return `${RU_MONTHS_FULL[anchor.getMonth()]} ${y}`;
+}
+
+// Сдвиг опорной даты на ±1 шаг выбранной гранулярности
+function stepAnchor(gran, anchor, dir) {
+  const d = new Date(anchor);
+  if (gran === "day") d.setDate(d.getDate() + dir);
+  else if (gran === "year") d.setFullYear(d.getFullYear() + dir);
+  else d.setMonth(d.getMonth() + dir);
+  return d;
 }
 
 // Палитра для секторов пирога. Цвета категорий в базе часто одинаковые
@@ -63,24 +70,22 @@ const PIE_PALETTE = [
 export default function Reports() {
   const { mainCurrency } = useUser();
   const navigate = useNavigate();
-  const [preset, setPreset] = useState("current_month");
+  const [gran, setGran] = useState("month");          // day | month | year
+  const [anchor, setAnchor] = useState(new Date());   // опорная дата периода
   const [drillCatId, setDrillCatId] = useState(null);   // id выбранной корневой для drill-down в pie
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const today = useMemo(() => new Date(), []);
-  const monthAgo = useMemo(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30); return d;
-  }, []);
-  const [custom, setCustom] = useState({ from: isoDate(monthAgo), to: isoDate(today) });
 
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const label = periodLabel(gran, anchor);
+
   const fetchData = useCallback(() => {
     setLoading(true);
     setError(null);
-    const params = buildPresetParams(preset, custom);
+    const params = buildPeriodParams(gran, anchor);
     Promise.all([
       api.get("/api/reports/summary", { params }),
       api.get("/api/reports/monthly-trend", { params: { months: 6 } }),
@@ -88,7 +93,22 @@ export default function Reports() {
       .then(([s, t]) => { setSummary(s.data); setTrend(t.data); })
       .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
-  }, [preset, custom]);
+  }, [gran, anchor]);
+
+  // Значение для пикера (<input>) под текущую гранулярность
+  const pickerValue = gran === "day"
+    ? isoDate(anchor)
+    : gran === "month"
+      ? `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, "0")}`
+      : String(anchor.getFullYear());
+
+  const onPickerChange = (e) => {
+    const v = e.target.value;
+    if (!v) return;
+    if (gran === "day") setAnchor(new Date(v + "T00:00:00"));
+    else if (gran === "month") { const [y, m] = v.split("-"); setAnchor(new Date(+y, +m - 1, 1)); }
+    else setAnchor(new Date(+v, anchor.getMonth(), 1));
+  };
 
   useEffect(() => {
     fetchData();
@@ -161,74 +181,58 @@ export default function Reports() {
 
   return (
     <div className="page">
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h1 style={{ margin: 0 }}>Анализ</h1>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          <Link to="/reports/annual" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
-            Денежный поток за год →
-          </Link>
-          <Link to="/reports/balances" style={{ fontSize: 14, color: "#173a54", textDecoration: "none", fontWeight: 500 }}>
-            Годовые балансы →
-          </Link>
-        </div>
-      </div>
+      <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
+      <AnalysisNav />
 
-      {/* Переключатель периода */}
+      {/* Период: гранулярность + один пикер + стрелки */}
       <div style={{
-        display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12,
+        display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center",
       }}>
-        {PRESETS.map(p => {
-          const active = preset === p.key;
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setPreset(p.key)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
-                background: active ? "#173a54" : "#fff",
-                color: active ? "#fff" : "#515c68",
-                fontSize: 13,
-                fontWeight: active ? 600 : 500,
-                cursor: "pointer",
-              }}
-            >
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Поля кастомного периода */}
-      {preset === "custom" && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
-          <label style={{ fontSize: 13, color: "#7a8590" }}>
-            С{" "}
-            <input
-              type="date"
-              value={custom.from}
-              onChange={e => setCustom({ ...custom, from: e.target.value })}
-              style={{ padding: "6px 10px" }}
-            />
-          </label>
-          <label style={{ fontSize: 13, color: "#7a8590" }}>
-            по{" "}
-            <input
-              type="date"
-              value={custom.to}
-              onChange={e => setCustom({ ...custom, to: e.target.value })}
-              style={{ padding: "6px 10px" }}
-            />
-          </label>
+        <div style={{ display: "flex", gap: 6 }}>
+          {GRANULARITIES.map(g => {
+            const active = gran === g.key;
+            return (
+              <button
+                key={g.key}
+                type="button"
+                onClick={() => setGran(g.key)}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 999,
+                  border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
+                  background: active ? "#173a54" : "transparent",
+                  color: active ? "#fff" : "#515c68",
+                  fontSize: 13,
+                  fontWeight: active ? 600 : 500,
+                  cursor: "pointer",
+                }}
+              >
+                {g.label}
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button type="button" className="btn-ghost" style={{ padding: "5px 11px" }}
+                  onClick={() => setAnchor(a => stepAnchor(gran, a, -1))}>‹</button>
+          <input
+            type={gran === "day" ? "date" : gran === "month" ? "month" : "number"}
+            value={pickerValue}
+            onChange={onPickerChange}
+            style={{ padding: "6px 10px", width: gran === "year" ? 90 : "auto" }}
+          />
+          <button type="button" className="btn-ghost" style={{ padding: "5px 11px" }}
+                  onClick={() => setAnchor(a => stepAnchor(gran, a, 1))}>›</button>
+          <button type="button" className="btn-ghost" style={{ padding: "5px 12px", fontSize: 13 }}
+                  onClick={() => setAnchor(new Date())}>Сегодня</button>
+        </div>
+      </div>
 
       {/* Заголовок периода */}
       {summary && (
         <p style={{ color: "#7a8590", fontSize: 14, marginBottom: 20 }}>
-          {summary.period_label} · {summary.transactions_count} операций
+          {label} · {summary.transactions_count} операций
         </p>
       )}
 
@@ -276,7 +280,7 @@ export default function Reports() {
               title={
                 drillRoot
                   ? `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} — подкатегории`
-                  : `Расходы по категориям · ${summary.period_label}`
+                  : `Расходы по категориям · ${label}`
               }
               right={drillRoot && (
                 <button
@@ -293,37 +297,52 @@ export default function Reports() {
               {pieData.length === 0 ? (
                 <p style={{ color: "#a6afb8" }}>Нет расходов за период</p>
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="45%"
-                      outerRadius={80}
-                      label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""}
-                      labelLine={false}
-                      onClick={(d) => { if (d?.drillable) setDrillCatId(d.id); }}
-                    >
-                      {pieData.map((entry, i) => (
-                        <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.share}%)`, props.payload.name]} />
-                    <Legend
-                      verticalAlign="bottom"
-                      height={36}
-                      wrapperStyle={{ fontSize: 12 }}
-                      formatter={(value) => value.length > 22 ? value.slice(0, 21) + "…" : value}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-              {!drillRoot && pieData.some(p => p.drillable) && (
-                <p style={{ fontSize: 11, color: "#a6afb8", marginTop: 6, marginBottom: 0, textAlign: "center" }}>
-                  Кликните на сектор с подкатегориями, чтобы раскрыть
-                </p>
+                <>
+                  {!drillRoot && pieData.some(p => p.drillable) && (
+                    <p style={{ fontSize: 11.5, color: "#9c7b3c", margin: "0 0 8px", textAlign: "center" }}>
+                      Кликните на сектор с подкатегориями, чтобы раскрыть
+                    </p>
+                  )}
+                  <ResponsiveContainer width="100%" height={240}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={85}
+                        label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""}
+                        labelLine={false}
+                        onClick={(d) => { if (d?.drillable) setDrillCatId(d.id); }}
+                      >
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={PIE_PALETTE[i % PIE_PALETTE.length]} style={{ cursor: entry.drillable ? "pointer" : "default" }} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v, n, props) => [`${formatMoney(v)} ${sym} (${props.payload.share}%)`, props.payload.name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Своя легенда — переносится по строкам, не накладывается */}
+                  <div style={{
+                    display: "flex", flexWrap: "wrap", gap: "4px 14px",
+                    marginTop: 12, justifyContent: "center",
+                  }}>
+                    {pieData.map((e, i) => (
+                      <span key={i} style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        fontSize: 12, color: "#515c68",
+                      }}>
+                        <span style={{
+                          width: 10, height: 10, borderRadius: 2,
+                          background: PIE_PALETTE[i % PIE_PALETTE.length], flexShrink: 0,
+                        }} />
+                        {e.name} <span style={{ color: "#a6afb8" }}>{e.share}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </>
               )}
             </Card>
           </div>

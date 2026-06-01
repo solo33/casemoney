@@ -9,17 +9,24 @@ const BASE_LINKS = [
   { to: "/transactions", label: "Записи" },
   { to: "/reports", label: "Анализ" },
   { to: "/goals", label: "Цели" },
-  { to: "/import", label: "Импорт" },
+];
+
+// Раздел «Настройки» — выпадающее меню
+const SETTINGS_LINKS = [
   { to: "/settings", label: "Настройки" },
+  { to: "/categories", label: "Категории" },
+  { to: "/currencies", label: "Валюты" },
 ];
 
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, mainCurrency, updateMainCurrency, isPremium } = useUser();
-  const links = user?.is_admin
-    ? [...BASE_LINKS, { to: "/admin", label: "Админка", admin: true }]
-    : BASE_LINKS;
+  const links = BASE_LINKS;
+  const settingsLinks = user?.is_admin
+    ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
+    : SETTINGS_LINKS;
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -85,12 +92,58 @@ export default function Nav() {
           </span>
         </NavLink>
 
-        <div style={{ display: "flex", gap: 2, flex: 1 }} className="nav-links-desktop">
+        <div style={{ display: "flex", gap: 2, flex: 1, alignItems: "center" }} className="nav-links-desktop">
           {links.map(l => (
             <NavLink key={l.to} to={l.to} style={linkStyle}>
               {l.label}
             </NavLink>
           ))}
+
+          {/* Настройки — выпадающее меню */}
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(o => !o)}
+              style={{
+                ...linkStyle({ isActive: false }),
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
+              }}
+            >
+              Настройки <span style={{ fontSize: 10 }}>▾</span>
+            </button>
+            {settingsOpen && (
+              <>
+                <div
+                  onClick={() => setSettingsOpen(false)}
+                  style={{ position: "fixed", inset: 0, zIndex: 90 }}
+                />
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", left: 0,
+                  background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
+                  boxShadow: "0 8px 20px rgba(15,30,45,0.18)", padding: 4, zIndex: 91,
+                  minWidth: 160,
+                }}>
+                  {settingsLinks.map(l => (
+                    <NavLink
+                      key={l.to}
+                      to={l.to}
+                      onClick={() => setSettingsOpen(false)}
+                      style={({ isActive }) => ({
+                        display: "block", padding: "8px 12px", borderRadius: 6,
+                        textDecoration: "none", fontSize: 14, whiteSpace: "nowrap",
+                        color: isActive ? "#173a54" : "#1b2531",
+                        fontWeight: isActive ? 600 : 400,
+                        background: isActive ? "#f6f2e9" : "transparent",
+                      })}
+                    >
+                      {l.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Plan badge */}
@@ -168,6 +221,22 @@ export default function Nav() {
           gap: 4,
         }}>
           {links.map(l => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              style={mobileLinkStyle}
+              onClick={() => setOpen(false)}
+            >
+              {l.label}
+            </NavLink>
+          ))}
+          <div style={{
+            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            letterSpacing: 0.5, padding: "10px 11px 4px",
+          }}>
+            Настройки
+          </div>
+          {settingsLinks.map(l => (
             <NavLink
               key={l.to}
               to={l.to}

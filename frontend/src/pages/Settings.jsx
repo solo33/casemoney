@@ -196,10 +196,18 @@ export default function Settings() {
         </form>
       </Section>
 
-      {/* Экспорт */}
-      <Section title="Экспорт">
+      {/* Импорт и экспорт */}
+      <Section title="Импорт и экспорт">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          <NavRow
+            to="/import"
+            icon="📥"
+            title="Импорт"
+            description="Загрузка операций из CSV (в т.ч. выгрузка HomeMoney)"
+          />
+        </div>
         <p style={muted}>
-          Скачать все транзакции в CSV (формат совместим с импортом HomeMoney).
+          Экспорт: скачать все операции в CSV (формат совместим с импортом).
         </p>
         <div style={{ marginTop: 10 }}>
           <button type="button" onClick={() => {

@@ -5,7 +5,7 @@ const SOURCES = [
     to: "/import/homemoney",
     title: "Из HomeMoney",
     icon: "🏠",
-    description: "CSV-выгрузка из ihomemoney.com (date;account;category;total;currency;description;transfer)",
+    description: "CSV-выгрузка из ihomemoney.com",
     available: true,
   },
   {

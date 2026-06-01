@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol, formatMoney } from "../utils/money";
+import AnalysisNav from "../components/AnalysisNav";
 
 const MONTHS = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
 
@@ -49,12 +49,9 @@ export default function AnnualBalances() {
 
   return (
     <div className="page" style={{ maxWidth: 1400 }}>
-      <div style={{ marginBottom: 8 }}>
-        <Link to="/reports" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
-          ← К сводке
-        </Link>
-      </div>
-      <h1 style={{ marginBottom: 6 }}>
+      <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
+      <AnalysisNav />
+      <h1 style={{ marginBottom: 6, fontSize: 26 }}>
         Годовые балансы, <span style={{ color: "#173a54" }}>{data?.main_currency || mainCurrency}</span>
       </h1>
       <p style={{ color: "#7a8590", fontSize: 13.5, marginBottom: 16, maxWidth: 760 }}>

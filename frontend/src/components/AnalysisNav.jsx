@@ -1,0 +1,37 @@
+import { NavLink } from "react-router-dom";
+
+// Субнавигация раздела «Анализ»: сводка + годовые отчёты в одном месте.
+const TABS = [
+  { to: "/reports", label: "Сводка", end: true },
+  { to: "/reports/annual", label: "Денежный поток" },
+  { to: "/reports/balances", label: "Годовые балансы" },
+];
+
+export default function AnalysisNav() {
+  return (
+    <div style={{
+      display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16,
+      borderBottom: "1px solid #e4ddcd", paddingBottom: 10,
+    }}>
+      {TABS.map(t => (
+        <NavLink
+          key={t.to}
+          to={t.to}
+          end={t.end}
+          style={({ isActive }) => ({
+            padding: "6px 14px",
+            borderRadius: 999,
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: isActive ? 600 : 500,
+            border: `1px solid ${isActive ? "#173a54" : "#e4ddcd"}`,
+            background: isActive ? "#173a54" : "transparent",
+            color: isActive ? "#fff" : "#515c68",
+          })}
+        >
+          {t.label}
+        </NavLink>
+      ))}
+    </div>
+  );
+}

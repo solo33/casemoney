@@ -86,7 +86,18 @@ export default function ImportHomeMoney() {
           ← К выбору источника
         </Link>
       </div>
-      <h1 style={{ marginBottom: 20 }}>Импорт из HomeMoney</h1>
+      <h1 style={{ marginBottom: 8 }}>Импорт из HomeMoney</h1>
+      <p style={{ color: "#7a8590", fontSize: 14, marginBottom: 8, maxWidth: 760 }}>
+        Загрузите CSV-выгрузку из ihomemoney.com. Ожидаемая структура колонок
+        (разделитель — точка с запятой):
+      </p>
+      <code style={{
+        display: "block", maxWidth: 760, overflowX: "auto", whiteSpace: "nowrap",
+        background: "#efe9db", border: "1px solid #e4ddcd", borderRadius: 6,
+        padding: "8px 12px", fontSize: 12.5, color: "#515c68", marginBottom: 20,
+      }}>
+        date;account;category;total;currency;description;transfer
+      </code>
 
       {error && (
         <div style={errorBox}>
