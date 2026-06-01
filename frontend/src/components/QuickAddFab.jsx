@@ -7,6 +7,7 @@ export const TX_ADDED_EVENT = "casemoney:tx-added";
 
 const TYPE_OPTIONS = [
   { value: "expense", label: "Расход", color: "#c0432b" },
+  { value: "transfer", label: "Перевод", color: "#2f6296" },
   { value: "income", label: "Доход", color: "#167a4a" },
 ];
 
@@ -120,7 +121,8 @@ export default function QuickAddFab() {
     <>
       <button
         onClick={() => setOpen(true)}
-        aria-label="Добавить транзакцию"
+        aria-label="Добавить операцию"
+        className="fab-add-btn"
         style={{
           position: "fixed",
           right: 20,
@@ -129,12 +131,17 @@ export default function QuickAddFab() {
           background: "#173a54", color: "#fff", border: "none",
           fontSize: 28, lineHeight: 1, cursor: "pointer",
           boxShadow: "0 6px 16px rgba(23, 58, 84, 0.4)",
-          zIndex: 90, padding: 0, display: "flex",
+          zIndex: 90, padding: 0,
           alignItems: "center", justifyContent: "center",
         }}
       >
         +
       </button>
+      {/* На десктопе используется встроенная форма на Главной, плавающую кнопку прячем */}
+      <style>{`
+        .fab-add-btn { display: flex; }
+        @media (min-width: 721px) { .fab-add-btn { display: none !important; } }
+      `}</style>
 
       {open && (
         <>
@@ -255,15 +262,16 @@ export default function QuickAddFab() {
                 </select>
               </label>
 
-              {/* Категория */}
+              {/* Категория (для перевода не используется) */}
               <label style={{ display: "block", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Категория</span>
                 <select
                   value={form.category_id}
                   onChange={e => setForm({ ...form, category_id: e.target.value })}
+                  disabled={form.type === "transfer"}
                   style={{ width: "100%", marginTop: 4 }}
                 >
-                  <option value="">— Без категории —</option>
+                  <option value="">{form.type === "transfer" ? "— перевод —" : "— Без категории —"}</option>
                   {categories.filter(c => c.type === form.type).map(c => (
                     <option key={c.id} value={c.id}>
                       {c.icon ? `${c.icon} ` : ""}{c.name}
@@ -276,7 +284,7 @@ export default function QuickAddFab() {
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Описание (необязательно)</span>
                 <input
                   type="text"
-                  placeholder="Например: Пятёрочка"
+                  placeholder="Например: Пятерочка"
                   value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
                   style={{ width: "100%", marginTop: 4 }}

@@ -47,10 +47,15 @@ export default function Register() {
         padding: 32, maxWidth: 460, width: "100%",
       }}>
         <div style={{
-          fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600,
-          color: "#173a54", marginBottom: 20, textAlign: "center",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          marginBottom: 20,
         }}>
-          ₽ CaseMoney
+          <img src="/icon.svg" alt="" width={32} height={32} style={{ borderRadius: 9 }} />
+          <span style={{
+            fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "#173a54",
+          }}>
+            CaseMoney
+          </span>
         </div>
 
         {done ? (

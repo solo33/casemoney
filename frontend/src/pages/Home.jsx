@@ -441,7 +441,11 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
       }}>
         {tx.category_icon || "💸"}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div
+        onClick={onEdit}
+        style={{ flex: 1, minWidth: 0, cursor: onEdit ? "pointer" : "default" }}
+        title={onEdit ? "Открыть для редактирования" : undefined}
+      >
         <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {tx.description || tx.category_name || TYPE_LABEL[tx.type]}
         </div>
