@@ -142,6 +142,41 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
     return send_email(to_email, subject, text, html)
 
 
+def send_code_email(to_email: str, username: str, code: str) -> bool:
+    subject = f"CaseMoney — код подтверждения: {code}"
+    username_html = _html.escape(username)
+    code_html = _html.escape(code)
+    text = (
+        f"Здравствуйте, {username}!\n\n"
+        f"Ваш код подтверждения регистрации в CaseMoney:\n\n"
+        f"    {code}\n\n"
+        f"Введите его на странице регистрации. Код действителен 15 минут.\n\n"
+        f"Если вы не регистрировались — просто проигнорируйте это письмо.\n\n"
+        f"— CaseMoney"
+    )
+    html = f"""\
+<!doctype html>
+<html><body style="font-family: system-ui, sans-serif; background: #f6f2e9; padding: 32px;">
+  <div style="max-width: 520px; margin: 0 auto; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 28px; text-align: center;">
+    <h1 style="font-family: Georgia, serif; font-weight: 600; color: #173a54; font-size: 26px; margin: 0 0 16px;">
+      CaseMoney
+    </h1>
+    <p style="color: #515c68; line-height: 1.5; margin: 0 0 16px;">
+      Здравствуйте, <strong>{username_html}</strong>! Ваш код подтверждения:
+    </p>
+    <div style="font-size: 34px; font-weight: 700; letter-spacing: 8px; color: #173a54;
+                background: #efe9db; border-radius: 10px; padding: 16px; margin: 0 0 16px;">
+      {code_html}
+    </div>
+    <p style="color: #7a8590; font-size: 13px; margin: 0;">
+      Код действителен 15 минут. Если вы не регистрировались — проигнорируйте письмо.
+    </p>
+  </div>
+</body></html>
+"""
+    return send_email(to_email, subject, text, html)
+
+
 def send_reset_email(to_email: str, username: str, reset_url: str) -> bool:
     subject = "CaseMoney — восстановление пароля"
     username_html = _html.escape(username)

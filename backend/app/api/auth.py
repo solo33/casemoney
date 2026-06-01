@@ -1,3 +1,4 @@
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -5,16 +6,32 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.user_currency import UserCurrency
+from app.models.pending_registration import PendingRegistration
 from app.schemas.user import UserRegister, UserLogin, UserResponse, Token
 from app.services.auth import (
     hash_password, verify_password, create_access_token,
     create_activation_token, verify_activation_token,
     create_reset_token, verify_reset_token,
 )
-from app.services.email import send_activation_email, send_reset_email, app_url, is_smtp_configured
+from app.services.email import (
+    send_activation_email, send_reset_email, send_code_email, app_url, is_smtp_configured,
+)
 from app.services.app_config import is_email_verification_required, get_config
 from app.seeds import seed_default_categories, seed_default_accounts
 from datetime import datetime, timedelta, timezone
+
+# Параметры кода подтверждения
+CODE_TTL_MIN = 15          # срок жизни кода
+RESEND_COOLDOWN_SEC = 60   # минимум между отправками кода на один email
+MAX_CODE_ATTEMPTS = 5      # попыток ввода кода
+
+
+def _gen_code() -> str:
+    return f"{secrets.randbelow(900000) + 100000}"  # 6 цифр, 100000..999999
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -33,9 +50,13 @@ def _send_activation(user: User):
 
 
 class RegisterResponse(BaseModel):
-    user: UserResponse
-    email_sent: bool
+    requires_code: bool        # нужно ли вводить код подтверждения
     smtp_configured: bool
+
+
+class VerifyCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
 
 
 class PublicConfig(BaseModel):
@@ -49,6 +70,31 @@ def public_config(db: Session = Depends(get_db)):
     return PublicConfig(registration_enabled=cfg.registration_enabled)
 
 
+def _create_user(db: Session, email: str, username: str, hashed_password: str, cfg) -> User:
+    """Создаёт пользователя + дефолтные валюту/категории/счета + стартовый тариф."""
+    user = User(
+        email=email,
+        username=username,
+        hashed_password=hashed_password,
+        email_verified=True,
+    )
+    if cfg.default_plan == "premium":
+        user.is_premium = True
+        days = cfg.default_premium_days or 0
+        user.premium_until = None if days <= 0 else _now() + timedelta(days=days)
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    db.add(UserCurrency(user_id=user.id, currency=user.main_currency, auto=True))
+    db.commit()
+
+    seed_default_categories(db, user.id)
+    seed_default_accounts(db, user.id, currency=user.main_currency)
+    return user
+
+
 @router.post("/register", response_model=RegisterResponse)
 def register(
     data: UserRegister,
@@ -59,52 +105,88 @@ def register(
     if not cfg.registration_enabled:
         raise HTTPException(status_code=403, detail="Регистрация временно закрыта")
 
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
+    if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    require_verification = cfg.require_email_verification
+    hashed = hash_password(data.password)
 
-    user = User(
-        email=data.email,
-        username=data.username,
-        hashed_password=hash_password(data.password),
-        # Если активация отключена админом — сразу считаем email подтверждённым
-        email_verified=not require_verification,
-    )
+    # Если админ отключил подтверждение email — создаём сразу, без кода.
+    if not cfg.require_email_verification:
+        _create_user(db, data.email, data.username, hashed, cfg)
+        return RegisterResponse(requires_code=False, smtp_configured=is_smtp_configured())
 
-    # Стартовый тариф задаётся админом в системных настройках.
-    if cfg.default_plan == "premium":
-        user.is_premium = True
-        days = cfg.default_premium_days or 0
-        user.premium_until = (
-            None if days <= 0
-            else datetime.now(timezone.utc) + timedelta(days=days)
-        )
+    # Иначе — заявка на регистрацию + код на email.
+    pending = db.query(PendingRegistration).filter(
+        PendingRegistration.email == data.email
+    ).first()
 
-    db.add(user)
+    now = _now()
+    if pending and pending.last_sent_at:
+        last = pending.last_sent_at
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        if (now - last).total_seconds() < RESEND_COOLDOWN_SEC:
+            wait = int(RESEND_COOLDOWN_SEC - (now - last).total_seconds())
+            raise HTTPException(status_code=429, detail=f"Код уже отправлен. Повторите через {wait} с.")
+
+    code = _gen_code()
+    if pending is None:
+        pending = PendingRegistration(email=data.email)
+        db.add(pending)
+    pending.username = data.username
+    pending.hashed_password = hashed
+    pending.code = code
+    pending.expires_at = now + timedelta(minutes=CODE_TTL_MIN)
+    pending.attempts = 0
+    pending.last_sent_at = now
     db.commit()
-    db.refresh(user)
 
-    # Создаём дефолтную user_currency
-    db.add(UserCurrency(user_id=user.id, currency=user.main_currency, auto=True))
+    def _send():
+        try:
+            send_code_email(data.email, data.username, code)
+        except Exception:
+            pass
+    background.add_task(_send)
+
+    return RegisterResponse(requires_code=True, smtp_configured=is_smtp_configured())
+
+
+@router.post("/verify-code", response_model=Token)
+def verify_code(data: VerifyCodeRequest, db: Session = Depends(get_db)):
+    """Проверяет код и создаёт пользователя. Возвращает токен (автологин)."""
+    pending = db.query(PendingRegistration).filter(
+        PendingRegistration.email == data.email
+    ).first()
+    if not pending:
+        raise HTTPException(status_code=400, detail="Заявка не найдена. Запросите код заново.")
+
+    exp = pending.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if _now() > exp:
+        raise HTTPException(status_code=400, detail="Код истёк. Запросите новый.")
+
+    if pending.attempts >= MAX_CODE_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Слишком много попыток. Запросите новый код.")
+
+    if data.code.strip() != pending.code:
+        pending.attempts += 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="Неверный код")
+
+    # На случай гонки — проверим, что email ещё не занят
+    if db.query(User).filter(User.email == pending.email).first():
+        db.delete(pending)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+
+    cfg = get_config(db)
+    user = _create_user(db, pending.email, pending.username, pending.hashed_password, cfg)
+    db.delete(pending)
     db.commit()
 
-    # Дефолтные категории и счета (группы + по одному счёту)
-    seed_default_categories(db, user.id)
-    seed_default_accounts(db, user.id, currency=user.main_currency)
-
-    # Письмо отправляем только если активация требуется
-    email_sent = False
-    if require_verification:
-        background.add_task(_send_activation, user)
-        email_sent = True
-
-    return RegisterResponse(
-        user=user,
-        email_sent=email_sent,
-        smtp_configured=is_smtp_configured(),
-    )
+    token = create_access_token({"sub": str(user.id)})
+    return {"access_token": token, "token_type": "bearer"}
 
 
 class ForgotPasswordRequest(BaseModel):

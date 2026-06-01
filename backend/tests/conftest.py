@@ -86,9 +86,25 @@ def register_and_login(client, email=None, password="secret123", premium=True):
         "email": email, "username": username, "password": password,
     })
     assert r.status_code == 200, r.text
-    r = client.post("/api/auth/login", json={"email": email, "password": password})
-    assert r.status_code == 200, r.text
-    token = r.json()["access_token"]
+
+    if r.json().get("requires_code"):
+        # Достаём код из тестовой БД и подтверждаем (автологин возвращает токен)
+        from app.models.pending_registration import PendingRegistration
+        db = TestingSessionLocal()
+        try:
+            code = db.query(PendingRegistration).filter(
+                PendingRegistration.email == email
+            ).first().code
+        finally:
+            db.close()
+        r = client.post("/api/auth/verify-code", json={"email": email, "code": code})
+        assert r.status_code == 200, r.text
+        token = r.json()["access_token"]
+    else:
+        r = client.post("/api/auth/login", json={"email": email, "password": password})
+        assert r.status_code == 200, r.text
+        token = r.json()["access_token"]
+
     headers = {"Authorization": f"Bearer {token}"}
     if premium:
         client.post("/api/me/upgrade", headers=headers)

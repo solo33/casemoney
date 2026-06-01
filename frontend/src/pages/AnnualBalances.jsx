@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { useUser } from "../contexts/UserContext";
@@ -54,6 +54,16 @@ export default function AnnualBalances() {
 
   const sym = currencySymbol(data?.main_currency || mainCurrency);
 
+  // Показываем только месяцы, где есть ненулевой остаток хотя бы по одному счёту
+  const visibleMonths = useMemo(() => {
+    if (!data) return [...Array(12).keys()];
+    const idx = [];
+    for (let i = 0; i < 12; i++) {
+      if (Math.abs(data.total_monthly[i]) > 0.5) idx.push(i);
+    }
+    return idx.length ? idx : [...Array(12).keys()];
+  }, [data]);
+
   return (
     <div className="page" style={{ maxWidth: 1680 }}>
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
@@ -96,24 +106,24 @@ export default function AnnualBalances() {
                   <th style={{ padding: "8px 10px", textAlign: "left", position: "sticky", left: 0, background: "#efe9db", zIndex: 1 }}>
                     Счёт
                   </th>
-                  {MONTHS.map(m => (
-                    <th key={m} style={{ padding: "8px 8px", textAlign: "right", fontSize: 11 }}>
-                      {m} {sym}
+                  {visibleMonths.map(i => (
+                    <th key={i} style={{ padding: "8px 8px", textAlign: "right", fontSize: 11 }}>
+                      {MONTHS[i]} {sym}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {data.groups.map(g => (
-                  <GroupBlock key={g.group_id ?? "ungrouped"} group={g} sym={sym} />
+                  <GroupBlock key={g.group_id ?? "ungrouped"} group={g} months={visibleMonths} />
                 ))}
                 {/* Грандтотал */}
                 <tr style={{ borderTop: "2px solid #d4cbb6", background: "#efe9db" }}>
                   <td style={{ padding: "9px 12px", fontWeight: 700, position: "sticky", left: 0, background: "#efe9db" }}>
                     Всего
                   </td>
-                  {data.total_monthly.map((v, i) => (
-                    <Cell key={i} value={v} sym={sym} bold />
+                  {visibleMonths.map(i => (
+                    <Cell key={i} value={data.total_monthly[i]} bold />
                   ))}
                 </tr>
               </tbody>
@@ -125,15 +135,16 @@ export default function AnnualBalances() {
   );
 }
 
-function GroupBlock({ group, sym }) {
+function GroupBlock({ group, months }) {
+  const cols = months || group.monthly.map((_, i) => i);
   return (
     <>
       <tr style={{ background: "#f6f2e9", borderTop: "1px solid #e4ddcd" }}>
         <td style={{ padding: "7px 10px", fontWeight: 700, color: "#1b2531", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#f6f2e9" }}>
           {group.group_name}
         </td>
-        {group.monthly.map((v, i) => (
-          <Cell key={i} value={v} bold />
+        {cols.map(i => (
+          <Cell key={i} value={group.monthly[i]} bold />
         ))}
       </tr>
       {group.accounts.map(a => (
@@ -141,8 +152,8 @@ function GroupBlock({ group, sym }) {
           <td style={{ padding: "6px 10px 6px 22px", color: "#515c68", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fffdf7" }}>
             {a.icon ? `${a.icon} ` : ""}{a.name}
           </td>
-          {a.monthly.map((v, i) => (
-            <Cell key={i} value={v} />
+          {cols.map(i => (
+            <Cell key={i} value={a.monthly[i]} />
           ))}
         </tr>
       ))}

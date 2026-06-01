@@ -59,6 +59,19 @@ export default function AnnualReport() {
   const incomeRows = useMemo(() => data ? filterRows(data.income) : [], [data, hideEmpty]);
   const expenseRows = useMemo(() => data ? filterRows(data.expense) : [], [data, hideEmpty]);
 
+  // Колонки-месяцы масштабируются по данным: показываем только те месяцы,
+  // где есть хоть какой-то доход или расход (итоги покрывают все строки).
+  const visibleMonths = useMemo(() => {
+    if (!data) return [...Array(12).keys()];
+    const idx = [];
+    for (let i = 0; i < 12; i++) {
+      if (Math.abs(data.income_totals[i]) > 0.005 || Math.abs(data.expense_totals[i]) > 0.005) {
+        idx.push(i);
+      }
+    }
+    return idx.length ? idx : [...Array(12).keys()];
+  }, [data]);
+
   return (
     <div className="page" style={{ maxWidth: 1680 }}>
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
@@ -126,26 +139,26 @@ export default function AnnualReport() {
           >
             <colgroup>
               <col style={{ minWidth: 170 }} />
-              {MONTHS.map((_, i) => <col key={i} style={{ minWidth: 60 }} />)}
+              {visibleMonths.map(i => <col key={i} style={{ minWidth: 60 }} />)}
               <col style={{ minWidth: 78 }} />
             </colgroup>
             <thead>
               <tr style={{ background: "#a6afb8" }}>
                 <Th style={{ color: "#fff" }}>Категория</Th>
-                {MONTHS.map(m => <Th key={m} align="right" style={{ color: "#fff" }}>{m}</Th>)}
+                {visibleMonths.map(i => <Th key={i} align="right" style={{ color: "#fff" }}>{MONTHS[i]}</Th>)}
                 <Th align="right" style={{ color: "#fff" }}>Всего</Th>
               </tr>
             </thead>
             <tbody>
               {/* === Доходы === */}
-              <SectionHeader title="Доходы" onAll={() => {
+              <SectionHeader title="Доходы" cols={visibleMonths.length} onAll={() => {
                 const p = periodForCell(year, null);
                 navigate(`/transactions?type=income&date_from=${p.from}&date_to=${p.to}`);
               }} />
               {incomeRows.map(row => (
                 <RowLine
                   key={`i-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#167a4a"
+                  row={row} sym={sym} accent="#167a4a" months={visibleMonths}
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "income" });
@@ -160,6 +173,7 @@ export default function AnnualReport() {
                 total={data.income_total}
                 sym={sym}
                 color="#167a4a"
+                months={visibleMonths}
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
                   navigate(`/transactions?type=income&date_from=${p.from}&date_to=${p.to}`);
@@ -167,14 +181,14 @@ export default function AnnualReport() {
               />
 
               {/* === Расходы === */}
-              <SectionHeader title="Расходы" onAll={() => {
+              <SectionHeader title="Расходы" cols={visibleMonths.length} onAll={() => {
                 const p = periodForCell(year, null);
                 navigate(`/transactions?type=expense&date_from=${p.from}&date_to=${p.to}`);
               }} />
               {expenseRows.map(row => (
                 <RowLine
                   key={`e-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#c0432b"
+                  row={row} sym={sym} accent="#c0432b" months={visibleMonths}
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "expense" });
@@ -189,6 +203,7 @@ export default function AnnualReport() {
                 total={data.expense_total}
                 sym={sym}
                 color="#c0432b"
+                months={visibleMonths}
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
                   navigate(`/transactions?type=expense&date_from=${p.from}&date_to=${p.to}`);
@@ -197,10 +212,11 @@ export default function AnnualReport() {
 
               {/* === Net === */}
               <NetRow
-                label="Расходы/доходы"
+                label="Сальдо"
                 monthly={data.net_monthly}
                 total={data.net_total}
                 sym={sym}
+                months={visibleMonths}
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
                   navigate(`/transactions?date_from=${p.from}&date_to=${p.to}`);
@@ -230,10 +246,10 @@ function Th({ children, align = "left", style = {} }) {
   );
 }
 
-function SectionHeader({ title, onAll }) {
+function SectionHeader({ title, onAll, cols = 12 }) {
   return (
     <tr style={{ background: "#e4ddcd" }}>
-      <td colSpan={13} style={{
+      <td colSpan={cols + 1} style={{
         padding: "10px 12px",
         fontFamily: "var(--serif)",
         fontSize: 18, fontWeight: 500, color: "#1b2531",
@@ -257,7 +273,8 @@ function SectionHeader({ title, onAll }) {
   );
 }
 
-function RowLine({ row, sym, accent, onCellClick }) {
+function RowLine({ row, sym, accent, onCellClick, months }) {
+  const cols = months || row.monthly.map((_, i) => i);
   const isChild = !!row.parent_id;
   const cellStyle = (active) => ({
     padding: "6px 10px",
@@ -292,7 +309,8 @@ function RowLine({ row, sym, accent, onCellClick }) {
       >
         {row.category_name}
       </td>
-      {row.monthly.map((v, i) => {
+      {cols.map((i) => {
+        const v = row.monthly[i];
         const active = Math.abs(v) > 0.005;
         return (
           <td
@@ -322,7 +340,8 @@ function RowLine({ row, sym, accent, onCellClick }) {
   );
 }
 
-function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
+function SubtotalRow({ label, monthly, total, sym, color, onCellClick, months }) {
+  const cols = months || monthly.map((_, i) => i);
   return (
     <tr style={{ background: "#efe9db", borderTop: "2px solid #c7cdd3" }}>
       <td
@@ -334,7 +353,8 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
       >
         {label}
       </td>
-      {monthly.map((v, i) => {
+      {cols.map((i) => {
+        const v = monthly[i];
         const active = Math.abs(v) > 0.005;
         return (
           <td
@@ -366,7 +386,8 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick }) {
   );
 }
 
-function NetRow({ label, monthly, total, sym, onCellClick }) {
+function NetRow({ label, monthly, total, sym, onCellClick, months }) {
+  const cols = months || monthly.map((_, i) => i);
   const overallColor = total >= 0 ? "#bbf7d0" : "#fecaca";
   return (
     <tr style={{ background: "#a6afb8" }}>
@@ -379,7 +400,8 @@ function NetRow({ label, monthly, total, sym, onCellClick }) {
       >
         {label}
       </td>
-      {monthly.map((v, i) => {
+      {cols.map((i) => {
+        const v = monthly[i];
         const color = Math.abs(v) < 0.005 ? "#e4ddcd" : (v >= 0 ? "#bbf7d0" : "#fecaca");
         const active = Math.abs(v) > 0.005;
         return (
