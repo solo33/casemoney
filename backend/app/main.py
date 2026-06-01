@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -14,6 +15,7 @@ from app.models.exchange_rate import ExchangeRate  # noqa: F401
 from app.models.user_currency import UserCurrency  # noqa: F401
 from app.models.goal import Goal  # noqa: F401
 from app.models.app_config import AppConfig  # noqa: F401
+from app.models.transaction_history import TransactionHistory  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -36,9 +38,14 @@ app = FastAPI(
     swagger_ui_parameters={"persistAuthorization": True},
 )
 
+# Разрешённые источники для CORS. На проде задаём переменной окружения
+# CORS_ORIGINS="https://app.example.com,https://www.example.com".
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,4 +89,10 @@ app.openapi = custom_openapi
 
 @app.get("/")
 def root():
-    return {"message": "CaseMoney API работает! 🎉"}
+    return {"message": "CaseMoney API работает"}
+
+
+@app.get("/health")
+def health():
+    """Healthcheck для хостинга/мониторинга."""
+    return {"status": "ok"}
