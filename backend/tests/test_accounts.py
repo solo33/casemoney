@@ -1,6 +1,21 @@
 from tests.conftest import register_and_login, make_account
 
 
+def test_registration_seeds_default_groups_and_accounts(client):
+    auth = register_and_login(client, premium=False)
+    r = client.get("/api/accounts/grouped", headers=auth)
+    assert r.status_code == 200
+    buckets = r.json()
+    names = [b["group"]["name"] for b in buckets]
+    assert "Наличные" in names
+    assert "Счета в банках" in names
+    assert "Депозиты" in names
+    # по одному счёту в каждой стартовой группе
+    for b in buckets:
+        if b["group"]["name"] in ("Наличные", "Счета в банках", "Депозиты"):
+            assert len(b["accounts"]) == 1
+
+
 def test_create_and_list_account(client, auth):
     acc = make_account(client, auth, name="Карта", balance=1000)
     assert acc["name"] == "Карта"

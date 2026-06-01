@@ -13,7 +13,7 @@ from app.services.auth import (
 )
 from app.services.email import send_activation_email, send_reset_email, app_url, is_smtp_configured
 from app.services.app_config import is_email_verification_required, get_config
-from app.seeds import seed_default_categories
+from app.seeds import seed_default_categories, seed_default_accounts
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -90,8 +90,9 @@ def register(
     db.add(UserCurrency(user_id=user.id, currency=user.main_currency, auto=True))
     db.commit()
 
-    # Дефолтные категории
+    # Дефолтные категории и счета (группы + по одному счёту)
     seed_default_categories(db, user.id)
+    seed_default_accounts(db, user.id, currency=user.main_currency)
 
     # Письмо отправляем только если активация требуется
     email_sent = False

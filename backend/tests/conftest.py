@@ -72,8 +72,13 @@ def client():
 _counter = {"n": 0}
 
 
-def register_and_login(client, email=None, password="secret123"):
-    """Регистрирует пользователя и возвращает заголовок Authorization."""
+def register_and_login(client, email=None, password="secret123", premium=True):
+    """Регистрирует пользователя и возвращает заголовок Authorization.
+
+    По умолчанию повышает до Premium, чтобы лимиты Free-тарифа (и автосоздание
+    стартовых счетов при регистрации) не мешали тестам фич. Для проверки самих
+    лимитов вызывайте с premium=False.
+    """
     _counter["n"] += 1
     email = email or f"user{_counter['n']}@test.com"
     username = f"user{_counter['n']}"
@@ -84,7 +89,10 @@ def register_and_login(client, email=None, password="secret123"):
     r = client.post("/api/auth/login", json={"email": email, "password": password})
     assert r.status_code == 200, r.text
     token = r.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    if premium:
+        client.post("/api/me/upgrade", headers=headers)
+    return headers
 
 
 @pytest.fixture
