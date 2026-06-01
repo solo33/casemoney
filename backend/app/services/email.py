@@ -140,3 +140,53 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
 </body></html>
 """
     return send_email(to_email, subject, text, html)
+
+
+def send_reset_email(to_email: str, username: str, reset_url: str) -> bool:
+    subject = "CaseMoney — восстановление пароля"
+    username_html = _html.escape(username)
+    url_html = _html.escape(reset_url, quote=True)
+    text = (
+        f"Здравствуйте, {username}!\n\n"
+        f"Вы запросили сброс пароля в CaseMoney. "
+        f"Перейдите по ссылке ниже, чтобы задать новый пароль:\n\n"
+        f"{reset_url}\n\n"
+        f"Ссылка действительна 1 час.\n\n"
+        f"Если вы не запрашивали сброс — просто проигнорируйте это письмо, "
+        f"пароль останется прежним.\n\n"
+        f"— CaseMoney"
+    )
+    html = f"""\
+<!doctype html>
+<html><body style="font-family: system-ui, sans-serif; background: #f6f2e9; padding: 32px;">
+  <div style="max-width: 520px; margin: 0 auto; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 28px;">
+    <h1 style="font-family: Georgia, serif; font-weight: 600; color: #173a54; font-size: 26px; margin: 0 0 16px;">
+      CaseMoney
+    </h1>
+    <h2 style="font-family: Georgia, serif; font-weight: 500; color: #1b2531; font-size: 22px; margin: 0 0 12px;">
+      Восстановление пароля
+    </h2>
+    <p style="color: #515c68; line-height: 1.5;">
+      Здравствуйте, <strong>{username_html}</strong>!<br>
+      Нажмите кнопку ниже, чтобы задать новый пароль.
+    </p>
+    <p style="margin: 24px 0;">
+      <a href="{url_html}" style="
+        display: inline-block; background: #173a54; color: #fff;
+        text-decoration: none; padding: 12px 24px; border-radius: 6px;
+        font-weight: 600;
+      ">
+        Задать новый пароль
+      </a>
+    </p>
+    <p style="color: #7a8590; font-size: 13px;">
+      Или скопируйте ссылку в браузер:<br>
+      <a href="{url_html}" style="color: #9c7b3c; word-break: break-all;">{url_html}</a>
+    </p>
+    <p style="color: #a6afb8; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e4ddcd;">
+      Ссылка действительна 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.
+    </p>
+  </div>
+</body></html>
+"""
+    return send_email(to_email, subject, text, html)

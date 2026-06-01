@@ -9,8 +9,9 @@ from app.schemas.user import UserRegister, UserLogin, UserResponse, Token
 from app.services.auth import (
     hash_password, verify_password, create_access_token,
     create_activation_token, verify_activation_token,
+    create_reset_token, verify_reset_token,
 )
-from app.services.email import send_activation_email, app_url, is_smtp_configured
+from app.services.email import send_activation_email, send_reset_email, app_url, is_smtp_configured
 from app.services.app_config import is_email_verification_required, get_config
 from app.seeds import seed_default_categories
 from datetime import datetime, timedelta, timezone
@@ -89,6 +90,61 @@ def register(
         email_sent=email_sent,
         smtp_configured=is_smtp_configured(),
     )
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    ok: bool
+    smtp_configured: bool
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+def _build_reset_url(user_id: int) -> str:
+    token = create_reset_token(user_id)
+    return f"{app_url()}/reset-password?token={token}"
+
+
+def _send_reset(user: User):
+    try:
+        send_reset_email(user.email, user.username, _build_reset_url(user.id))
+    except Exception:
+        pass
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(
+    data: ForgotPasswordRequest,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Запрос сброса пароля. Всегда отвечаем ok=True (не раскрываем, есть ли
+    такой email), но письмо шлём только если пользователь реально существует."""
+    user = db.query(User).filter(User.email == data.email).first()
+    if user and user.is_active:
+        background.add_task(_send_reset, user)
+    return ForgotPasswordResponse(ok=True, smtp_configured=is_smtp_configured())
+
+
+@router.post("/reset-password")
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user_id = verify_reset_token(data.token)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Ссылка недействительна или истекла")
+    if len(data.new_password) < 4:
+        raise HTTPException(status_code=400, detail="Пароль слишком короткий (мин. 4 символа)")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/login", response_model=Token)

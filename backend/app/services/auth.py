@@ -82,3 +82,29 @@ def verify_activation_token(token: str) -> int | None:
         return None
     sub = payload.get("sub")
     return int(sub) if sub else None
+
+
+# === Восстановление пароля ===
+
+RESET_TOKEN_TTL_HOURS = 1
+
+
+def create_reset_token(user_id: int) -> str:
+    """Подписанный JWT для сброса пароля. TTL 1ч."""
+    exp = datetime.utcnow() + timedelta(hours=RESET_TOKEN_TTL_HOURS)
+    return jwt.encode(
+        {"sub": str(user_id), "purpose": "reset", "exp": exp},
+        SECRET_KEY, algorithm=ALGORITHM,
+    )
+
+
+def verify_reset_token(token: str) -> int | None:
+    """Возвращает user_id если токен валидный и для сброса пароля, иначе None."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("purpose") != "reset":
+        return None
+    sub = payload.get("sub")
+    return int(sub) if sub else None

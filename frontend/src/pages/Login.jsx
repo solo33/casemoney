@@ -172,7 +172,12 @@ export default function Login() {
             </button>
           </form>
 
-          <p style={{ marginTop: 16, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
+          <p style={{ marginTop: 12, fontSize: 13, textAlign: "center" }}>
+            <Link to="/forgot-password" style={{ color: "#9c7b3c", fontWeight: 500 }}>
+              Забыли пароль?
+            </Link>
+          </p>
+          <p style={{ marginTop: 4, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
             Еще нет аккаунта?{" "}
             <Link to="/register" style={{ color: "#173a54", fontWeight: 500 }}>
               Создать
