@@ -15,6 +15,12 @@ function isToday(iso) {
   return new Date(iso).toDateString() === new Date().toDateString();
 }
 
+function isoToday() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0, 10);
+}
+
 // Границы текущего месяца в формате YYYY-MM-DD
 function currentMonthRange() {
   const now = new Date();
@@ -51,6 +57,8 @@ export default function Home() {
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
   const [categories, setCategories] = useState([]);
   const [editingTx, setEditingTx] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
+  const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -86,23 +94,52 @@ export default function Home() {
     [grouped]
   );
 
+  // Обогащаем сырую транзакцию (из /api/transactions) именами счёта/категории
+  const enrichTx = useCallback((t) => {
+    const acc = flatAccounts.find(a => a.id === t.account_id);
+    const cat = t.category_id ? categories.find(c => c.id === t.category_id) : null;
+    return {
+      ...t,
+      account_name: acc?.name || "—",
+      category_name: cat?.name || null,
+      category_icon: cat?.icon || null,
+    };
+  }, [flatAccounts, categories]);
+
+  // Записи за выбранный день
+  const fetchDay = useCallback(async (dateStr) => {
+    try {
+      const res = await api.get("/api/transactions/", {
+        params: { date_from: dateStr, date_to: dateStr, limit: 100 },
+      });
+      setDayTx(res.data.items || []);
+    } catch {
+      setDayTx([]);
+    }
+  }, []);
+
   const handleDeleteTx = async (tx) => {
     if (!confirm("Удалить запись?")) return;
     try {
       await api.delete(`/api/transactions/${tx.id}`);
       fetchAll();
+      fetchDay(selectedDate);
     } catch (e) {
       setError(e.response?.data?.detail || "Не удалось удалить");
     }
   };
 
   useEffect(() => {
+    const reload = () => { fetchAll(); fetchDay(selectedDate); };
     fetchAll();
-    window.addEventListener(TX_ADDED_EVENT, fetchAll);
-    return () => window.removeEventListener(TX_ADDED_EVENT, fetchAll);
-  }, [fetchAll]);
+    window.addEventListener(TX_ADDED_EVENT, reload);
+    return () => window.removeEventListener(TX_ADDED_EVENT, reload);
+  }, [fetchAll, fetchDay, selectedDate]);
 
   useEffect(() => { fetchAll(); }, [mainCurrency, fetchAll]);
+
+  // Перезагрузка ленты дня при смене даты / валюты
+  useEffect(() => { fetchDay(selectedDate); }, [selectedDate, mainCurrency, fetchDay]);
 
   const sym = currencySymbol(mainCurrency);
 
@@ -115,11 +152,16 @@ export default function Home() {
     return dashboard.monthly_stats.slice(-3).reverse();
   }, [dashboard]);
 
-  // транзакции за сегодня (для правой колонки)
-  const todayTx = useMemo(() => {
-    if (!dashboard?.recent_transactions) return [];
-    return dashboard.recent_transactions.filter(t => isToday(t.date));
-  }, [dashboard]);
+  // записи за выбранный день (для правой колонки), обогащённые именами
+  const todayTx = useMemo(() => dayTx.map(enrichTx), [dayTx, enrichTx]);
+
+  // Заголовок таба = выбранная дата
+  const dayLabel = useMemo(() => {
+    const d = new Date(selectedDate + "T00:00:00");
+    const today = isToday(d.toISOString());
+    const human = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    return today ? `Записи за ${human}` : `Записи · ${human}`;
+  }, [selectedDate]);
 
   const recentlyChanged = dashboard?.recently_changed || [];
 
@@ -236,8 +278,8 @@ export default function Home() {
 
       {/* ============== RIGHT MAIN ============== */}
       <main style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* Inline quick-add form */}
-        <QuickAddInline />
+        {/* Inline quick-add form — дата синхронизирована с лентой за день */}
+        <QuickAddInline date={selectedDate} onDateChange={setSelectedDate} />
 
         {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>
@@ -249,7 +291,7 @@ export default function Home() {
               active={recordsTab === "today"}
               onClick={() => setRecordsTab("today")}
             >
-              Записи за {new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+              {dayLabel}
             </TabHead>
             <TabHead
               active={recordsTab === "changed"}
@@ -271,7 +313,7 @@ export default function Home() {
               return (
                 <p style={{ padding: 24, textAlign: "center", color: "#a6afb8", fontSize: 14 }}>
                   {recordsTab === "today"
-                    ? <>Нет записей за сегодня. Добавьте первую операцию кнопкой <strong>+</strong>.</>
+                    ? <>Нет записей за этот день. Выберите дату или добавьте операцию.</>
                     : "Пока нет записей."}
                 </p>
               );

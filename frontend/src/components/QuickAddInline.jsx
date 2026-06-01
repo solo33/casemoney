@@ -15,18 +15,21 @@ function isoToday() {
   return new Date(d - tz).toISOString().slice(0, 10);
 }
 
-export default function QuickAddInline() {
+export default function QuickAddInline({ date, onDateChange }) {
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);
   const [type, setType] = useState("expense");
+  const [internalDate, setInternalDate] = useState(isoToday());
+  // Дата может управляться родителем (синхронизация с лентой за день)
+  const dateVal = date !== undefined ? date : internalDate;
+  const setDateVal = onDateChange || setInternalDate;
   const [form, setForm] = useState({
     amount: "",
     account_id: "",
     currency: "",
     category_id: "",
     description: "",
-    date: isoToday(),
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -104,7 +107,7 @@ export default function QuickAddInline() {
         account_id: parseInt(form.account_id),
         category_id: form.category_id ? parseInt(form.category_id) : undefined,
       };
-      if (form.date) payload.date = new Date(form.date).toISOString();
+      if (dateVal) payload.date = new Date(dateVal).toISOString();
       await api.post("/api/transactions/", payload);
       window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
       // reset суммы/описания/категории, сохраняем счёт+валюту+дату
@@ -213,8 +216,8 @@ export default function QuickAddInline() {
           </select>
           <input
             type="date"
-            value={form.date}
-            onChange={e => setForm({ ...form, date: e.target.value })}
+            value={dateVal}
+            onChange={e => setDateVal(e.target.value)}
             style={{ gridColumn: "3 / span 2" }}
           />
         </div>
