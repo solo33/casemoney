@@ -25,23 +25,39 @@ function opDateLabel(iso) {
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+const ACTION_FILTERS = [
+  { key: "", label: "Все" },
+  { key: "created", label: "Записано" },
+  { key: "edited", label: "Отредактировано" },
+  { key: "deleted", label: "Удалено" },
+];
+
 export default function History() {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [limit, setLimit] = useState(100);
+  const [q, setQ] = useState("");
+  const [action, setAction] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
-    api.get("/api/transactions/history", { params: { limit, offset: 0 } })
+    const params = { limit, offset: 0 };
+    if (q.trim()) params.q = q.trim();
+    if (action) params.action = action;
+    api.get("/api/transactions/history", { params })
       .then(r => { setItems(r.data.items); setTotal(r.data.total); })
       .catch(() => setError("Ошибка загрузки истории"))
       .finally(() => setLoading(false));
-  }, [limit]);
+  }, [limit, q, action]);
 
   useEffect(() => {
-    load();
+    const t = setTimeout(load, 250); // дебаунс поиска
+    return () => clearTimeout(t);
+  }, [load]);
+
+  useEffect(() => {
     window.addEventListener(TX_ADDED_EVENT, load);
     return () => window.removeEventListener(TX_ADDED_EVENT, load);
   }, [load]);
@@ -56,6 +72,37 @@ export default function History() {
         <span style={{ color: "#a6afb8" }}>, </span>
         <span style={{ color: ACTION_COLOR.deleted, fontWeight: 600 }}>удалено</span>
       </p>
+
+      {/* Поиск + фильтр по действию */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+        <input
+          placeholder="Поиск: счёт, категория, примечание…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          style={{ flex: 1, minWidth: 200 }}
+        />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {ACTION_FILTERS.map(f => {
+            const on = action === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setAction(f.key)}
+                style={{
+                  padding: "6px 12px", borderRadius: 999, fontSize: 13,
+                  border: `1px solid ${on ? "#173a54" : "#e4ddcd"}`,
+                  background: on ? "#173a54" : "transparent",
+                  color: on ? "#fff" : "#515c68", cursor: "pointer",
+                  fontWeight: on ? 600 : 500,
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {loading && <p>Загрузка...</p>}
       {error && <p style={{ color: "#c0432b" }}>{error}</p>}

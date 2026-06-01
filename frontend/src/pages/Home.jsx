@@ -59,8 +59,14 @@ export default function Home() {
   const [editingTx, setEditingTx] = useState(null);
   const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
+  const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const dismissOnboarding = () => {
+    localStorage.setItem("cm_onb_done", "1");
+    setOnbDismissed(true);
+  };
 
   const fetchAll = useCallback(async () => {
     setError(null);
@@ -184,6 +190,13 @@ export default function Home() {
   const breakdownColor = breakdownType === "income" ? "#167a4a" : "#c0432b";
   const breakdownWord = breakdownType === "income" ? "Доходы" : "Расходы";
 
+  // Онбординг: показываем, пока нет счетов или нет операций (и не скрыт вручную)
+  const hasAccounts = flatAccounts.length > 0;
+  const hasTx = (dashboard?.recent_transactions?.length || 0) > 0
+    || monthIncome > 0 || monthExpense > 0
+    || (dashboard?.recently_changed?.length || 0) > 0;
+  const showOnboarding = !onbDismissed && (!hasAccounts || !hasTx);
+
   // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
   const goToCategory = (catId) => {
     const { from, to } = currentMonthRange();
@@ -212,6 +225,17 @@ export default function Home() {
           .home-layout { grid-template-columns: 1fr !important; }
         }
       `}</style>
+
+      {showOnboarding && (
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Onboarding
+            hasAccounts={hasAccounts}
+            hasTx={hasTx}
+            onDismiss={dismissOnboarding}
+            navigate={navigate}
+          />
+        </div>
+      )}
 
       {/* ============== LEFT SIDEBAR ============== */}
       <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -396,6 +420,69 @@ export default function Home() {
 }
 
 // =============== components ===============
+
+function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
+  const steps = [
+    { done: hasAccounts, title: "Создайте первый счёт", desc: "Кошелёк, карта, вклад — что угодно", cta: "К счетам", to: "/accounts" },
+    { done: hasTx, title: "Запишите операцию", desc: "Доход, расход или перевод — формой справа или кнопкой +", cta: null, to: null },
+    { done: false, title: "Посмотрите анализ", desc: "Расходы по категориям, денежный поток, балансы", cta: "Открыть анализ", to: "/reports" },
+  ];
+  return (
+    <div style={{
+      background: "linear-gradient(100deg, #173a54, #0f293d)",
+      color: "var(--text-on-dark)", borderRadius: 12, padding: 20,
+      position: "relative",
+    }}>
+      <button
+        type="button" onClick={onDismiss}
+        style={{
+          position: "absolute", top: 12, right: 12, background: "transparent",
+          border: "none", color: "rgba(244,241,232,0.6)", fontSize: 18, cursor: "pointer",
+        }}
+        title="Скрыть"
+      >×</button>
+      <h2 style={{ fontFamily: "var(--font-display)", color: "#fff", margin: "0 0 4px", fontSize: 22 }}>
+        Добро пожаловать в CaseMoney
+      </h2>
+      <p style={{ color: "rgba(244,241,232,0.8)", margin: "0 0 16px", fontSize: 14 }}>
+        Три шага, чтобы начать вести учёт.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        {steps.map((s, i) => (
+          <div key={i} style={{
+            background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: 14,
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{
+                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+                background: s.done ? "#167a4a" : "rgba(255,255,255,0.15)",
+                color: "#fff", fontWeight: 700,
+              }}>{s.done ? "✓" : i + 1}</span>
+              <span style={{ fontWeight: 600, fontSize: 14, color: "#fff" }}>{s.title}</span>
+            </div>
+            <div style={{ fontSize: 12.5, color: "rgba(244,241,232,0.7)", marginBottom: s.cta ? 10 : 0 }}>
+              {s.desc}
+            </div>
+            {s.cta && (
+              <button
+                type="button"
+                onClick={() => navigate(s.to)}
+                style={{
+                  background: "#c2a05a", border: "none", color: "#0a1d2c",
+                  fontWeight: 600, fontSize: 13, padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+                }}
+              >
+                {s.cta}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function TabHead({ active, onClick, children }) {
   return (

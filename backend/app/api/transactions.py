@@ -175,6 +175,8 @@ class HistoryPage(BaseModel):
 
 @router.get("/history", response_model=HistoryPage)
 def get_history(
+    q: Optional[str] = Query(None, description="Поиск по счёту, категории, примечанию"),
+    action: Optional[str] = Query(None, description="created | edited | deleted"),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -182,6 +184,15 @@ def get_history(
 ):
     """Журнал изменений операций пользователя (новые сверху)."""
     base = db.query(TransactionHistory).filter(TransactionHistory.user_id == user_id)
+    if action in ("created", "edited", "deleted"):
+        base = base.filter(TransactionHistory.action == action)
+    if q:
+        like = f"%{q.lower()}%"
+        base = base.filter(or_(
+            func.lower(TransactionHistory.account_name).like(like),
+            func.lower(TransactionHistory.category_name).like(like),
+            func.lower(TransactionHistory.description).like(like),
+        ))
     total = base.count()
     items = (
         base.order_by(TransactionHistory.changed_at.desc(), TransactionHistory.id.desc())
