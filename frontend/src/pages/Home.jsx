@@ -538,6 +538,7 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
     currency: tx.currency,
     account_id: String(tx.account_id),
     category_id: tx.category_id ? String(tx.category_id) : "",
+    to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
   });
@@ -556,6 +557,12 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
 
   const save = async (e) => {
     e.preventDefault();
+    if (form.type === "transfer") {
+      if (!form.to_account_id) { setErr("Выберите счёт-получатель"); return; }
+      if (String(form.to_account_id) === String(form.account_id)) {
+        setErr("Счёт-источник и получатель совпадают"); return;
+      }
+    }
     setSaving(true);
     setErr(null);
     try {
@@ -564,7 +571,8 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
         type: form.type,
         currency: form.currency,
         account_id: parseInt(form.account_id),
-        category_id: form.category_id ? parseInt(form.category_id) : null,
+        category_id: form.type === "transfer" || !form.category_id ? null : parseInt(form.category_id),
+        to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       });
@@ -626,14 +634,23 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
         </div>
 
         <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })} required>
-          <option value="">— Счёт —</option>
+          <option value="">{form.type === "transfer" ? "— Со счёта —" : "— Счёт —"}</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
         </select>
 
-        <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })} disabled={form.type === "transfer"}>
-          <option value="">{form.type === "transfer" ? "— перевод —" : "— Без категории —"}</option>
-          {cats.map(c => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
-        </select>
+        {form.type === "transfer" ? (
+          <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
+            <option value="">— На счёт (получатель) —</option>
+            {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
+              <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
+            ))}
+          </select>
+        ) : (
+          <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
+            <option value="">— Без категории —</option>
+            {cats.map(c => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
+          </select>
+        )}
 
         <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
 

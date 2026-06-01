@@ -29,6 +29,7 @@ export default function QuickAddInline({ date, onDateChange }) {
     account_id: "",
     currency: "",
     category_id: "",
+    to_account_id: "",
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -96,6 +97,12 @@ export default function QuickAddInline({ date, onDateChange }) {
     }
     if (!form.account_id) { setError("Выберите счёт"); return; }
     if (!form.currency) { setError("Выберите валюту"); return; }
+    if (type === "transfer") {
+      if (!form.to_account_id) { setError("Выберите счёт-получатель"); return; }
+      if (String(form.to_account_id) === String(form.account_id)) {
+        setError("Счёт-источник и получатель совпадают"); return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -105,7 +112,8 @@ export default function QuickAddInline({ date, onDateChange }) {
         currency: form.currency,
         description: form.description || undefined,
         account_id: parseInt(form.account_id),
-        category_id: form.category_id ? parseInt(form.category_id) : undefined,
+        category_id: type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
+        to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
       };
       if (dateVal) payload.date = new Date(dateVal).toISOString();
       await api.post("/api/transactions/", payload);
@@ -199,21 +207,37 @@ export default function QuickAddInline({ date, onDateChange }) {
           </select>
         </div>
 
-        {/* Row 2: Категория + Дата */}
+        {/* Row 2: Категория (или счёт-получатель для перевода) + Дата */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 110px 90px", gap: 10, alignItems: "center", marginBottom: 10 }}>
-          <label style={lbl}>Категория</label>
-          <select
-            value={form.category_id}
-            onChange={e => setForm({ ...form, category_id: e.target.value })}
-            disabled={type === "transfer"}
-          >
-            <option value="">{type === "transfer" ? "— перевод —" : "— не выбрана —"}</option>
-            {filteredCategories.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.icon ? `${c.icon} ` : ""}{c.name}
-              </option>
-            ))}
-          </select>
+          <label style={lbl}>{type === "transfer" ? "На счёт" : "Категория"}</label>
+          {type === "transfer" ? (
+            <select
+              value={form.to_account_id}
+              onChange={e => setForm({ ...form, to_account_id: e.target.value })}
+              required
+            >
+              <option value="">— получатель —</option>
+              {accountGroups.map(b => (
+                <optgroup key={b.group.id ?? "ungrouped"} label={b.group.name}>
+                  {b.accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
+                    <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={form.category_id}
+              onChange={e => setForm({ ...form, category_id: e.target.value })}
+            >
+              <option value="">— не выбрана —</option>
+              {filteredCategories.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.icon ? `${c.icon} ` : ""}{c.name}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="date"
             value={dateVal}

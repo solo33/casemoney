@@ -30,4 +30,10 @@ class Transaction(Base):
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    account = relationship("Account", back_populates="transactions")
+    # Для переводов: счёт-получатель и сумма зачисления (в его валюте).
+    # У income/expense эти поля NULL.
+    to_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
+    to_amount = Column(Float, nullable=True)
+    to_currency = Column(String(10), nullable=True)
+
+    account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")

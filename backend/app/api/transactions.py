@@ -15,6 +15,7 @@ from app.models.transaction_history import TransactionHistory
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
+from app.services import exchange as exchange_svc
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
@@ -32,13 +33,36 @@ def get_current_user_id(
 def _apply_to_balance(
     bal: AccountBalance, tx_type: TransactionType, amount: float, reverse: bool = False
 ) -> None:
-    """Применяет/отменяет дельту транзакции к балансу."""
+    """Применяет/отменяет дельту дохода/расхода к одному балансу."""
     sign = -1 if reverse else 1
     if tx_type == TransactionType.income:
         bal.balance += sign * amount
     elif tx_type == TransactionType.expense:
         bal.balance -= sign * amount
-    # transfer пока обрабатываем как изменение одного счёта (без второй стороны)
+
+
+def _apply_tx_effect(db: Session, tx: Transaction, reverse: bool = False) -> None:
+    """Применяет (или откатывает при reverse=True) эффект всей операции на балансы.
+
+    income  → счёт +amount
+    expense → счёт −amount
+    transfer→ счёт-источник −amount, счёт-получатель +to_amount (двусторонний перевод)
+    """
+    sign = -1 if reverse else 1
+    if tx.type == TransactionType.income:
+        bal = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
+        bal.balance += sign * tx.amount
+    elif tx.type == TransactionType.expense:
+        bal = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
+        bal.balance -= sign * tx.amount
+    elif tx.type == TransactionType.transfer:
+        # списание с источника
+        src = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
+        src.balance -= sign * tx.amount
+        # зачисление на получателя
+        if tx.to_account_id and tx.to_currency and tx.to_amount is not None:
+            dst = accounts_svc.get_or_create_balance(db, tx.to_account_id, tx.to_currency)
+            dst.balance += sign * tx.to_amount
 
 
 def _category_path(db: Session, user_id: int, category_id: Optional[int]) -> Optional[str]:
@@ -58,9 +82,39 @@ def _account_name(db: Session, account_id: int) -> str:
     return a.name if a else "—"
 
 
+def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amount: float,
+                           to_account_id, to_currency, to_amount):
+    """Готовит (to_account_id, to_currency, to_amount) для перевода.
+
+    Валидирует счёт-получатель. Если сумма зачисления не задана — вычисляет:
+    та же валюта → та же сумма; иначе конвертирует по курсу пользователя.
+    """
+    if not to_account_id:
+        raise HTTPException(status_code=400, detail="Для перевода укажите счёт-получатель")
+    dst = db.query(Account).filter(Account.id == to_account_id, Account.user_id == user_id).first()
+    if not dst:
+        raise HTTPException(status_code=404, detail="Счёт-получатель не найден")
+    cur = (to_currency or src_currency).upper()
+    if to_amount is None:
+        if cur == src_currency.upper():
+            to_amount = src_amount
+        else:
+            try:
+                to_amount = exchange_svc.convert_for_user(db, user_id, src_amount, src_currency, cur)
+            except exchange_svc.ExchangeError:
+                to_amount = src_amount
+    return to_account_id, cur, round(float(to_amount), 2)
+
+
 def _write_history(db: Session, user_id: int, tx: Transaction, action: str,
                    prev_amount: Optional[float] = None, prev_currency: Optional[str] = None) -> None:
     """Записать событие в журнал изменений (денормализованный снимок)."""
+    # Для перевода вместо категории показываем счёт-получатель
+    if tx.type == TransactionType.transfer and tx.to_account_id:
+        category_name = _account_name(db, tx.to_account_id)
+    else:
+        category_name = _category_path(db, user_id, tx.category_id)
+
     db.add(TransactionHistory(
         user_id=user_id,
         transaction_id=tx.id,
@@ -70,7 +124,7 @@ def _write_history(db: Session, user_id: int, tx: Transaction, action: str,
         amount=tx.amount,
         currency=tx.currency,
         account_name=_account_name(db, tx.account_id),
-        category_name=_category_path(db, user_id, tx.category_id),
+        category_name=category_name,
         description=tx.description,
         prev_amount=prev_amount,
         prev_currency=prev_currency,
@@ -200,7 +254,12 @@ def create_transaction(
     else:
         currency = accounts_svc.get_user_main_currency(db, user_id)
 
-    bal = accounts_svc.get_or_create_balance(db, account.id, currency)
+    to_account_id = to_amount = to_currency = None
+    if tx_type == TransactionType.transfer:
+        to_account_id, to_currency, to_amount = _resolve_transfer_dest(
+            db, user_id, currency, data.amount,
+            data.to_account_id, data.to_currency, data.to_amount,
+        )
 
     transaction = Transaction(
         amount=data.amount,
@@ -209,12 +268,15 @@ def create_transaction(
         description=data.description,
         date=data.date,
         account_id=data.account_id,
-        category_id=data.category_id,
+        category_id=None if tx_type == TransactionType.transfer else data.category_id,
         user_id=user_id,
+        to_account_id=to_account_id,
+        to_amount=to_amount,
+        to_currency=to_currency,
     )
     db.add(transaction)
-    _apply_to_balance(bal, tx_type, data.amount, reverse=False)
     db.flush()
+    _apply_tx_effect(db, transaction, reverse=False)
     _write_history(db, user_id, transaction, "created")
     db.commit()
     db.refresh(transaction)
@@ -249,15 +311,10 @@ def update_transaction(
         if not acc:
             raise HTTPException(status_code=404, detail="Account not found")
 
-    # Откатываем эффект старого состояния (на старом счёте/валюте)
-    old_bal = db.query(AccountBalance).filter(
-        AccountBalance.account_id == tx.account_id,
-        AccountBalance.currency == tx.currency,
-    ).first()
-    if old_bal is not None:
-        _apply_to_balance(old_bal, tx.type, tx.amount, reverse=True)
+    # Откатываем эффект старого состояния полностью (обе стороны для перевода)
+    _apply_tx_effect(db, tx, reverse=True)
 
-    # Применяем изменения
+    # Нормализуем входящие значения
     if "type" in update:
         try:
             update["type"] = TransactionType[update["type"]]
@@ -269,9 +326,20 @@ def update_transaction(
     for k, v in update.items():
         setattr(tx, k, v)
 
-    # Применяем новый эффект на актуальном (account, currency)
-    new_bal = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
-    _apply_to_balance(new_bal, tx.type, tx.amount, reverse=False)
+    # Пересчитываем поля перевода / очищаем их для дохода-расхода
+    if tx.type == TransactionType.transfer:
+        tx.category_id = None
+        # Если сумму зачисления передали явно — берём её, иначе пересчитываем по курсу
+        explicit_to_amount = update["to_amount"] if "to_amount" in update else None
+        tx.to_account_id, tx.to_currency, tx.to_amount = _resolve_transfer_dest(
+            db, user_id, tx.currency, tx.amount,
+            tx.to_account_id, tx.to_currency, explicit_to_amount,
+        )
+    else:
+        tx.to_account_id = tx.to_amount = tx.to_currency = None
+
+    # Применяем новый эффект
+    _apply_tx_effect(db, tx, reverse=False)
 
     db.flush()
     _write_history(db, user_id, tx, "edited", prev_amount=prev_amount, prev_currency=prev_currency)
@@ -292,13 +360,7 @@ def delete_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    bal = db.query(AccountBalance).filter(
-        AccountBalance.account_id == tx.account_id,
-        AccountBalance.currency == tx.currency,
-    ).first()
-    if bal is not None:
-        _apply_to_balance(bal, tx.type, tx.amount, reverse=True)
-
+    _apply_tx_effect(db, tx, reverse=True)
     _write_history(db, user_id, tx, "deleted")
     db.delete(tx)
     db.commit()

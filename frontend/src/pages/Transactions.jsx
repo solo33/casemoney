@@ -48,7 +48,7 @@ export default function Transactions() {
   // Форма создания
   const [newTx, setNewTx] = useState({
     amount: "", type: "expense", currency: "",
-    description: "", account_id: "", category_id: "",
+    description: "", account_id: "", category_id: "", to_account_id: "",
     date: isoToday(),
   });
 
@@ -114,13 +114,20 @@ export default function Transactions() {
     e.preventDefault();
     setError(null);
     try {
+      if (newTx.type === "transfer") {
+        if (!newTx.to_account_id) { setError("Выберите счёт-получатель"); return; }
+        if (String(newTx.to_account_id) === String(newTx.account_id)) {
+          setError("Счёт-источник и получатель совпадают"); return;
+        }
+      }
       const payload = {
         amount: parseFloat(newTx.amount),
         type: newTx.type,
         currency: newTx.currency || undefined,
         description: newTx.description || undefined,
         account_id: parseInt(newTx.account_id),
-        category_id: newTx.category_id ? parseInt(newTx.category_id) : undefined,
+        category_id: newTx.type === "transfer" || !newTx.category_id ? undefined : parseInt(newTx.category_id),
+        to_account_id: newTx.type === "transfer" ? parseInt(newTx.to_account_id) : undefined,
       };
       if (newTx.date) payload.date = new Date(newTx.date).toISOString();
       await api.post("/api/transactions/", payload);
@@ -231,12 +238,21 @@ export default function Transactions() {
             <option value="">— Счёт —</option>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-          <select value={newTx.category_id} onChange={e => setNewTx({ ...newTx, category_id: e.target.value })}>
-            <option value="">— Категория —</option>
-            {filteredCategoriesForCreate.map(c => (
-              <option key={c.id} value={c.id}>{categoryNameFor(c.id)}</option>
-            ))}
-          </select>
+          {newTx.type === "transfer" ? (
+            <select value={newTx.to_account_id} onChange={e => setNewTx({ ...newTx, to_account_id: e.target.value })} required>
+              <option value="">— На счёт —</option>
+              {accounts.filter(a => String(a.id) !== String(newTx.account_id)).map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ) : (
+            <select value={newTx.category_id} onChange={e => setNewTx({ ...newTx, category_id: e.target.value })}>
+              <option value="">— Категория —</option>
+              {filteredCategoriesForCreate.map(c => (
+                <option key={c.id} value={c.id}>{categoryNameFor(c.id)}</option>
+              ))}
+            </select>
+          )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
           <input
             placeholder="Описание"
@@ -388,11 +404,13 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
         padding: "8px 12px", textAlign: "right",
         fontWeight: 600, color: TYPE_COLOR[tx.type], whiteSpace: "nowrap",
       }}>
-        {tx.type === "expense" ? "−" : "+"}{formatMoney(tx.amount)} {currencySymbol(tx.currency)}
+        {tx.type === "expense" ? "−" : tx.type === "transfer" ? "" : "+"}{formatMoney(tx.amount)} {currencySymbol(tx.currency)}
       </td>
       <td style={{ padding: "8px 12px", fontSize: 13 }}>{accountName(tx.account_id)}</td>
       <td style={{ padding: "8px 12px", fontSize: 13 }}>
-        {tx.category_id ? categoryName(tx.category_id) : "—"}
+        {tx.type === "transfer"
+          ? <span style={{ color: "#2f6296" }}>→ {accountName(tx.to_account_id)}</span>
+          : (tx.category_id ? categoryName(tx.category_id) : "—")}
       </td>
       <td style={{
         padding: "8px 12px", color: "#515c68", fontSize: 13,
@@ -419,6 +437,7 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
     currency: tx.currency,
     account_id: String(tx.account_id),
     category_id: tx.category_id ? String(tx.category_id) : "",
+    to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
   });
@@ -427,9 +446,15 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
 
   const acc = accounts.find(a => String(a.id) === form.account_id);
   const accCurrencies = (acc?.balances || []).map(b => b.currency);
-  const cats = form.type === "transfer" ? categories : categories.filter(c => c.type === form.type);
+  const cats = form.type === "transfer" ? [] : categories.filter(c => c.type === form.type);
 
   const save = async () => {
+    if (form.type === "transfer") {
+      if (!form.to_account_id) { setErr("Выберите счёт-получатель"); return; }
+      if (String(form.to_account_id) === String(form.account_id)) {
+        setErr("Счёт-источник и получатель совпадают"); return;
+      }
+    }
     setSaving(true);
     setErr(null);
     try {
@@ -438,7 +463,8 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
         type: form.type,
         currency: form.currency,
         account_id: parseInt(form.account_id),
-        category_id: form.category_id ? parseInt(form.category_id) : null,
+        category_id: form.type === "transfer" || !form.category_id ? null : parseInt(form.category_id),
+        to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       };
@@ -475,17 +501,26 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
           <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })}>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
-          <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
-            <option value="">— Без категории —</option>
-            {cats.map(c => {
-              const p = c.parent_id ? categories.find(x => x.id === c.parent_id) : null;
-              return (
-                <option key={c.id} value={c.id}>
-                  {p ? `${p.name} → ${c.name}` : c.name}
-                </option>
-              );
-            })}
-          </select>
+          {form.type === "transfer" ? (
+            <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
+              <option value="">— На счёт —</option>
+              {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          ) : (
+            <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
+              <option value="">— Без категории —</option>
+              {cats.map(c => {
+                const p = c.parent_id ? categories.find(x => x.id === c.parent_id) : null;
+                return (
+                  <option key={c.id} value={c.id}>
+                    {p ? `${p.name} → ${c.name}` : c.name}
+                  </option>
+                );
+              })}
+            </select>
+          )}
           <input
             placeholder="Описание"
             value={form.description}

@@ -21,6 +21,7 @@ export default function QuickAddFab() {
     account_id: "",
     currency: "",       // выбранная валюта (из balances счёта или COMMON)
     category_id: "",
+    to_account_id: "",  // счёт-получатель для перевода
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -96,6 +97,12 @@ export default function QuickAddFab() {
     if (!form.account_id) { setError("Выберите счёт"); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { setError("Введите сумму"); return; }
     if (!form.currency) { setError("Выберите валюту"); return; }
+    if (form.type === "transfer") {
+      if (!form.to_account_id) { setError("Выберите счёт-получатель"); return; }
+      if (String(form.to_account_id) === String(form.account_id)) {
+        setError("Счёт-источник и получатель совпадают"); return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -105,7 +112,8 @@ export default function QuickAddFab() {
         currency: form.currency,
         description: form.description || undefined,
         account_id: parseInt(form.account_id),
-        category_id: form.category_id ? parseInt(form.category_id) : undefined,
+        category_id: form.type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
+        to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : undefined,
       });
       window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
       setForm(f => ({ ...f, amount: "", description: "", category_id: "" }));
@@ -262,23 +270,39 @@ export default function QuickAddFab() {
                 </select>
               </label>
 
-              {/* Категория (для перевода не используется) */}
-              <label style={{ display: "block", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#7a8590" }}>Категория</span>
-                <select
-                  value={form.category_id}
-                  onChange={e => setForm({ ...form, category_id: e.target.value })}
-                  disabled={form.type === "transfer"}
-                  style={{ width: "100%", marginTop: 4 }}
-                >
-                  <option value="">{form.type === "transfer" ? "— перевод —" : "— Без категории —"}</option>
-                  {categories.filter(c => c.type === form.type).map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.icon ? `${c.icon} ` : ""}{c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Категория или счёт-получатель (для перевода) */}
+              {form.type === "transfer" ? (
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, color: "#7a8590" }}>На счёт</span>
+                  <select
+                    value={form.to_account_id}
+                    onChange={e => setForm({ ...form, to_account_id: e.target.value })}
+                    required
+                    style={{ width: "100%", marginTop: 4 }}
+                  >
+                    <option value="">— получатель —</option>
+                    {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
+                      <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, color: "#7a8590" }}>Категория</span>
+                  <select
+                    value={form.category_id}
+                    onChange={e => setForm({ ...form, category_id: e.target.value })}
+                    style={{ width: "100%", marginTop: 4 }}
+                  >
+                    <option value="">— Без категории —</option>
+                    {categories.filter(c => c.type === form.type).map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.icon ? `${c.icon} ` : ""}{c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <label style={{ display: "block", marginBottom: 16 }}>
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Описание (необязательно)</span>

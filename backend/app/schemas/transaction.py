@@ -11,6 +11,10 @@ class TransactionCreate(BaseModel):
     date: Optional[datetime] = None
     account_id: int
     category_id: Optional[int] = None
+    # Перевод: счёт-получатель и сумма зачисления (необязательно — вычислим по курсу)
+    to_account_id: Optional[int] = None
+    to_amount: Optional[float] = None
+    to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
 
 
 class TransactionUpdate(BaseModel):
@@ -21,6 +25,9 @@ class TransactionUpdate(BaseModel):
     date: Optional[datetime] = None
     account_id: Optional[int] = None
     category_id: Optional[int] = None
+    to_account_id: Optional[int] = None
+    to_amount: Optional[float] = None
+    to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
 
 
 class TransactionResponse(BaseModel):
@@ -33,6 +40,9 @@ class TransactionResponse(BaseModel):
     account_id: int
     category_id: Optional[int]
     user_id: int
+    to_account_id: Optional[int] = None
+    to_amount: Optional[float] = None
+    to_currency: Optional[str] = None
 
     class Config:
         from_attributes = True
