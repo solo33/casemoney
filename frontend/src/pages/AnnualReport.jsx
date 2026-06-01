@@ -26,6 +26,12 @@ export default function AnnualReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hideEmpty, setHideEmpty] = useState(true);
+  const [hoverCol, setHoverCol] = useState(null);
+
+  const onCellOver = (e) => {
+    const cell = e.target.closest("td, th");
+    if (cell) setHoverCol(cell.cellIndex + 1);
+  };
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -112,7 +118,12 @@ export default function AnnualReport() {
         <div className="table-wrap" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
-          <table style={{ minWidth: 980, fontSize: 12.5 }}>
+          <table
+            className={`report-table${hoverCol ? ` hc-${hoverCol}` : ""}`}
+            style={{ minWidth: 980, fontSize: 12.5 }}
+            onMouseOver={onCellOver}
+            onMouseLeave={() => setHoverCol(null)}
+          >
             <colgroup>
               <col style={{ minWidth: 170 }} />
               {MONTHS.map((_, i) => <col key={i} style={{ minWidth: 60 }} />)}

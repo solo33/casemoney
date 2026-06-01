@@ -351,7 +351,7 @@ export default function Reports() {
           {summary.category_breakdown.length > 0 && (
             <Card title="Топ категорий по расходам">
               <div className="table-wrap">
-                <table>
+                <table className="report-table">
                   <thead>
                     <tr style={{ background: "#f6f2e9" }}>
                       <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 13, color: "#7a8590", minWidth: 32 }}></th>

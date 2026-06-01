@@ -28,6 +28,13 @@ export default function AnnualBalances() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [hoverCol, setHoverCol] = useState(null);
+
+  // Делегирование: подсветка колонки по nth-child наведённой ячейки
+  const onCellOver = (e) => {
+    const cell = e.target.closest("td, th");
+    if (cell) setHoverCol(cell.cellIndex + 1);
+  };
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -78,7 +85,12 @@ export default function AnnualBalances() {
           <div className="table-wrap" style={{
             background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           }}>
-            <table style={{ minWidth: 980, fontSize: 12.5 }}>
+            <table
+              className={`report-table${hoverCol ? ` hc-${hoverCol}` : ""}`}
+              style={{ minWidth: 980, fontSize: 12.5 }}
+              onMouseOver={onCellOver}
+              onMouseLeave={() => setHoverCol(null)}
+            >
               <thead>
                 <tr>
                   <th style={{ padding: "8px 10px", textAlign: "left", position: "sticky", left: 0, background: "#efe9db", zIndex: 1 }}>
