@@ -179,6 +179,7 @@ def _config_out(cfg) -> AdminConfig:
         smtp_configured=is_smtp_configured(),
         default_plan=cfg.default_plan,
         default_premium_days=cfg.default_premium_days,
+        registration_enabled=cfg.registration_enabled,
     )
 
 

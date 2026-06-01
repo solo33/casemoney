@@ -38,17 +38,31 @@ class RegisterResponse(BaseModel):
     smtp_configured: bool
 
 
+class PublicConfig(BaseModel):
+    registration_enabled: bool
+
+
+@router.get("/config", response_model=PublicConfig)
+def public_config(db: Session = Depends(get_db)):
+    """Публичные флаги для неавторизованных страниц (логин/регистрация)."""
+    cfg = get_config(db)
+    return PublicConfig(registration_enabled=cfg.registration_enabled)
+
+
 @router.post("/register", response_model=RegisterResponse)
 def register(
     data: UserRegister,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    cfg = get_config(db)
+    if not cfg.registration_enabled:
+        raise HTTPException(status_code=403, detail="Регистрация временно закрыта")
+
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    cfg = get_config(db)
     require_verification = cfg.require_email_verification
 
     user = User(

@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { login } from "../api/auth";
+import { login, getPublicConfig } from "../api/auth";
 
 export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [regEnabled, setRegEnabled] = useState(true);
+
+  useEffect(() => {
+    getPublicConfig()
+      .then(r => setRegEnabled(r.data?.registration_enabled !== false))
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -46,16 +53,18 @@ export default function Login() {
             CaseMoney
           </span>
         </div>
-        <Link
-          to="/register"
-          style={{
-            fontSize: 13, fontWeight: 500,
-            color: "#173a54", textDecoration: "none",
-            border: "1px solid #173a54", padding: "6px 14px", borderRadius: 6,
-          }}
-        >
-          Регистрация
-        </Link>
+        {regEnabled && (
+          <Link
+            to="/register"
+            style={{
+              fontSize: 13, fontWeight: 500,
+              color: "#173a54", textDecoration: "none",
+              border: "1px solid #173a54", padding: "6px 14px", borderRadius: 6,
+            }}
+          >
+            Регистрация
+          </Link>
+        )}
       </header>
 
       {/* Hero + form */}
@@ -177,12 +186,14 @@ export default function Login() {
               Забыли пароль?
             </Link>
           </p>
-          <p style={{ marginTop: 4, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
-            Еще нет аккаунта?{" "}
-            <Link to="/register" style={{ color: "#173a54", fontWeight: 500 }}>
-              Создать
-            </Link>
-          </p>
+          {regEnabled && (
+            <p style={{ marginTop: 4, fontSize: 13, color: "#7a8590", textAlign: "center" }}>
+              Еще нет аккаунта?{" "}
+              <Link to="/register" style={{ color: "#173a54", fontWeight: 500 }}>
+                Создать
+              </Link>
+            </p>
+          )}
         </div>
       </main>
 
@@ -195,7 +206,11 @@ export default function Login() {
         fontSize: 12, color: "#a6afb8",
       }}>
         <span>© CaseMoney · Личные финансы</span>
-        <span>Курсы валют: ЦБ РФ · CoinGecko</span>
+        <span style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <Link to="/privacy" style={{ color: "#9c7b3c", textDecoration: "none" }}>Конфиденциальность</Link>
+          <Link to="/terms" style={{ color: "#9c7b3c", textDecoration: "none" }}>Соглашение</Link>
+          <span>Курсы: ЦБ РФ · CoinGecko</span>
+        </span>
       </footer>
 
       <style>{`

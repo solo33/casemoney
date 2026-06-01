@@ -18,4 +18,6 @@ class AppConfig(Base):
     default_plan = Column(String(10), nullable=False, default="free")
     # Если стартовый тариф premium — на сколько дней давать (0 = бессрочно)
     default_premium_days = Column(Integer, nullable=False, default=0)
+    # Открыта ли регистрация. Если FALSE — регистрация недоступна.
+    registration_enabled = Column(Boolean, nullable=False, default=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

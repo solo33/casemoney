@@ -41,12 +41,14 @@ class AdminConfig(BaseModel):
     smtp_configured: bool
     default_plan: str                 # "free" | "premium"
     default_premium_days: int         # 0 = бессрочно
+    registration_enabled: bool
 
 
 class AdminConfigUpdate(BaseModel):
     require_email_verification: Optional[bool] = None
     default_plan: Optional[str] = None
     default_premium_days: Optional[int] = None
+    registration_enabled: Optional[bool] = None
 
 
 class AdminStats(BaseModel):

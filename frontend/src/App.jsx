@@ -4,6 +4,8 @@ import Register from './pages/Register'
 import Activate from './pages/Activate'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import Privacy from './pages/legal/Privacy'
+import Terms from './pages/legal/Terms'
 import Home from './pages/Home'
 import Reports from './pages/Reports'
 import AnnualReport from './pages/AnnualReport'
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="/activate" element={<Activate />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
 
         <Route
           path="/home"

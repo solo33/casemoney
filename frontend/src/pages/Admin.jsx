@@ -583,6 +583,33 @@ function StatsTab() {
               )}
             </div>
           </div>
+
+          {/* Регистрация новых пользователей */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            gap: 16, padding: "12px 0", borderTop: "1px solid #ece6d8",
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1b2531", marginBottom: 4 }}>
+                Регистрация новых пользователей
+              </div>
+              <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
+                {config.registration_enabled ? (
+                  <><strong style={{ color: "#167a4a" }}>Открыта.</strong> Новые пользователи могут зарегистрироваться.</>
+                ) : (
+                  <><strong style={{ color: "#c0432b" }}>Закрыта.</strong> Кнопка регистрации скрыта, создать аккаунт нельзя.</>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => patchConfig({ registration_enabled: !config.registration_enabled })}
+              disabled={savingConfig}
+              className={config.registration_enabled ? "btn-danger" : ""}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {savingConfig ? "..." : config.registration_enabled ? "Закрыть" : "Открыть"}
+            </button>
+          </div>
         </div>
       )}
     </div>
