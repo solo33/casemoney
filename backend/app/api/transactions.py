@@ -11,6 +11,7 @@ from app.models.transaction import Transaction, TransactionType
 from app.models.account import Account
 from app.models.account_balance import AccountBalance
 from app.models.category import Category
+from app.models.transaction_history import TransactionHistory
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
@@ -40,6 +41,42 @@ def _apply_to_balance(
     # transfer пока обрабатываем как изменение одного счёта (без второй стороны)
 
 
+def _category_path(db: Session, user_id: int, category_id: Optional[int]) -> Optional[str]:
+    if not category_id:
+        return None
+    c = db.query(Category).filter(Category.id == category_id, Category.user_id == user_id).first()
+    if not c:
+        return None
+    if c.parent_id:
+        p = db.query(Category).filter(Category.id == c.parent_id).first()
+        return f"{p.name}\\{c.name}" if p else c.name
+    return c.name
+
+
+def _account_name(db: Session, account_id: int) -> str:
+    a = db.query(Account).filter(Account.id == account_id).first()
+    return a.name if a else "—"
+
+
+def _write_history(db: Session, user_id: int, tx: Transaction, action: str,
+                   prev_amount: Optional[float] = None, prev_currency: Optional[str] = None) -> None:
+    """Записать событие в журнал изменений (денормализованный снимок)."""
+    db.add(TransactionHistory(
+        user_id=user_id,
+        transaction_id=tx.id,
+        action=action,
+        op_date=tx.date,
+        type=tx.type.value,
+        amount=tx.amount,
+        currency=tx.currency,
+        account_name=_account_name(db, tx.account_id),
+        category_name=_category_path(db, user_id, tx.category_id),
+        description=tx.description,
+        prev_amount=prev_amount,
+        prev_currency=prev_currency,
+    ))
+
+
 def _expand_categories(db: Session, user_id: int, category_id: int) -> list[int]:
     """Возвращает category_id + все дочерние (для иерархического фильтра)."""
     children = db.query(Category.id).filter(
@@ -54,6 +91,49 @@ class TransactionsPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class HistoryItem(BaseModel):
+    id: int
+    transaction_id: Optional[int]
+    action: str
+    changed_at: datetime
+    op_date: Optional[datetime]
+    type: str
+    amount: float
+    currency: str
+    account_name: Optional[str]
+    category_name: Optional[str]
+    description: Optional[str]
+    prev_amount: Optional[float]
+    prev_currency: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class HistoryPage(BaseModel):
+    items: List[HistoryItem]
+    total: int
+    limit: int
+    offset: int
+
+
+@router.get("/history", response_model=HistoryPage)
+def get_history(
+    limit: int = Query(100, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Журнал изменений операций пользователя (новые сверху)."""
+    base = db.query(TransactionHistory).filter(TransactionHistory.user_id == user_id)
+    total = base.count()
+    items = (
+        base.order_by(TransactionHistory.changed_at.desc(), TransactionHistory.id.desc())
+        .offset(offset).limit(limit).all()
+    )
+    return HistoryPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/", response_model=TransactionsPage)
@@ -134,6 +214,8 @@ def create_transaction(
     )
     db.add(transaction)
     _apply_to_balance(bal, tx_type, data.amount, reverse=False)
+    db.flush()
+    _write_history(db, user_id, transaction, "created")
     db.commit()
     db.refresh(transaction)
     return transaction
@@ -156,7 +238,18 @@ def update_transaction(
 
     update = data.model_dump(exclude_unset=True)
 
-    # Откатываем эффект старого состояния
+    # Снимок до изменений (для журнала)
+    prev_amount, prev_currency = tx.amount, tx.currency
+
+    # Если меняется счёт — проверим, что он принадлежит пользователю
+    if "account_id" in update and update["account_id"] is not None:
+        acc = db.query(Account).filter(
+            Account.id == update["account_id"], Account.user_id == user_id
+        ).first()
+        if not acc:
+            raise HTTPException(status_code=404, detail="Account not found")
+
+    # Откатываем эффект старого состояния (на старом счёте/валюте)
     old_bal = db.query(AccountBalance).filter(
         AccountBalance.account_id == tx.account_id,
         AccountBalance.currency == tx.currency,
@@ -180,6 +273,8 @@ def update_transaction(
     new_bal = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
     _apply_to_balance(new_bal, tx.type, tx.amount, reverse=False)
 
+    db.flush()
+    _write_history(db, user_id, tx, "edited", prev_amount=prev_amount, prev_currency=prev_currency)
     db.commit()
     db.refresh(tx)
     return tx
@@ -204,5 +299,6 @@ def delete_transaction(
     if bal is not None:
         _apply_to_balance(bal, tx.type, tx.amount, reverse=True)
 
+    _write_history(db, user_id, tx, "deleted")
     db.delete(tx)
     db.commit()

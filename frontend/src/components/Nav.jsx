@@ -16,6 +16,7 @@ const SETTINGS_LINKS = [
   { to: "/settings", label: "Настройки" },
   { to: "/categories", label: "Категории" },
   { to: "/currencies", label: "Валюты" },
+  { to: "/history", label: "История" },
 ];
 
 export default function Nav() {

@@ -19,6 +19,7 @@ class TransactionUpdate(BaseModel):
     currency: Optional[str] = Field(None, min_length=2, max_length=10)
     description: Optional[str] = None
     date: Optional[datetime] = None
+    account_id: Optional[int] = None
     category_id: Optional[int] = None
 
 

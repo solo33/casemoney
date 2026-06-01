@@ -15,6 +15,7 @@ import Import from './pages/Import'
 import ImportHomeMoney from './pages/ImportHomeMoney'
 import Transactions from './pages/Transactions'
 import Settings from './pages/Settings'
+import History from './pages/History'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
@@ -150,6 +151,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/history"
+          element={
+            <ProtectedRoute>
+              <History />
             </ProtectedRoute>
           }
         />
