@@ -25,7 +25,11 @@ class Account(Base):
     # Если FALSE — счёт виден, но не суммируется в total_balance дашборда/группы.
     include_in_balance = Column(Boolean, nullable=False, default=True)
 
-    transactions = relationship("Transaction", back_populates="account")
+    transactions = relationship(
+        "Transaction",
+        foreign_keys="Transaction.account_id",
+        back_populates="account",
+    )
     group = relationship("AccountGroup", back_populates="accounts")
     balances = relationship(
         "AccountBalance",
