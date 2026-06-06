@@ -15,7 +15,12 @@ function isoToday() {
   return new Date(d - tz).toISOString().slice(0, 10);
 }
 
-export default function QuickAddInline({ date, onDateChange }) {
+export default function QuickAddInline({
+  date,
+  onDateChange,
+  accountGroups: externalAccountGroups,
+  categories: externalCategories,
+}) {
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);
@@ -36,32 +41,39 @@ export default function QuickAddInline({ date, onDateChange }) {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
+  const applyOptions = useCallback((buckets, cats) => {
+    const flat = buckets.flatMap(b => b.accounts || []);
+    setAccountGroups(buckets);
+    setAccounts(flat);
+    setCategories(cats);
+    setForm(f => {
+      if (f.account_id) return f;
+      const first = flat[0];
+      if (!first) return f;
+      return {
+        ...f,
+        account_id: String(first.id),
+        currency: first.balances?.[0]?.currency || "",
+      };
+    });
+  }, []);
+
   const loadOptions = useCallback(async () => {
+    if (externalAccountGroups && externalCategories) {
+      applyOptions(externalAccountGroups, externalCategories);
+      return;
+    }
+
     try {
       const [grp, cat] = await Promise.all([
         api.get("/api/accounts/grouped"),
         api.get("/api/categories/"),
       ]);
-      const buckets = grp.data || [];
-      const flat = buckets.flatMap(b => b.accounts || []);
-      setAccountGroups(buckets);
-      setAccounts(flat);
-      setCategories(cat.data);
-      // подставим первый счёт + его первую валюту, если ещё не выбраны
-      setForm(f => {
-        if (f.account_id) return f;
-        const first = flat[0];
-        if (!first) return f;
-        return {
-          ...f,
-          account_id: String(first.id),
-          currency: first.balances?.[0]?.currency || "",
-        };
-      });
+      applyOptions(grp.data || [], cat.data || []);
     } catch {
       setError("Не удалось загрузить счета и категории");
     }
-  }, []);
+  }, [applyOptions, externalAccountGroups, externalCategories]);
 
   useEffect(() => { loadOptions(); }, [loadOptions]);
 

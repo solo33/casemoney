@@ -78,11 +78,6 @@ def _create_user(db: Session, email: str, username: str, hashed_password: str, c
         hashed_password=hashed_password,
         email_verified=True,
     )
-    if cfg.default_plan == "premium":
-        user.is_premium = True
-        days = cfg.default_premium_days or 0
-        user.premium_until = None if days <= 0 else _now() + timedelta(days=days)
-
     db.add(user)
     db.commit()
     db.refresh(user)

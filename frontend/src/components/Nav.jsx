@@ -23,7 +23,7 @@ export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { user, mainCurrency, updateMainCurrency, isPremium } = useUser();
+  const { user, mainCurrency, updateMainCurrency } = useUser();
   const links = BASE_LINKS;
   const settingsLinks = user?.is_admin
     ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
@@ -154,20 +154,18 @@ export default function Nav() {
           style={{
             marginLeft: "auto", fontSize: 11, padding: "4px 11px",
             textDecoration: "none",
-            color: isPremium ? "var(--navy-deep)" : "rgba(244,241,232,0.82)",
-            background: isPremium
-              ? "linear-gradient(95deg, #9c7b3c, #c2a05a)"
-              : "transparent",
-            border: `1px solid ${isPremium ? "transparent" : "rgba(255,255,255,0.18)"}`,
+            color: "rgba(244,241,232,0.82)",
+            background: "transparent",
+            border: "1px solid rgba(255,255,255,0.18)",
             borderRadius: 999,
             whiteSpace: "nowrap",
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: 0.5,
           }}
-          title={isPremium ? "Premium активирован" : "Перейти на Premium"}
+          title="Тариф Personal"
         >
-          {isPremium ? "★ Premium" : "Free"}
+          Personal
         </NavLink>
 
         {/* Текущая основная валюта */}

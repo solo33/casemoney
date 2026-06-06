@@ -137,7 +137,6 @@ export default function Home() {
 
   useEffect(() => {
     const reload = () => { fetchAll(); fetchDay(selectedDate); };
-    fetchAll();
     window.addEventListener(TX_ADDED_EVENT, reload);
     return () => window.removeEventListener(TX_ADDED_EVENT, reload);
   }, [fetchAll, fetchDay, selectedDate]);
@@ -303,7 +302,12 @@ export default function Home() {
       {/* ============== RIGHT MAIN ============== */}
       <main style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Inline quick-add form — дата синхронизирована с лентой за день */}
-        <QuickAddInline date={selectedDate} onDateChange={setSelectedDate} />
+        <QuickAddInline
+          date={selectedDate}
+          onDateChange={setSelectedDate}
+          accountGroups={grouped}
+          categories={categories}
+        />
 
         {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>

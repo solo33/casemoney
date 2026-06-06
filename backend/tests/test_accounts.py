@@ -2,7 +2,7 @@ from tests.conftest import register_and_login, make_account
 
 
 def test_registration_seeds_default_groups_and_accounts(client):
-    auth = register_and_login(client, premium=False)
+    auth = register_and_login(client)
     r = client.get("/api/accounts/grouped", headers=auth)
     assert r.status_code == 200
     buckets = r.json()

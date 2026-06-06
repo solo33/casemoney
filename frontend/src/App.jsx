@@ -1,29 +1,31 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import Activate from './pages/Activate'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import Privacy from './pages/legal/Privacy'
-import Terms from './pages/legal/Terms'
-import Home from './pages/Home'
-import Reports from './pages/Reports'
-import AnnualReport from './pages/AnnualReport'
-import AnnualBalances from './pages/AnnualBalances'
-import Goals from './pages/Goals'
-import Admin from './pages/Admin'
-import Accounts from './pages/Accounts'
-import Categories from './pages/Categories'
-import Currencies from './pages/Currencies'
-import Import from './pages/Import'
-import ImportHomeMoney from './pages/ImportHomeMoney'
-import Transactions from './pages/Transactions'
-import Settings from './pages/Settings'
-import History from './pages/History'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import { UserProvider } from './contexts/UserContext'
+
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const Activate = lazy(() => import('./pages/Activate'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Privacy = lazy(() => import('./pages/legal/Privacy'))
+const Terms = lazy(() => import('./pages/legal/Terms'))
+const Home = lazy(() => import('./pages/Home'))
+const Reports = lazy(() => import('./pages/Reports'))
+const AnnualReport = lazy(() => import('./pages/AnnualReport'))
+const AnnualBalances = lazy(() => import('./pages/AnnualBalances'))
+const Goals = lazy(() => import('./pages/Goals'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Accounts = lazy(() => import('./pages/Accounts'))
+const Categories = lazy(() => import('./pages/Categories'))
+const Currencies = lazy(() => import('./pages/Currencies'))
+const Import = lazy(() => import('./pages/Import'))
+const ImportHomeMoney = lazy(() => import('./pages/ImportHomeMoney'))
+const Transactions = lazy(() => import('./pages/Transactions'))
+const Settings = lazy(() => import('./pages/Settings'))
+const History = lazy(() => import('./pages/History'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -43,14 +45,15 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/activate" element={<Activate />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
+      <Suspense fallback={<div className="page">Загрузка...</div>}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/activate" element={<Activate />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
 
         <Route
           path="/home"
@@ -181,8 +184,9 @@ export default function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/home" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/home" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

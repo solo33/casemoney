@@ -6,11 +6,9 @@ const UserContext = createContext({
   mainCurrency: "RUB",
   loading: true,
   limits: null,
-  isPremium: false,
   refresh: () => {},
   refreshLimits: () => {},
   updateMainCurrency: async () => {},
-  upgrade: async () => {},
 });
 
 export function UserProvider({ children }) {
@@ -48,23 +46,15 @@ export function UserProvider({ children }) {
     setUser(res.data);
   }, []);
 
-  const upgrade = useCallback(async () => {
-    const res = await api.post("/api/me/upgrade");
-    setUser(res.data);
-    refreshLimits();
-  }, [refreshLimits]);
-
   return (
     <UserContext.Provider value={{
       user,
       mainCurrency: user?.main_currency || "RUB",
       loading,
       limits,
-      isPremium: !!limits?.premium || !!user?.is_premium,
       refresh,
       refreshLimits,
       updateMainCurrency,
-      upgrade,
     }}>
       {children}
     </UserContext.Provider>

@@ -119,6 +119,8 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     update = data.model_dump(exclude_unset=True)
+    update.pop("is_premium", None)
+    update.pop("premium_until", None)
 
     # Защита: нельзя снять admin с самого себя если он последний админ
     if u.id == admin_id and "is_admin" in update and update["is_admin"] is False:
@@ -177,8 +179,8 @@ def _config_out(cfg) -> AdminConfig:
     return AdminConfig(
         require_email_verification=cfg.require_email_verification,
         smtp_configured=is_smtp_configured(),
-        default_plan=cfg.default_plan,
-        default_premium_days=cfg.default_premium_days,
+        default_plan="personal",
+        default_premium_days=0,
         registration_enabled=cfg.registration_enabled,
     )
 
@@ -200,12 +202,8 @@ def update_app_config(
     cfg = app_config_svc.get_config(db)
     update = data.model_dump(exclude_unset=True)
 
-    if "default_plan" in update and update["default_plan"] not in ("free", "premium"):
-        raise HTTPException(status_code=400, detail="default_plan должен быть 'free' или 'premium'")
-    if "default_premium_days" in update:
-        days = update["default_premium_days"]
-        if days is None or days < 0:
-            raise HTTPException(status_code=400, detail="default_premium_days должен быть >= 0")
+    update.pop("default_plan", None)
+    update.pop("default_premium_days", None)
 
     for k, v in update.items():
         setattr(cfg, k, v)
@@ -226,7 +224,6 @@ def get_stats(
 
     total = db.query(User).count()
     active = db.query(User).filter(User.is_active == True).count()
-    premium = db.query(User).filter(User.is_premium == True).count()
     admins = db.query(User).filter(User.is_admin == True).count()
 
     accs = db.query(Account).count()
@@ -255,7 +252,7 @@ def get_stats(
     return AdminStats(
         total_users=total,
         active_users=active,
-        premium_users=premium,
+        premium_users=0,
         admin_users=admins,
         total_accounts=accs,
         total_categories=cats,

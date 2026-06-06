@@ -40,13 +40,13 @@ def test_wrong_code_rejected(client):
 
 
 def test_duplicate_email_rejected(client):
-    register_and_login(client, email="c@test.com", premium=False)  # полноценно создаёт юзера
+    register_and_login(client, email="c@test.com")  # полноценно создаёт юзера
     r = client.post("/api/auth/register", json={"email": "c@test.com", "username": "c2", "password": "secret1"})
     assert r.status_code == 400
 
 
 def test_login_wrong_password(client):
-    register_and_login(client, email="d@test.com", password="rightpass", premium=False)
+    register_and_login(client, email="d@test.com", password="rightpass")
     r = client.post("/api/auth/login", json={"email": "d@test.com", "password": "wrong"})
     assert r.status_code == 401
 

@@ -118,8 +118,7 @@ export default function Login() {
           <div style={{
             display: "flex", gap: 12, flexWrap: "wrap",
           }}>
-            <PricingPill plan="Free" desc="3 счета · 10 категорий · 1 валюта" />
-            <PricingPill plan="Premium" desc="без лимитов · все валюты · история без срока" highlight />
+            <PricingPill plan="Personal" desc="счета · категории · валюты · импорт · отчеты" highlight />
           </div>
         </div>
 
@@ -255,7 +254,7 @@ function PricingPill({ plan, desc, highlight }) {
       fontSize: 13,
       display: "flex", gap: 10, alignItems: "center",
     }}>
-      <strong style={{ fontWeight: 700 }}>{highlight ? "★ " : ""}{plan}</strong>
+      <strong style={{ fontWeight: 700 }}>{plan}</strong>
       <span style={{ opacity: highlight ? 0.9 : 0.7 }}>· {desc}</span>
     </div>
   );

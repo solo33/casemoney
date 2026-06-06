@@ -238,16 +238,6 @@ button.btn-link:hover {
   text-underline-offset: 3px;
 }
 
-button.btn-premium {
-  background: var(--brass);
-  border-color: var(--brass);
-  color: #fff;
-}
-button.btn-premium:hover {
-  background: var(--brass-strong);
-  border-color: var(--brass-strong);
-}
-
 /* Ссылки на бумаге — латунные */
 a { color: var(--brass); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 3px; }

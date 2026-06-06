@@ -5,7 +5,7 @@ import { useUser } from "../contexts/UserContext";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, refresh, limits, isPremium, upgrade, refreshLimits } = useUser();
+  const { user, refresh, limits } = useUser();
   const [emailForm, setEmailForm] = useState({ email: "", username: "" });
   const [pwdForm, setPwdForm] = useState({ current_password: "", new_password: "", repeat: "" });
   const [error, setError] = useState(null);
@@ -97,14 +97,7 @@ export default function Settings() {
 
       {/* Тариф */}
       <PlanCard
-        isPremium={isPremium}
-        until={user?.premium_until}
         limits={limits}
-        onUpgrade={async () => {
-          try { await upgrade(); flash("Premium активирован на 30 дней!"); }
-          catch (e) { flash(e.response?.data?.detail || "Ошибка", true); }
-        }}
-        refreshLimits={refreshLimits}
       />
 
       {/* Профиль */}
@@ -352,42 +345,12 @@ function FlashBox({ color, bg, border, children }) {
 const muted = { color: "#7a8590", fontSize: 13, margin: 0 };
 
 
-function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
-  if (isPremium) {
-    return (
-      <div style={{
-        background: "linear-gradient(135deg, #173a54 0%, #0f293d 100%)",
-        color: "#fff",
-        border: "none", borderRadius: 10, padding: 18, marginBottom: 16,
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
-          <h3 style={{
-            margin: 0, fontFamily: "var(--serif)", fontSize: 20,
-            fontWeight: 600, color: "#fff",
-          }}>
-            ★ Premium активен
-          </h3>
-          {until && (
-            <span style={{ fontSize: 13, opacity: 0.85 }}>
-              до {new Date(until).toLocaleDateString("ru-RU", {
-                day: "2-digit", month: "long", year: "numeric",
-              })}
-            </span>
-          )}
-        </div>
-        <p style={{ margin: "8px 0 0", fontSize: 13, opacity: 0.9 }}>
-          Без лимитов: счета, категории, валюты — без ограничений.
-        </p>
-      </div>
-    );
-  }
-
+function PlanCard({ limits }) {
   const u = limits?.usage || {};
-  const l = limits?.limits || {};
   const items = [
-    { key: "accounts",        label: "Счета",     plural: "счетов" },
-    { key: "categories",      label: "Категории", plural: "категорий" },
-    { key: "user_currencies", label: "Валюты",    plural: "валют" },
+    { key: "accounts", label: "Счета" },
+    { key: "categories", label: "Категории" },
+    { key: "user_currencies", label: "Валюты" },
   ];
 
   return (
@@ -400,45 +363,32 @@ function PlanCard({ isPremium, until, limits, onUpgrade, refreshLimits }) {
           margin: 0, fontFamily: "var(--serif)", fontSize: 20,
           fontWeight: 600, color: "#1b2531",
         }}>
-          Бесплатный тариф
+          Personal
         </h3>
-        <button
-          onClick={() => { onUpgrade(); refreshLimits(); }}
-          style={{ fontSize: 13, padding: "8px 18px" }}
-        >
-          ★ Перейти на Premium
-        </button>
       </div>
 
-      <div style={{ display: "grid", gap: 8 }}>
+      <p style={{ ...muted, marginBottom: 12 }}>
+        Все текущие функции доступны в Personal: счета, категории, валюты, импорт, экспорт и отчеты.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
         {items.map(it => {
           const used = u[it.key] ?? 0;
-          const max = l[it.key] ?? 0;
-          const pct = max > 0 ? Math.min(100, (used / max) * 100) : 0;
-          const reached = used >= max;
           return (
-            <div key={it.key}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: "#515c68" }}>{it.label}</span>
-                <span style={{ color: reached ? "#c0432b" : "#7a8590", fontWeight: reached ? 600 : 400 }}>
-                  {used} / {max} {it.plural}
-                </span>
-              </div>
-              <div style={{ height: 6, background: "#efe9db", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{
-                  width: `${pct}%`, height: "100%",
-                  background: reached ? "#c0432b" : "#173a54",
-                  transition: "width 0.3s",
-                }} />
+            <div key={it.key} style={{
+              background: "#f6f2e9",
+              border: "1px solid #e4ddcd",
+              borderRadius: 8,
+              padding: 12,
+            }}>
+              <div style={{ color: "#7a8590", fontSize: 12 }}>{it.label}</div>
+              <div style={{ color: "#1b2531", fontSize: 22, fontWeight: 700, marginTop: 4 }}>
+                {used}
               </div>
             </div>
           );
         })}
       </div>
-
-      <p style={{ ...muted, marginTop: 12, fontSize: 12 }}>
-        Premium снимает все лимиты. Активация — тестовая (без оплаты), на 30 дней.
-      </p>
     </div>
   );
 }

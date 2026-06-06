@@ -68,7 +68,7 @@ function UsersTab({ adminId }) {
   const [data, setData] = useState({ items: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({ q: "", is_premium: "", is_active: "" });
+  const [filters, setFilters] = useState({ q: "", is_active: "" });
   const [selected, setSelected] = useState(null);
 
   const load = useCallback(async () => {
@@ -118,18 +118,13 @@ function UsersTab({ adminId }) {
             onChange={e => setFilter("q", e.target.value)}
             style={{ flex: 1, minWidth: 220 }}
           />
-          <select value={filters.is_premium} onChange={e => setFilter("is_premium", e.target.value)}>
-            <option value="">Все планы</option>
-            <option value="true">★ Premium</option>
-            <option value="false">Free</option>
-          </select>
           <select value={filters.is_active} onChange={e => setFilter("is_active", e.target.value)}>
             <option value="">Все</option>
             <option value="true">Активные</option>
             <option value="false">Заблокированы</option>
           </select>
-          {(filters.q || filters.is_premium !== "" || filters.is_active !== "") && (
-            <button className="btn-ghost" onClick={() => setFilters({ q: "", is_premium: "", is_active: "" })}>
+          {(filters.q || filters.is_active !== "") && (
+            <button className="btn-ghost" onClick={() => setFilters({ q: "", is_active: "" })}>
               Сбросить
             </button>
           )}
@@ -191,7 +186,7 @@ function UsersTab({ adminId }) {
                   </td>
                   <td style={td}>{u.username}</td>
                   <td style={td}>
-                    <PlanBadge premium={u.is_premium} />
+                    <PlanBadge />
                   </td>
                   <td style={{ ...td, color: u.is_active ? "#167a4a" : "#c0432b" }}>
                     {u.is_active ? "активен" : "заблокирован"}
@@ -290,40 +285,10 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
 
       {/* План */}
       <Section title="План">
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {user.is_premium ? (
-            <>
-              <button
-                disabled={busy}
-                onClick={() => patch({ premium_until: new Date(Date.now() + 30 * 86400000).toISOString() }, "Продлено")}
-              >
-                +30 дней
-              </button>
-              <button
-                disabled={busy}
-                className="btn-danger"
-                onClick={() => patch({ is_premium: false, premium_until: null }, "Отменён")}
-              >
-                Отменить Premium
-              </button>
-            </>
-          ) : (
-            <button
-              disabled={busy}
-              onClick={() => patch({
-                is_premium: true,
-                premium_until: new Date(Date.now() + 30 * 86400000).toISOString(),
-              }, "Premium активирован")}
-            >
-              ★ Активировать Premium
-            </button>
-          )}
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#173a54" }}>Personal</div>
+        <div style={{ fontSize: 12, color: "#7a8590", marginTop: 4 }}>
+          Все текущие функции доступны без ограничений. Управление платными тарифами пока отключено.
         </div>
-        {user.premium_until && (
-          <div style={{ fontSize: 12, color: "#7a8590", marginTop: 6 }}>
-            До {new Date(user.premium_until).toLocaleString("ru-RU")}
-          </div>
-        )}
       </Section>
 
       {/* Статус */}
@@ -421,8 +386,6 @@ function StatsTab() {
   if (error) return <p style={{ color: "#c0432b" }}>{error}</p>;
   if (!stats) return <p>Загрузка...</p>;
 
-  const premiumPct = stats.total_users > 0 ? (stats.premium_users / stats.total_users * 100).toFixed(1) : 0;
-
   // Sparkline для регистраций
   const maxCount = Math.max(...stats.new_signups_by_day.map(d => d.count), 1);
 
@@ -434,7 +397,6 @@ function StatsTab() {
       }}>
         <Kpi label="Всего юзеров" value={stats.total_users} />
         <Kpi label="Активных" value={stats.active_users} color="#167a4a" />
-        <Kpi label="Premium" value={`${stats.premium_users}`} sub={`${premiumPct}%`} color="#173a54" />
         <Kpi label="Админов" value={stats.admin_users} />
         <Kpi label="Регистраций (7д)" value={stats.new_users_last_7d} />
         <Kpi label="Регистраций (30д)" value={stats.new_users_last_30d} />
@@ -538,49 +500,9 @@ function StatsTab() {
                 Стартовый тариф нового пользователя
               </div>
               <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
-                {config.default_plan === "premium" ? (
-                  <>
-                    <strong style={{ color: "#173a54" }}>Premium.</strong> Новые юзеры
-                    получают premium сразу при регистрации
-                    {config.default_premium_days > 0
-                      ? <> на <strong>{config.default_premium_days}</strong> дней.</>
-                      : <> бессрочно.</>}
-                  </>
-                ) : (
-                  <>
-                    <strong style={{ color: "#167a4a" }}>Free.</strong> Новые юзеры
-                    стартуют на бесплатном тарифе с лимитами.
-                  </>
-                )}
+                <strong style={{ color: "#167a4a" }}>Personal.</strong> Новые пользователи получают
+                доступ ко всем текущим функциям без ограничений. Платные тарифы пока отключены.
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-              <select
-                value={config.default_plan}
-                disabled={savingConfig}
-                onChange={e => patchConfig({ default_plan: e.target.value })}
-              >
-                <option value="free">Free</option>
-                <option value="premium">Premium</option>
-              </select>
-              {config.default_plan === "premium" && (
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#7a8590" }}>
-                  дней
-                  <input
-                    type="number"
-                    min="0"
-                    defaultValue={config.default_premium_days}
-                    disabled={savingConfig}
-                    onBlur={e => {
-                      const v = parseInt(e.target.value, 10);
-                      const days = Number.isNaN(v) || v < 0 ? 0 : v;
-                      if (days !== config.default_premium_days) patchConfig({ default_premium_days: days });
-                    }}
-                    style={{ width: 70 }}
-                    title="0 = бессрочно"
-                  />
-                </label>
-              )}
             </div>
           </div>
 
@@ -663,16 +585,16 @@ function Kpi({ label, value, sub, color }) {
   );
 }
 
-function PlanBadge({ premium }) {
+function PlanBadge() {
   return (
     <span style={{
       fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
       textTransform: "uppercase", letterSpacing: 0.5,
-      background: premium ? "linear-gradient(90deg, #173a54 0%, #be123c 100%)" : "transparent",
-      color: premium ? "#fff" : "#173a54",
-      border: premium ? "none" : "1px solid #173a54",
+      background: "transparent",
+      color: "#173a54",
+      border: "1px solid #173a54",
     }}>
-      {premium ? "★ Premium" : "Free"}
+      Personal
     </span>
   );
 }
