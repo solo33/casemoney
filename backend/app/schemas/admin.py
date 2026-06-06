@@ -9,8 +9,6 @@ class AdminUserSummary(BaseModel):
     username: str
     is_active: bool
     is_admin: bool
-    is_premium: bool
-    premium_until: Optional[datetime]
     main_currency: str
     created_at: Optional[datetime]
     accounts_count: int = 0
@@ -28,8 +26,6 @@ class AdminUsersPage(BaseModel):
 class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
-    is_premium: Optional[bool] = None
-    premium_until: Optional[datetime] = None
 
 
 class AdminPasswordReset(BaseModel):

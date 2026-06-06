@@ -12,7 +12,5 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     main_currency = Column(String(10), nullable=False, default="RUB")
-    is_premium = Column(Boolean, nullable=False, default=False)
-    premium_until = Column(DateTime(timezone=True), nullable=True)
     is_admin = Column(Boolean, nullable=False, default=False)
     email_verified = Column(Boolean, nullable=False, default=False)

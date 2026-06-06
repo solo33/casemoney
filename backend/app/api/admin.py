@@ -56,8 +56,6 @@ def _summary(db: Session, u: User) -> AdminUserSummary:
         username=u.username,
         is_active=u.is_active,
         is_admin=u.is_admin,
-        is_premium=u.is_premium,
-        premium_until=u.premium_until,
         main_currency=u.main_currency,
         created_at=u.created_at,
         accounts_count=acc_count,
@@ -69,7 +67,6 @@ def _summary(db: Session, u: User) -> AdminUserSummary:
 @router.get("/users", response_model=AdminUsersPage)
 def list_users(
     q: Optional[str] = Query(None, description="Поиск по email или username"),
-    is_premium: Optional[bool] = Query(None),
     is_active: Optional[bool] = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
@@ -83,8 +80,6 @@ def list_users(
             func.lower(User.email).like(like),
             func.lower(User.username).like(like),
         ))
-    if is_premium is not None:
-        query = query.filter(User.is_premium == is_premium)
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
     total = query.count()
@@ -119,8 +114,6 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
 
     update = data.model_dump(exclude_unset=True)
-    update.pop("is_premium", None)
-    update.pop("premium_until", None)
 
     # Защита: нельзя снять admin с самого себя если он последний админ
     if u.id == admin_id and "is_admin" in update and update["is_admin"] is False:

@@ -1,6 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
-from datetime import datetime
 
 
 class UserRegister(BaseModel):
@@ -19,8 +18,6 @@ class UserResponse(BaseModel):
     email: str
     username: str
     main_currency: str = "RUB"
-    is_premium: bool = False
-    premium_until: Optional[datetime] = None
     is_admin: bool = False
     email_verified: bool = True
 
