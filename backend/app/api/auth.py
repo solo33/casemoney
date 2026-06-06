@@ -70,8 +70,8 @@ def public_config(db: Session = Depends(get_db)):
     return PublicConfig(registration_enabled=cfg.registration_enabled)
 
 
-def _create_user(db: Session, email: str, username: str, hashed_password: str, cfg) -> User:
-    """Создаёт пользователя + дефолтные валюту/категории/счета + стартовый тариф."""
+def _create_user(db: Session, email: str, username: str, hashed_password: str) -> User:
+    """Создаёт пользователя + дефолтные валюту/категории/счета."""
     user = User(
         email=email,
         username=username,
@@ -107,7 +107,7 @@ def register(
 
     # Если админ отключил подтверждение email — создаём сразу, без кода.
     if not cfg.require_email_verification:
-        _create_user(db, data.email, data.username, hashed, cfg)
+        _create_user(db, data.email, data.username, hashed)
         return RegisterResponse(requires_code=False, smtp_configured=is_smtp_configured())
 
     # Иначе — заявка на регистрацию + код на email.
@@ -175,8 +175,7 @@ def verify_code(data: VerifyCodeRequest, db: Session = Depends(get_db)):
         db.commit()
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    cfg = get_config(db)
-    user = _create_user(db, pending.email, pending.username, pending.hashed_password, cfg)
+    user = _create_user(db, pending.email, pending.username, pending.hashed_password)
     db.delete(pending)
     db.commit()
 

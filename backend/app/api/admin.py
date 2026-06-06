@@ -172,8 +172,6 @@ def _config_out(cfg) -> AdminConfig:
     return AdminConfig(
         require_email_verification=cfg.require_email_verification,
         smtp_configured=is_smtp_configured(),
-        default_plan="personal",
-        default_premium_days=0,
         registration_enabled=cfg.registration_enabled,
     )
 
@@ -194,9 +192,6 @@ def update_app_config(
 ):
     cfg = app_config_svc.get_config(db)
     update = data.model_dump(exclude_unset=True)
-
-    update.pop("default_plan", None)
-    update.pop("default_premium_days", None)
 
     for k, v in update.items():
         setattr(cfg, k, v)
@@ -245,7 +240,6 @@ def get_stats(
     return AdminStats(
         total_users=total,
         active_users=active,
-        premium_users=0,
         admin_users=admins,
         total_accounts=accs,
         total_categories=cats,
