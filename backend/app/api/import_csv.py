@@ -1,9 +1,9 @@
-"""Импорт CSV-выгрузок (iHomeMoney/HomeMoney формат).
+"""Import transactions from CSV/XLSX/XLS files.
 
-Двухшаговый поток:
-1) POST /api/import/preview — загружает файл, парсит, возвращает preview + token
-   (сами строки храним в сессии пользователя через простой in-memory кэш по токену).
-2) POST /api/import/confirm — принимает token, создаёт сущности и транзакции.
+Two-step flow:
+1) POST /api/import/preview uploads and scans a file, then returns preview + token.
+2) POST /api/import/confirm takes the token and creates accounts, categories,
+   currencies, and transactions.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -35,6 +35,7 @@ def get_current_user_id(
 # TTL — 30 минут.
 _PREVIEW_CACHE: dict[str, tuple[int, list, float]] = {}
 PREVIEW_TTL = 30 * 60
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
 
 
 def _cleanup_cache():
@@ -55,8 +56,10 @@ async def preview(
     user_id: int = Depends(get_current_user_id),
 ):
     content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="Файл слишком большой. Максимум 10 МБ.")
     try:
-        rows = svc.parse_csv(content)
+        rows = svc.parse_file(file.filename or "", content)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

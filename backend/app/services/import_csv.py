@@ -1,19 +1,19 @@
-"""Импорт CSV-выгрузок iHomeMoney / HomeMoney.
+"""Import transactions from CSV/XLSX/XLS files.
 
-Формат файла (разделитель ';', десятичная запятая):
-    date;account;category;total;currency;description;transfer
-    03.05.2026;Тинькофф;Покупки\\Подарки;-600,00;RUB;папе листерин;
+Expected columns:
+    date;account;category;amount;currency;description;transfer
 
-Правила:
-- date: dd.mm.yyyy
-- total: знак определяет направление: отрицательное = расход, положительное = доход
-- category: может содержать `\\` — иерархия parent\\child (макс 2 уровня)
-- transfer: если задан — это перевод (две строки на одно перемещение)
+Rules:
+- date: dd.mm.yyyy, yyyy-mm-dd, dd/mm/yyyy, or Excel date cell
+- amount: negative = expense, positive = income
+- category: may contain parent\\child hierarchy
+- transfer: optional destination/counterparty account for account transfers
 """
 import csv
 import io
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, date
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -54,11 +54,48 @@ class ImportPreview:
     totals: dict = field(default_factory=dict)
 
 
-def _parse_amount(value: str) -> float:
+COLUMN_ALIASES = {
+    "date": "date",
+    "дата": "date",
+    "account": "account",
+    "счет": "account",
+    "счёт": "account",
+    "category": "category",
+    "категория": "category",
+    "amount": "amount",
+    "total": "amount",
+    "сумма": "amount",
+    "currency": "currency",
+    "валюта": "currency",
+    "description": "description",
+    "note": "description",
+    "comment": "description",
+    "описание": "description",
+    "комментарий": "description",
+    "transfer": "transfer",
+    "перевод": "transfer",
+}
+REQUIRED_COLUMNS = {"date", "account", "amount"}
+POSITIONAL_COLUMNS = ["date", "account", "category", "amount", "currency", "description", "transfer"]
+
+
+def _stringify(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    return str(value).strip()
+
+
+def _parse_amount(value) -> float:
     """Преобразует '-600,00' → -600.0"""
     if value is None:
         return 0.0
-    s = value.strip().replace(" ", "").replace(" ", "").replace(",", ".")
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip().replace(" ", "").replace(" ", "").replace(",", ".")
     if not s:
         return 0.0
     try:
@@ -67,9 +104,13 @@ def _parse_amount(value: str) -> float:
         return 0.0
 
 
-def _parse_date(value: str) -> Optional[str]:
+def _parse_date(value) -> Optional[str]:
     if not value:
         return None
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
     s = value.strip()
     for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"):
         try:
@@ -79,64 +120,55 @@ def _parse_date(value: str) -> Optional[str]:
     return None
 
 
-def parse_csv(content: bytes) -> list[ParsedRow]:
-    """Парсит сырой CSV. Возвращает список ParsedRow (включая ошибочные строки)."""
-    # Пробуем UTF-8 BOM/без, затем CP1251 как fallback
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "cp1251"):
-        try:
-            text = content.decode(enc)
-            break
-        except UnicodeDecodeError:
-            continue
-    if text is None:
-        raise ValueError("Не удалось распознать кодировку файла")
+def _normalize_header(raw_header: list) -> dict[str, int]:
+    normalized = {}
+    for idx, value in enumerate(raw_header):
+        key = _stringify(value).lower().strip()
+        key = COLUMN_ALIASES.get(key, key)
+        if key and key not in normalized:
+            normalized[key] = idx
+    return normalized
 
-    reader = csv.reader(io.StringIO(text), delimiter=";")
-    rows = list(reader)
+
+def _parse_rows(rows: list[list]) -> list[ParsedRow]:
     if not rows:
         return []
 
-    # Заголовок
-    header = [h.strip().lower() for h in rows[0]]
-    expected = {"date", "account", "category", "total", "currency", "description", "transfer"}
-    if not expected.issubset(set(header)):
-        # Возможно ещё не та структура — попытаемся всё равно по позициям
-        pass
-
-    col_idx = {name: header.index(name) for name in header}
+    header_map = _normalize_header(rows[0])
+    has_header = REQUIRED_COLUMNS.issubset(set(header_map))
+    if not has_header:
+        header_map = {name: idx for idx, name in enumerate(POSITIONAL_COLUMNS)}
 
     parsed: list[ParsedRow] = []
-    for i, raw in enumerate(rows[1:], start=2):
-        if not raw or all(not c.strip() for c in raw):
+    start = 1 if has_header else 0
+    for raw_idx, raw in enumerate(rows[start:], start=start + 1):
+        if not raw or all(not _stringify(c) for c in raw):
             continue
 
-        def get(col: str) -> str:
-            idx = col_idx.get(col)
+        def get(col: str):
+            idx = header_map.get(col)
             if idx is None or idx >= len(raw):
                 return ""
-            return (raw[idx] or "").strip()
+            return raw[idx]
 
         date_iso = _parse_date(get("date"))
-        account = get("account")
-        category_path = get("category") or ""
-        amount = _parse_amount(get("total"))
-        currency = (get("currency") or "RUB").upper()
-        description = get("description") or None
-        transfer_to = get("transfer") or None
+        account = _stringify(get("account"))
+        category_path = _stringify(get("category"))
+        amount = _parse_amount(get("amount"))
+        currency = (_stringify(get("currency")) or "RUB").upper()
+        description = _stringify(get("description")) or None
+        transfer_to = _stringify(get("transfer")) or None
 
-        # Тип транзакции
         if transfer_to:
             tx_type = "transfer"
         else:
             tx_type = "expense" if amount < 0 else ("income" if amount > 0 else "expense")
 
-        # Иерархия категории
         parent = child = None
         if category_path:
             parts = [p.strip() for p in category_path.split("\\") if p.strip()]
             if len(parts) >= 2:
-                parent, child = parts[0], parts[-1]  # берём первый и последний (макс 2)
+                parent, child = parts[0], parts[-1]
             elif len(parts) == 1:
                 parent = parts[0]
 
@@ -144,12 +176,12 @@ def parse_csv(content: bytes) -> list[ParsedRow]:
         if not date_iso:
             err = "не удалось распарсить дату"
         elif not account:
-            err = "пустой счёт"
+            err = "пустой счет"
         elif amount == 0:
             err = "нулевая сумма"
 
         parsed.append(ParsedRow(
-            line_no=i,
+            line_no=raw_idx,
             date=date_iso,
             account=account,
             category_path=category_path or None,
@@ -164,6 +196,75 @@ def parse_csv(content: bytes) -> list[ParsedRow]:
             error=err,
         ))
     return parsed
+
+
+def parse_csv(content: bytes) -> list[ParsedRow]:
+    """Parse raw CSV content into ParsedRow objects."""
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "cp1251"):
+        try:
+            text = content.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise ValueError("Не удалось распознать кодировку файла")
+
+    sample = text[:4096]
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=";,")
+        delimiter = dialect.delimiter
+    except csv.Error:
+        delimiter = ";"
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    rows = list(reader)
+    return _parse_rows(rows)
+
+
+def parse_xlsx(content: bytes) -> list[ParsedRow]:
+    """Parse XLSX content using the first worksheet."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError as e:
+        raise ValueError("Для импорта XLSX установите зависимость openpyxl") from e
+
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    ws = wb.active
+    rows = [[cell for cell in row] for row in ws.iter_rows(values_only=True)]
+    return _parse_rows(rows)
+
+
+def parse_xls(content: bytes) -> list[ParsedRow]:
+    """Parse legacy XLS content using the first worksheet."""
+    try:
+        import xlrd
+    except ImportError as e:
+        raise ValueError("Для импорта XLS установите зависимость xlrd") from e
+
+    book = xlrd.open_workbook(file_contents=content)
+    sheet = book.sheet_by_index(0)
+    rows = []
+    for row_idx in range(sheet.nrows):
+        row = []
+        for col_idx in range(sheet.ncols):
+            cell = sheet.cell(row_idx, col_idx)
+            value = cell.value
+            if cell.ctype == xlrd.XL_CELL_DATE:
+                value = datetime(*xlrd.xldate_as_tuple(value, book.datemode))
+            row.append(value)
+        rows.append(row)
+    return _parse_rows(rows)
+
+
+def parse_file(filename: str, content: bytes) -> list[ParsedRow]:
+    suffix = Path(filename or "").suffix.lower()
+    if suffix == ".csv" or not suffix:
+        return parse_csv(content)
+    if suffix == ".xlsx":
+        return parse_xlsx(content)
+    if suffix == ".xls":
+        return parse_xls(content)
+    raise ValueError("Поддерживаются файлы CSV, XLSX и XLS")
 
 
 def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPreview:
@@ -241,7 +342,7 @@ def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPre
     p.existing_accounts = sorted(seen_accounts)
     p.new_categories = [
         {"name": (k[1] if not k[0] else f"{k[0]}\\{k[1]}"), "type": t}
-        for k, t in sorted(new_categories.items())
+        for k, t in sorted(new_categories.items(), key=lambda item: ((item[0][0] or ""), item[0][1]))
     ]
     p.existing_categories = sorted(seen_categories)
     p.currencies_to_add = sorted(currencies - existing_user_currencies)
@@ -361,11 +462,27 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
 
             description = r.description
             if r.transfer_to:
-                arrow = "→" if r.amount < 0 else "←"
+                arrow = "->" if r.amount < 0 else "<-"
                 prefix = f"Перевод {arrow} {r.transfer_to}"
                 description = f"{prefix}: {description}" if description else prefix
 
             tx_date = datetime.strptime(r.date, "%Y-%m-%d") if r.date else None
+
+            to_account_id = to_amount = to_currency = None
+            if r.transfer_to:
+                other = ensure_account(r.transfer_to)
+                ensure_balance(other, r.currency)
+                if r.amount < 0:
+                    source = account
+                    target = other
+                else:
+                    source = other
+                    target = account
+                account = source
+                bal = ensure_balance(source, r.currency)
+                to_account_id = target.id
+                to_amount = r.abs_amount
+                to_currency = r.currency.upper()
 
             tx = Transaction(
                 amount=r.abs_amount,
@@ -376,11 +493,17 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
                 account_id=account.id,
                 category_id=cat.id if cat else None,
                 user_id=user_id,
+                to_account_id=to_account_id,
+                to_amount=to_amount,
+                to_currency=to_currency,
             )
             db.add(tx)
 
-            # Обновляем баланс
-            if r.amount < 0:
+            if tx_type == TransactionType.transfer:
+                bal.balance -= r.abs_amount
+                target_bal = ensure_balance(target, r.currency)
+                target_bal.balance += r.abs_amount
+            elif r.amount < 0:
                 bal.balance -= r.abs_amount
             else:
                 bal.balance += r.abs_amount

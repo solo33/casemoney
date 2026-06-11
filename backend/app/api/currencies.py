@@ -91,7 +91,7 @@ def add_currency(
     ).first()
     if exists:
         raise HTTPException(status_code=400, detail=f"Валюта {currency} уже добавлена")
-    # Лимит free-tier (основная валюта уже есть, так что free не сможет добавить вторую)
+    # Ограничения тарифов сейчас не блокируют добавление пользовательских валют.
     limits_svc.enforce_limit(db, user_id, "user_currencies")
 
     uc = UserCurrency(

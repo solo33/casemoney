@@ -1,4 +1,4 @@
-"""Экспорт транзакций в CSV (формат iHomeMoney/HomeMoney — совместим с импортом)."""
+"""Export transactions to CSV compatible with the generic import format."""
 import csv
 import io
 from datetime import date, datetime
@@ -65,7 +65,7 @@ def export_csv(
 ):
     """Скачать CSV всех транзакций пользователя.
 
-    Формат совместим с /api/import/preview: date;account;category;total;currency;description;transfer
+    Формат совместим с /api/import/preview: date;account;category;amount;currency;description;transfer
     """
     accounts = {a.id: a for a in db.query(Account).filter(Account.user_id == user_id).all()}
     categories = {c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()}
@@ -82,17 +82,11 @@ def export_csv(
     # BOM для нормального открытия в Excel
     buf.write("﻿")
     writer = csv.writer(buf, delimiter=";", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["date", "account", "category", "total", "currency", "description", "transfer"])
+    writer.writerow(["date", "account", "category", "amount", "currency", "description", "transfer"])
 
     for t in transactions:
         acc = accounts.get(t.account_id)
         cat = categories.get(t.category_id) if t.category_id else None
-        # Сумма: положительная для доход, отрицательная для расход.
-        # transfer: на текущий момент в БД мы храним направление через знак самого amount
-        # (см. import — мы сохраняем абсолютное значение, но для exp/inc используем знак).
-        # Для transfer мы тоже храним abs(amount), направление определяется по типу записи и описанию.
-        # Здесь воспроизводим: expense -> отрицательный, income -> положительный.
-        # Для transfer пытаемся вытащить адресата из описания вида "Перевод → X" / "Перевод ← X".
         transfer_to = ""
         amount = t.amount
         if t.type == TransactionType.expense:
@@ -100,21 +94,9 @@ def export_csv(
         elif t.type == TransactionType.income:
             amount = +amount
         elif t.type == TransactionType.transfer:
-            desc = (t.description or "")
-            if "→" in desc:
-                # стрелка наружу: deposit -> Тинькофф, значит amount отрицательный с этой стороны
-                amount = -amount
-                # Извлечь имя после "→"
-                try:
-                    transfer_to = desc.split("→", 1)[1].split(":", 1)[0].strip()
-                except Exception:
-                    transfer_to = ""
-            elif "←" in desc:
-                amount = +amount
-                try:
-                    transfer_to = desc.split("←", 1)[1].split(":", 1)[0].strip()
-                except Exception:
-                    transfer_to = ""
+            amount = -amount
+            target = accounts.get(t.to_account_id) if t.to_account_id else None
+            transfer_to = target.name if target else ""
 
         writer.writerow([
             t.date.strftime("%d.%m.%Y") if t.date else "",
