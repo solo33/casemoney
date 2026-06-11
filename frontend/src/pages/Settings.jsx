@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
+import SettingsTabs from "../components/SettingsTabs";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -91,6 +92,7 @@ export default function Settings() {
   return (
     <div className="page" style={{ maxWidth: 760 }}>
       <h1 style={{ marginBottom: 20 }}>Настройки</h1>
+      <SettingsTabs />
 
       {error && <FlashBox color="#c0432b" bg="#fef2f0" border="#fecdd3">{error}</FlashBox>}
       {msg && <FlashBox color="#167a4a" bg="#dcfce7" border="#86efac">{msg}</FlashBox>}
@@ -132,13 +134,13 @@ export default function Settings() {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <NavRow
-            to="/categories"
+            to="/settings/categories"
             icon="🗂"
             title="Категории"
             description="Иерархия доходов и расходов, цвета и иконки"
           />
           <NavRow
-            to="/currencies"
+            to="/settings/currencies"
             icon="💱"
             title="Валюты"
             description="Список валют, ручные курсы, основная валюта"
@@ -149,7 +151,7 @@ export default function Settings() {
       {/* Основная валюта */}
       <Section title="Основная валюта">
         <p style={muted}>
-          В этой валюте показываются все суммы и итоги. Управление списком валют и курсами — в разделе <Link to="/currencies">Валюты</Link>.
+          В этой валюте показываются все суммы и итоги. Управление списком валют и курсами — в разделе <Link to="/settings/currencies">Валюты</Link>.
         </p>
         <div style={{ fontSize: 18, fontWeight: 600, marginTop: 8 }}>
           {user.main_currency}
@@ -196,7 +198,7 @@ export default function Settings() {
             to="/import"
             icon="📥"
             title="Импорт"
-            description="Загрузка операций из CSV (в т.ч. выгрузка HomeMoney)"
+            description="Загрузка операций из CSV, XLSX или XLS"
           />
         </div>
         <p style={muted}>
@@ -220,6 +222,29 @@ export default function Settings() {
           }}>
             Скачать CSV
           </button>
+        </div>
+      </Section>
+
+      <Section title="Документы">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <NavRow
+            to="/privacy"
+            icon="📄"
+            title="Политика конфиденциальности"
+            description="Как обрабатываются персональные данные и финансовые записи"
+          />
+          <NavRow
+            to="/terms"
+            icon="⚖"
+            title="Пользовательское соглашение"
+            description="Условия использования CaseMoney"
+          />
+          <NavRow
+            to="/cookies"
+            icon="🍪"
+            title="Cookie"
+            description="Какие технические данные хранит браузер и зачем"
+          />
         </div>
       </Section>
 

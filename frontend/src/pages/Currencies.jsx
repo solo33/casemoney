@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
+import SettingsTabs from "../components/SettingsTabs";
 
 // Полные русские названия некоторых валют (опционально)
 const NAMES = {
@@ -106,6 +107,7 @@ export default function Currencies() {
   return (
     <div className="page" style={{ maxWidth: 880 }}>
       <h1 style={{ marginBottom: 20 }}>Валюты</h1>
+      <SettingsTabs />
 
       {error && (
         <div style={{

@@ -37,6 +37,7 @@ export default function LegalLayout({ title, updated, children }) {
         <div style={{ marginTop: 20, display: "flex", gap: 16, fontSize: 14 }}>
           <Link to="/privacy" style={{ color: "#9c7b3c" }}>Политика конфиденциальности</Link>
           <Link to="/terms" style={{ color: "#9c7b3c" }}>Пользовательское соглашение</Link>
+          <Link to="/cookies" style={{ color: "#9c7b3c" }}>Cookie</Link>
           <Link to="/login" style={{ color: "#173a54" }}>Войти</Link>
         </div>
       </main>

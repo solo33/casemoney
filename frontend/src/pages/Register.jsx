@@ -160,8 +160,23 @@ export default function Register() {
               Регистрация
             </h2>
             <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 20px" }}>
-              Бесплатный тариф: 3 счёта · 10 категорий · 1 валюта
+              Personal: счета, категории, валюты, импорт и отчеты
             </p>
+
+            <div style={{
+              background: "#f6f2e9",
+              border: "1px solid #e4ddcd",
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 18,
+            }}>
+              <div style={{ color: "#9c7b3c", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Больше порядка с первого дня
+              </div>
+              <p style={{ margin: "6px 0 0", color: "#515c68", fontSize: 13, lineHeight: 1.5 }}>
+                Начните с обычного учета, а дальше подключайте импорт CSV/Excel, отчеты и роадмап будущих функций.
+              </p>
+            </div>
 
             <form onSubmit={handleSubmit}>
               <label style={lbl}>
@@ -223,6 +238,12 @@ export default function Register() {
               Уже есть аккаунт?{" "}
               <Link to="/login" style={{ color: "#173a54", fontWeight: 500 }}>Войти</Link>
             </p>
+            <div style={{ marginTop: 12, display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
+              <Link to="/articles" style={{ color: "#9c7b3c" }}>Статьи</Link>
+              <Link to="/help" style={{ color: "#9c7b3c" }}>Помощь</Link>
+              <Link to="/roadmap" style={{ color: "#9c7b3c" }}>Роадмап</Link>
+              <Link to="/cookies" style={{ color: "#9c7b3c" }}>Cookie</Link>
+            </div>
           </>
         )}
       </div>

@@ -6,7 +6,7 @@ import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 
-export default function ImportHomeMoney() {
+export default function ImportFile() {
   const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -15,6 +15,7 @@ export default function ImportHomeMoney() {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const inputRef = useRef(null);
 
   const reset = () => {
@@ -22,6 +23,7 @@ export default function ImportHomeMoney() {
     setPreview(null);
     setError(null);
     setResult(null);
+    setConfirmed(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -30,6 +32,7 @@ export default function ImportHomeMoney() {
     setPreview(null);
     setResult(null);
     setError(null);
+    setConfirmed(false);
   };
 
   const onDrop = (e) => {
@@ -54,6 +57,7 @@ export default function ImportHomeMoney() {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setPreview(res.data);
+      setConfirmed(false);
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка обработки файла");
     } finally {
@@ -83,21 +87,25 @@ export default function ImportHomeMoney() {
     <div className="page" style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: 12 }}>
         <Link to="/import" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
-          ← К выбору источника
+          ← К импорту
         </Link>
       </div>
-      <h1 style={{ marginBottom: 8 }}>Импорт из HomeMoney</h1>
+      <h1 style={{ marginBottom: 8 }}>Импорт из CSV или Excel</h1>
       <p style={{ color: "#7a8590", fontSize: 14, marginBottom: 8, maxWidth: 760 }}>
-        Загрузите CSV-выгрузку из ihomemoney.com. Ожидаемая структура колонок
-        (разделитель — точка с запятой):
+        Загрузите файл с операциями. Перед сохранением мы просканируем строки и покажем,
+        какие счета, категории и валюты будут созданы. Ожидаемая структура колонок:
       </p>
       <code style={{
         display: "block", maxWidth: 760, overflowX: "auto", whiteSpace: "nowrap",
         background: "#efe9db", border: "1px solid #e4ddcd", borderRadius: 6,
         padding: "8px 12px", fontSize: 12.5, color: "#515c68", marginBottom: 20,
       }}>
-        date;account;category;total;currency;description;transfer
+        date;account;category;amount;currency;description;transfer
       </code>
+      <p style={{ color: "#7a8590", fontSize: 13, marginTop: -10, marginBottom: 20, maxWidth: 760 }}>
+        CSV может быть разделен точкой с запятой или запятой. В Excel используется первый лист.
+        Колонка <strong>transfer</strong> необязательна: если она заполнена, строка будет импортирована как перевод между счетами.
+      </p>
 
       {error && (
         <div style={errorBox}>
@@ -165,17 +173,17 @@ export default function ImportHomeMoney() {
             ) : (
               <>
                 <div style={{ fontSize: 14, color: "#515c68" }}>
-                  Перетащите CSV-файл сюда или нажмите для выбора
+                  Перетащите CSV/XLSX/XLS-файл сюда или нажмите для выбора
                 </div>
                 <div style={{ fontSize: 12, color: "#a6afb8", marginTop: 6 }}>
-                  Формат: iHomeMoney / HomeMoney (date;account;category;total;currency;description;transfer)
+                  Формат: date;account;category;amount;currency;description;transfer
                 </div>
               </>
             )}
             <input
               ref={inputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               onChange={onChange}
               style={{ display: "none" }}
             />
@@ -196,6 +204,29 @@ export default function ImportHomeMoney() {
           {preview && (
             <>
               <Summary preview={preview} />
+              <label style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                background: "#fffdf7",
+                border: "1px solid #e4ddcd",
+                borderRadius: 8,
+                padding: 12,
+                marginTop: 16,
+                fontSize: 13,
+                color: "#515c68",
+              }}>
+                <input
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={e => setConfirmed(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  Я проверил найденные счета, категории и валюты. Можно создавать недостающие элементы
+                  и импортировать операции.
+                </span>
+              </label>
               <h3 style={{ fontSize: 14, color: "#44403c", margin: "20px 0 10px" }}>
                 Строки ({preview.rows.length})
               </h3>
@@ -253,7 +284,7 @@ export default function ImportHomeMoney() {
               </div>
 
               <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button onClick={confirm} disabled={importing || preview.totals.ok === 0}>
+                <button onClick={confirm} disabled={importing || preview.totals.ok === 0 || !confirmed}>
                   {importing ? "Импортируем..." : `Импортировать ${preview.totals.ok} записей`}
                 </button>
                 <button className="btn-ghost" onClick={reset}>Отмена</button>

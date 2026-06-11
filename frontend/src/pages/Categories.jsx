@@ -10,6 +10,7 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import api from "../api/client";
+import SettingsTabs from "../components/SettingsTabs";
 
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b" };
 const TYPE_LABEL = { income: "Доходы", expense: "Расходы" };
@@ -166,6 +167,7 @@ export default function Categories() {
   return (
     <div className="page">
       <h1>Категории</h1>
+      <SettingsTabs />
 
       {error && (
         <p style={{ color: "#c0432b", marginBottom: 12 }}>

@@ -109,16 +109,38 @@ export default function Login() {
             <Feature icon="📊" title="Годовой анализ">
               12 месяцев в одной таблице. Клик по сумме открывает операции.
             </Feature>
-            <Feature icon="📥" title="Импорт из CSV">
-              Выгрузки из других сервисов загружаются за пару кликов с превью.
+            <Feature icon="📥" title="Импорт из файлов">
+              CSV и Excel загружаются за пару кликов с предварительной проверкой.
             </Feature>
           </div>
 
           {/* Pricing teaser */}
           <div style={{
             display: "flex", gap: 12, flexWrap: "wrap",
+            marginBottom: 18,
           }}>
             <PricingPill plan="Personal" desc="счета · категории · валюты · импорт · отчеты" highlight />
+          </div>
+
+          <div style={{
+            background: "#fffdf7",
+            border: "1px solid #e4ddcd",
+            borderRadius: 10,
+            padding: 16,
+            maxWidth: 560,
+          }}>
+            <div style={{ color: "#9c7b3c", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              Скоро в CaseMoney
+            </div>
+            <h2 style={{ margin: "6px 0 8px", fontSize: 22, fontFamily: "var(--serif)", fontWeight: 600 }}>
+              Напоминания, автоплатежи и импорт с подтверждением
+            </h2>
+            <p style={{ margin: "0 0 10px", color: "#515c68", fontSize: 14, lineHeight: 1.5 }}>
+              Планируем платежный календарь, регулярные операции и более умный импорт CSV/Excel с проверкой категорий перед загрузкой.
+            </p>
+            <Link to="/roadmap" style={{ color: "#173a54", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
+              Смотреть роадмап →
+            </Link>
           </div>
         </div>
 
@@ -208,6 +230,10 @@ export default function Login() {
         <span style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <Link to="/privacy" style={{ color: "#9c7b3c", textDecoration: "none" }}>Конфиденциальность</Link>
           <Link to="/terms" style={{ color: "#9c7b3c", textDecoration: "none" }}>Соглашение</Link>
+          <Link to="/cookies" style={{ color: "#9c7b3c", textDecoration: "none" }}>Cookie</Link>
+          <Link to="/articles" style={{ color: "#9c7b3c", textDecoration: "none" }}>Статьи</Link>
+          <Link to="/help" style={{ color: "#9c7b3c", textDecoration: "none" }}>Помощь</Link>
+          <Link to="/roadmap" style={{ color: "#9c7b3c", textDecoration: "none" }}>Роадмап</Link>
           <span>Курсы: ЦБ РФ · CoinGecko</span>
         </span>
       </footer>

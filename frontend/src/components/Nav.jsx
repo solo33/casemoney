@@ -13,9 +13,12 @@ const BASE_LINKS = [
 
 // Раздел «Настройки» — выпадающее меню
 const SETTINGS_LINKS = [
-  { to: "/settings", label: "Настройки" },
-  { to: "/categories", label: "Категории" },
-  { to: "/currencies", label: "Валюты" },
+  { to: "/settings/personal", label: "Персональные" },
+  { to: "/settings/categories", label: "Категории" },
+  { to: "/settings/currencies", label: "Валюты" },
+  { to: "/articles", label: "Статьи" },
+  { to: "/help", label: "Помощь" },
+  { to: "/roadmap", label: "Роадмап" },
   { to: "/history", label: "История" },
 ];
 
@@ -149,7 +152,7 @@ export default function Nav() {
 
         {/* Plan badge */}
         <NavLink
-          to="/settings"
+          to="/settings/personal"
           className="nav-settings-desktop"
           style={{
             marginLeft: "auto", fontSize: 11, padding: "4px 11px",
@@ -170,7 +173,7 @@ export default function Nav() {
 
         {/* Текущая основная валюта */}
         <NavLink
-          to="/currencies"
+          to="/settings/currencies"
           style={{
             fontFamily: "var(--font-mono)",
             fontSize: 12, padding: "5px 10px",

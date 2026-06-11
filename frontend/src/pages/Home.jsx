@@ -309,6 +309,23 @@ export default function Home() {
           categories={categories}
         />
 
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <h3 style={{ ...sectionTitle, marginBottom: 6 }}>Роадмап</h3>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#1b2531", marginBottom: 4 }}>
+                Следующие улучшения учета
+              </div>
+              <p style={{ margin: 0, color: "#7a8590", fontSize: 13, lineHeight: 1.45 }}>
+                Импорт с подтверждением категорий, напоминания о платежах, автотранзакции и платежный календарь.
+              </p>
+            </div>
+            <Link to="/roadmap" style={{ color: "#9c7b3c", fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
+              Смотреть →
+            </Link>
+          </div>
+        </Card>
+
         {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>
           <div style={{
