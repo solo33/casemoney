@@ -22,3 +22,17 @@ __pycache__/
 node_modules/
 dist/
 dev-dist/
+
+# Claude Code / IDE
+.claude/
+frontend/.claude/
+
+# Локальные ассеты (иконки, логотипы — не часть билда)
+assets/
+
+# Скрипты и отчёты других проектов
+reports/
+
+# Excel lock-файлы
+~$*.xlsx
+~$*.xls
