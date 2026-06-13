@@ -1,7 +1,11 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 from app.database import get_db
 from app.models.user import User
@@ -91,7 +95,9 @@ def _create_user(db: Session, email: str, username: str, hashed_password: str) -
 
 
 @router.post("/register", response_model=RegisterResponse)
+@limiter.limit("10/hour")
 def register(
+    request: Request,
     data: UserRegister,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -147,7 +153,8 @@ def register(
 
 
 @router.post("/verify-code", response_model=Token)
-def verify_code(data: VerifyCodeRequest, db: Session = Depends(get_db)):
+@limiter.limit("20/hour")
+def verify_code(request: Request, data: VerifyCodeRequest, db: Session = Depends(get_db)):
     """Проверяет код и создаёт пользователя. Возвращает токен (автологин)."""
     pending = db.query(PendingRegistration).filter(
         PendingRegistration.email == data.email
@@ -210,7 +217,9 @@ def _send_reset(user: User):
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
+@limiter.limit("5/hour")
 def forgot_password(
+    request: Request,
     data: ForgotPasswordRequest,
     background: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -239,7 +248,8 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(data: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("20/minute;200/hour")
+def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
@@ -285,7 +295,9 @@ class ResendResponse(BaseModel):
 
 
 @router.post("/resend-activation", response_model=ResendResponse)
+@limiter.limit("5/hour")
 def resend_activation(
+    request: Request,
     data: ResendRequest,
     background: BackgroundTasks,
     db: Session = Depends(get_db),

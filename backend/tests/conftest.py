@@ -8,6 +8,7 @@ import os
 os.environ.setdefault("SECRET_KEY", "test_" + "x" * 60)         # длинный валидный ключ
 os.environ.setdefault("DATABASE_URL", "sqlite:///./_unused_test.db")  # перекрывается ниже
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
+os.environ.setdefault("RATELIMIT_ENABLED", "0")                   # отключаем rate limiting в тестах
 
 import pytest
 from sqlalchemy import create_engine

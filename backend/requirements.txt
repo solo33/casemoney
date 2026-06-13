@@ -37,3 +37,5 @@ typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.47.0
 xlrd==2.0.1
+limits==5.8.0
+slowapi==0.1.10

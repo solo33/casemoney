@@ -1,7 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 # Импорты моделей нужны для регистрации в Base.metadata (используется alembic).
 # Схему БД меняем ТОЛЬКО через alembic, create_all больше не вызываем.
@@ -31,12 +36,19 @@ from app.api.export_csv import router as export_router
 from app.api.goals import router as goals_router
 from app.api.admin import router as admin_router
 
+_ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "1") not in ("0", "false", "off")
+limiter = Limiter(key_func=get_remote_address, default_limits=[], enabled=_ratelimit_enabled)
+
 app = FastAPI(
     title="CaseMoney API",
     description="API для учёта домашних финансов",
     version="0.1.0",
     swagger_ui_parameters={"persistAuthorization": True},
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Разрешённые источники для CORS. На проде задаём переменной окружения
 # CORS_ORIGINS="https://app.example.com,https://www.example.com".
