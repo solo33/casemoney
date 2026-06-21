@@ -164,6 +164,8 @@ def seed_demo_user(db: Session):
         ("2026-05-18", card, 17500, "Продукты", "Месячные покупки"),
         ("2026-04-12", card, 42000, "Путешествия", "Билеты"),
     ]
+    # Начальное пополнение наличных (снятие с карты) — чтобы баланс cash был положительным
+    demo_rows.append(("2026-01-01", card, TransactionType.transfer, 15000, None, "Наличные на месяц", cash))
     demo_rows.extend((d, a, TransactionType.expense, amount, cat[cat_name], desc, None) for d, a, amount, cat_name, desc in expenses)
     demo_rows.extend([
         ("2026-06-05", card, TransactionType.transfer, 45000, None, "В накопления", savings),
