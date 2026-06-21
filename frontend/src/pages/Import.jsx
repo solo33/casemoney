@@ -3,6 +3,11 @@ import { Link } from "react-router-dom";
 export default function Import() {
   return (
     <div className="page" style={{ maxWidth: 900 }}>
+      <div style={{ marginBottom: 12 }}>
+        <Link to="/transactions" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
+          ← К записям
+        </Link>
+      </div>
       <h1 style={{ marginBottom: 8 }}>Импорт</h1>
       <p style={{ color: "#7a8590", marginBottom: 24, fontSize: 14 }}>
         Загрузите файл с операциями, проверьте найденные счета, категории и валюты, затем подтвердите импорт.

@@ -127,37 +127,6 @@ export default function Settings() {
         </form>
       </Section>
 
-      {/* Персональные справочники */}
-      <Section title="Персональные">
-        <p style={{ ...muted, marginBottom: 12 }}>
-          Личные справочники: категории доходов и расходов и список валют с курсами.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <NavRow
-            to="/settings/categories"
-            icon="🗂"
-            title="Категории"
-            description="Иерархия доходов и расходов, цвета и иконки"
-          />
-          <NavRow
-            to="/settings/currencies"
-            icon="💱"
-            title="Валюты"
-            description="Список валют, ручные курсы, основная валюта"
-          />
-        </div>
-      </Section>
-
-      {/* Основная валюта */}
-      <Section title="Основная валюта">
-        <p style={muted}>
-          В этой валюте показываются все суммы и итоги. Управление списком валют и курсами — в разделе <Link to="/settings/currencies">Валюты</Link>.
-        </p>
-        <div style={{ fontSize: 18, fontWeight: 600, marginTop: 8 }}>
-          {user.main_currency}
-        </div>
-      </Section>
-
       {/* Смена пароля */}
       <Section title="Сменить пароль">
         <form onSubmit={changePassword} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -207,7 +176,7 @@ export default function Settings() {
         <div style={{ marginTop: 10 }}>
           <button type="button" onClick={() => {
             const token = localStorage.getItem("token");
-            const url = `${import.meta.env.VITE_API_URL}/api/export/csv`;
+            const url = `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/export/csv`;
             // Скачивание через fetch + blob, чтобы передать Bearer токен
             fetch(url, { headers: { Authorization: `Bearer ${token}` } })
               .then(r => r.ok ? r.blob() : Promise.reject(r))

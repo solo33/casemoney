@@ -4,9 +4,9 @@ import { TX_ADDED_EVENT } from "./QuickAddFab";
 import { COMMON_CURRENCIES } from "../utils/money";
 
 const TABS = [
-  { value: "expense",  label: "Расход",  color: "#c0432b" },
-  { value: "transfer", label: "Перевод", color: "#2f6296" },
-  { value: "income",   label: "Доход",   color: "#167a4a" },
+  { value: "expense",  label: "↘ Расход",  color: "#c0432b" },
+  { value: "transfer", label: "⇄ Перевод", color: "#2f6296" },
+  { value: "income",   label: "↗ Доход",   color: "#167a4a" },
 ];
 
 function isoToday() {

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { COMMON_CURRENCIES, currencySymbol, formatMoney } from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
+const TYPE_ICON = { income: "↗", expense: "↘", transfer: "⇄" };
 const PAGE_SIZE = 50;
 
 function isoToday() {
@@ -192,12 +193,16 @@ export default function Transactions() {
     <div className="page" style={{ maxWidth: 1200 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ margin: 0 }}>Записи</h1>
-        <button
-          type="button"
-          onClick={() => setEditing(editing === "new" ? null : "new")}
-        >
-          {editing === "new" ? "Отмена" : "+ Добавить"}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <Link to="/import" className="btn-ghost" style={{ textDecoration: "none", padding: "7px 12px" }}>Импорт</Link>
+          <Link to="/history" className="btn-ghost" style={{ textDecoration: "none", padding: "7px 12px" }}>История</Link>
+          <button
+            type="button"
+            onClick={() => setEditing(editing === "new" ? null : "new")}
+          >
+            {editing === "new" ? "Отмена" : "+ Добавить"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -398,7 +403,7 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
         {formatDate(tx.date)}
       </td>
       <td style={{ padding: "8px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>
-        {TYPE_LABEL[tx.type]}
+        {TYPE_ICON[tx.type]} {TYPE_LABEL[tx.type]}
       </td>
       <td style={{
         padding: "8px 12px", textAlign: "right",

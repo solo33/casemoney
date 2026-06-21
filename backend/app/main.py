@@ -35,6 +35,9 @@ from app.api.import_csv import router as import_router
 from app.api.export_csv import router as export_router
 from app.api.goals import router as goals_router
 from app.api.admin import router as admin_router
+from app.api.support import router as support_router
+from app.database import SessionLocal
+from app.seeds import seed_demo_user
 
 _ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "1") not in ("0", "false", "off")
 limiter = Limiter(key_func=get_remote_address, default_limits=[], enabled=_ratelimit_enabled)
@@ -77,6 +80,16 @@ app.include_router(import_router)
 app.include_router(export_router)
 app.include_router(goals_router)
 app.include_router(admin_router)
+app.include_router(support_router)
+
+
+@app.on_event("startup")
+def seed_demo_data():
+    db = SessionLocal()
+    try:
+        seed_demo_user(db)
+    finally:
+        db.close()
 
 def custom_openapi():
     if app.openapi_schema:

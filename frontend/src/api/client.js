@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Базовый URL нашего FastAPI backend
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
 })
 
 // Перехватчик запросов — автоматически добавляет JWT токен в каждый запрос

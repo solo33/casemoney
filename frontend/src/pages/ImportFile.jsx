@@ -86,8 +86,8 @@ export default function ImportFile() {
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: 12 }}>
-        <Link to="/import" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
-          ← К импорту
+        <Link to="/transactions" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
+          ← К записям
         </Link>
       </div>
       <h1 style={{ marginBottom: 8 }}>Импорт из CSV или Excel</h1>

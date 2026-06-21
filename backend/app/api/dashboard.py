@@ -133,55 +133,13 @@ def get_dashboard(
         for t in month_transactions if t.type == TransactionType.expense
     )
 
-    # 3. Топ категорий по расходам — конвертим каждую транзакцию
-    expense_tx = (
-        db.query(Transaction)
-        .filter(
-            Transaction.user_id == user_id,
-            Transaction.type == TransactionType.expense,
-        )
-        .all()
-    )
-    by_category: dict[Optional[int], float] = {}
-    for t in expense_tx:
-        by_category[t.category_id] = by_category.get(t.category_id, 0.0) + _to_main(
-            db, user_id, t.amount, t.currency, main
-        )
-
     categories_map = {
         c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
     }
-    sorted_cats = sorted(by_category.items(), key=lambda x: x[1], reverse=True)[:5]
+    # Подробные категории и месячный тренд грузятся отдельными report-эндпоинтами.
+    # На главной это резко сокращает ожидание для аккаунтов с большой историей.
     top_categories = []
-    for cat_id, total in sorted_cats:
-        cat = categories_map.get(cat_id)
-        top_categories.append(
-            CategoryStat(
-                category_id=cat_id,
-                category_name=cat.name if cat else "Без категории",
-                category_color=cat.color if cat else "#94a3b8",
-                category_icon=cat.icon if cat else None,
-                total=round(total, 2),
-            )
-        )
-
-    # 4. Месячный тренд (6 мес) — конвертим каждую транзакцию
-    all_tx = db.query(Transaction).filter(Transaction.user_id == user_id).all()
-    monthly_map: dict[str, dict] = {}
-    for t in all_tx:
-        key = f"{t.date.year:04d}-{t.date.month:02d}"
-        if key not in monthly_map:
-            monthly_map[key] = {"income": 0.0, "expense": 0.0}
-        in_main = _to_main(db, user_id, t.amount, t.currency, main)
-        if t.type == TransactionType.income:
-            monthly_map[key]["income"] += in_main
-        elif t.type == TransactionType.expense:
-            monthly_map[key]["expense"] += in_main
-
-    monthly_stats = [
-        MonthStat(month=k, income=round(v["income"], 2), expense=round(v["expense"], 2))
-        for k, v in sorted(monthly_map.items())
-    ][-6:]
+    monthly_stats = []
 
     # 5. Последние 10 транзакций
     recent_rows = (

@@ -36,3 +36,11 @@ reports/
 # Excel lock-файлы
 ~$*.xlsx
 ~$*.xls
+
+# Артефакты тестирования / документы (не часть репо)
+CaseMoney_TestCases.docx
+
+# Логи dev-сервера
+backend/*.log
+backend/*.err.log
+backend/*.out.log

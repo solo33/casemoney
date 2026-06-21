@@ -8,6 +8,7 @@ import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/m
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
+const TYPE_ICON = { income: "↗", expense: "↘", transfer: "⇄" };
 
 const RU_MONTHS_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 
@@ -54,6 +55,9 @@ export default function Home() {
   const [grouped, setGrouped] = useState([]);
   const [summary, setSummary] = useState(null);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
+  const now = new Date();
+  const [flowMonth, setFlowMonth] = useState(() => now.getMonth() + 1);
+  const [flowYear, setFlowYear] = useState(() => now.getFullYear());
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
   const [categories, setCategories] = useState([]);
   const [editingTx, setEditingTx] = useState(null);
@@ -71,11 +75,10 @@ export default function Home() {
   const fetchAll = useCallback(async () => {
     setError(null);
     try {
-      const now = new Date();
       const params = {
         period: "month",
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
+        year: flowYear,
+        month: flowMonth,
         breakdown_type: breakdownType,
       };
       const [d, g, s, c] = await Promise.all([
@@ -93,7 +96,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [breakdownType]);
+  }, [breakdownType, flowMonth, flowYear]);
 
   const flatAccounts = useMemo(
     () => grouped.flatMap(b => b.accounts || []),
@@ -174,11 +177,9 @@ export default function Home() {
   if (error) return <div className="page" style={{ color: "#c0432b" }}>{error}</div>;
 
   const totalBalance = dashboard.total_balance;
-  const monthIncome = dashboard.month_income || 0;
-  const monthExpense = dashboard.month_expense || 0;
+  const monthIncome = summary?.total_income ?? dashboard.month_income ?? 0;
+  const monthExpense = summary?.total_expense ?? dashboard.month_expense ?? 0;
   const maxMonthFlow = Math.max(Math.abs(monthIncome), Math.abs(monthExpense)) || 1;
-  const thisMonthLabel = RU_MONTHS_FULL[new Date().getMonth()];
-
   const breakdownItems = summary?.category_breakdown || [];
   const breakdownTotal = breakdownType === "income"
     ? (summary?.total_income || 0)
@@ -215,7 +216,7 @@ export default function Home() {
       margin: "0 auto",
       padding: "16px",
       display: "grid",
-      gridTemplateColumns: "380px 1fr",
+        gridTemplateColumns: "360px minmax(0, 760px)",
       gap: 20,
       alignItems: "start",
     }}>
@@ -236,43 +237,25 @@ export default function Home() {
         </div>
       )}
 
+      <div style={{ gridColumn: "1 / -1" }}>
+        <DashboardOverview
+          totalBalance={totalBalance}
+          mainCurrency={mainCurrency}
+          monthIncome={monthIncome}
+          monthExpense={monthExpense}
+          maxMonthFlow={maxMonthFlow}
+          sym={sym}
+          byCurrency={byCurrency}
+          flowMonth={flowMonth}
+          flowYear={flowYear}
+          setFlowMonth={setFlowMonth}
+          setFlowYear={setFlowYear}
+          navigate={navigate}
+        />
+      </div>
+
       {/* ============== LEFT SIDEBAR ============== */}
       <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {/* Balance card */}
-        <Card>
-          <h3 style={sectionTitle}>Баланс</h3>
-          <div className="money-hero tabular" style={{
-            fontSize: 42, color: "#1b2531", lineHeight: 1.1, marginTop: 4,
-          }}>
-            {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
-          </div>
-
-          {/* Доходы и расходы за текущий месяц — гистограмма */}
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #ece6d8" }}>
-            <div style={{ fontSize: 11, color: "#7a8590", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.4 }}>
-              Доходы и расходы за {thisMonthLabel}
-            </div>
-            <Bar value={monthIncome} max={maxMonthFlow} color="#167a4a" sym={sym} sign="+" />
-            <Bar value={monthExpense} max={maxMonthFlow} color="#c0432b" sym={sym} sign="−" />
-          </div>
-
-          {byCurrency.length > 0 && (
-            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 2 }}>
-              {byCurrency.map(c => (
-                <div key={c.currency} style={{
-                  display: "flex", justifyContent: "flex-end", gap: 6,
-                  fontSize: 13, color: "#7a8590",
-                }}>
-                  <span style={{ fontWeight: 500, color: "#515c68" }}>
-                    {formatMoney(c.balance, { maxFraction: 2 })}
-                  </span>
-                  <span>{c.currency}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
         {/* Accounts grouped — только учитываемые в балансе */}
         <Card noPadding>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -308,23 +291,6 @@ export default function Home() {
           accountGroups={grouped}
           categories={categories}
         />
-
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-            <div>
-              <h3 style={{ ...sectionTitle, marginBottom: 6 }}>Роадмап</h3>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#1b2531", marginBottom: 4 }}>
-                Следующие улучшения учета
-              </div>
-              <p style={{ margin: 0, color: "#7a8590", fontSize: 13, lineHeight: 1.45 }}>
-                Импорт с подтверждением категорий, напоминания о платежах, автотранзакции и платежный календарь.
-              </p>
-            </div>
-            <Link to="/roadmap" style={{ color: "#9c7b3c", fontSize: 13, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
-              Смотреть →
-            </Link>
-          </div>
-        </Card>
 
         {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>
@@ -444,9 +410,10 @@ export default function Home() {
 
 function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
   const steps = [
-    { done: hasAccounts, title: "Создайте первый счёт", desc: "Кошелёк, карта, вклад — что угодно", cta: "К счетам", to: "/accounts" },
-    { done: hasTx, title: "Запишите операцию", desc: "Доход, расход или перевод — формой справа или кнопкой +", cta: null, to: null },
-    { done: false, title: "Посмотрите анализ", desc: "Расходы по категориям, денежный поток, балансы", cta: "Открыть анализ", to: "/reports" },
+    { done: hasAccounts, title: "1. Создайте счета", desc: "Карта, наличные, вклад или криптокошелек.", cta: "К счетам", to: "/accounts" },
+    { done: false, title: "2. Импортируйте историю", desc: "CSV, XLSX или XLS с предварительной проверкой.", cta: "Импорт", to: "/import" },
+    { done: hasTx, title: "3. Добавьте первую запись", desc: "Расход, доход или перевод через форму на главной.", cta: null, to: null },
+    { done: false, title: "4. Посмотрите анализ", desc: "Категории, динамика и годовые отчеты.", cta: "Анализ", to: "/reports" },
   ];
   return (
     <div style={{
@@ -466,9 +433,9 @@ function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
         Добро пожаловать в CaseMoney
       </h2>
       <p style={{ color: "rgba(244,241,232,0.8)", margin: "0 0 16px", fontSize: 14 }}>
-        Три шага, чтобы начать вести учёт.
+        Пошаговый режим для новичка: настройте счета, загрузите историю или добавьте записи вручную.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
         {steps.map((s, i) => (
           <div key={i} style={{
             background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: 14,
@@ -502,6 +469,112 @@ function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function DashboardOverview({
+  totalBalance,
+  mainCurrency,
+  monthIncome,
+  monthExpense,
+  maxMonthFlow,
+  sym,
+  byCurrency,
+  flowMonth,
+  flowYear,
+  setFlowMonth,
+  setFlowYear,
+  navigate,
+}) {
+  return (
+    <div className="overview-grid-fix" style={{
+      background: "#fffdf7",
+      border: "1px solid #e4ddcd",
+      borderRadius: 12,
+      padding: 18,
+      display: "grid",
+      gridTemplateColumns: "minmax(280px, 1.1fr) minmax(260px, 1fr) minmax(220px, 0.8fr)",
+      gap: 18,
+      alignItems: "stretch",
+      boxShadow: "0 10px 28px -22px rgba(15,30,45,0.35)",
+    }}>
+      <style>{`
+        @media (max-width: 980px) {
+          .overview-actions { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 760px) {
+          .overview-grid-fix { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+      <div style={{ display: "contents" }}>
+        <section>
+          <h3 style={sectionTitle}>Обзор</h3>
+          <div className="money-hero tabular" style={{ fontSize: 44, color: "#1b2531", lineHeight: 1.05 }}>
+            {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
+          </div>
+          {byCurrency.length > 0 && (
+            <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {byCurrency.slice(0, 4).map(c => (
+                <span key={c.currency} style={{
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  background: "#f6f2e9",
+                  color: "#515c68",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}>
+                  {formatMoney(c.balance, { maxFraction: 2 })} {c.currency}
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section style={{ borderLeft: "1px solid #ece6d8", paddingLeft: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Движение денег</h3>
+            <div style={{ display: "flex", gap: 4 }}>
+              <select value={flowMonth} onChange={e => setFlowMonth(Number(e.target.value))} style={{ fontSize: 12, padding: "4px 7px" }}>
+                {RU_MONTHS_FULL.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+              </select>
+              <input type="number" value={flowYear} onChange={e => setFlowYear(Number(e.target.value) || new Date().getFullYear())} style={{ width: 74, fontSize: 12, padding: "4px 7px" }} />
+            </div>
+          </div>
+          <Bar value={monthIncome} max={maxMonthFlow} color="#167a4a" sym={sym} sign="+" />
+          <Bar value={monthExpense} max={maxMonthFlow} color="#c0432b" sym={sym} sign="−" />
+        </section>
+
+        <section style={{ borderLeft: "1px solid #ece6d8", paddingLeft: 18 }}>
+          <h3 style={sectionTitle}>Быстрый путь</h3>
+          <div className="overview-actions" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+            <QuickLink onClick={() => navigate("/transactions")} title="Записи" text="Добавить или найти операцию" />
+            <QuickLink onClick={() => navigate("/import")} title="Импорт" text="Загрузить CSV/XLS/XLSX" />
+            <QuickLink onClick={() => navigate("/reports")} title="Анализ" text="Понять категории и динамику" />
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function QuickLink({ title, text, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        textAlign: "left",
+        background: "#f6f2e9",
+        border: "1px solid #e4ddcd",
+        borderRadius: 8,
+        padding: "10px 12px",
+        color: "#1b2531",
+        cursor: "pointer",
+      }}
+    >
+      <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>{title}</span>
+      <span style={{ display: "block", color: "#7a8590", fontSize: 12, marginTop: 2 }}>{text}</span>
+    </button>
   );
 }
 
@@ -589,7 +662,7 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
         background: "#ece6d8", display: "flex",
         alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0,
       }}>
-        {tx.category_icon || "💸"}
+        {tx.category_icon || TYPE_ICON[tx.type] || "•"}
       </div>
       <div
         onClick={onEdit}
@@ -607,7 +680,7 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
         fontWeight: 600, fontSize: 14,
         color: TYPE_COLOR[tx.type], whiteSpace: "nowrap",
       }}>
-        {tx.type === "expense" ? "−" : "+"}{formatMoneyWithCurrency(tx.amount, tx.currency)}
+        {tx.type === "expense" ? "−" : tx.type === "income" ? "+" : ""}{formatMoneyWithCurrency(tx.amount, tx.currency)}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button
@@ -634,9 +707,9 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
 }
 
 const TYPE_TABS = [
-  { value: "expense", label: "Расход", color: "#c0432b" },
-  { value: "transfer", label: "Перевод", color: "#2f6296" },
-  { value: "income", label: "Доход", color: "#167a4a" },
+  { value: "expense", label: "↘ Расход", color: "#c0432b" },
+  { value: "transfer", label: "⇄ Перевод", color: "#2f6296" },
+  { value: "income", label: "↗ Доход", color: "#167a4a" },
 ];
 
 function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
@@ -865,7 +938,10 @@ function AccountBlock({ acc, sym, onClick }) {
         paddingLeft: 4,
         cursor: onClick ? "pointer" : "default",
         borderRadius: 6,
+        transition: "background 0.15s",
       }}
+      onMouseEnter={e => { e.currentTarget.style.background = "#f6f2e9"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "baseline",

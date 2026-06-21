@@ -1,13 +1,13 @@
 """Email-сервис.
 
 Конфигурация через .env:
-    SMTP_HOST=smtp.gmail.com
-    SMTP_PORT=587
-    SMTP_USER=...
-    SMTP_PASSWORD=...
-    SMTP_FROM="CaseMoney <noreply@casemoney.ru>"
-    SMTP_STARTTLS=true      (по умолчанию true)
-    SMTP_USE_SSL=false      (для порта 465 — true)
+    SMTP_HOST=smtp.yandex.com
+    SMTP_PORT=465
+    SMTP_USER=case.m0ney@ya.ru
+    SMTP_PASSWORD=...       (пароль приложения / внешний пароль)
+    SMTP_FROM="CaseMoney <case.m0ney@ya.ru>"
+    SMTP_STARTTLS=false
+    SMTP_USE_SSL=true
     APP_URL=https://casemoney.ru
 
 Если SMTP_HOST не задан — письма выводятся в консоль (dev mode).
@@ -221,6 +221,37 @@ def send_reset_email(to_email: str, username: str, reset_url: str) -> bool:
     <p style="color: #a6afb8; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e4ddcd;">
       Ссылка действительна 1 час. Если вы не запрашивали сброс — проигнорируйте это письмо.
     </p>
+  </div>
+</body></html>
+"""
+    return send_email(to_email, subject, text, html)
+
+
+def send_support_email(to_email: str, sender_name: str, sender_email: str, message: str) -> bool:
+    subject = f"CaseMoney — обращение в поддержку от {sender_name}"
+    name_html = _html.escape(sender_name)
+    email_html = _html.escape(sender_email)
+    message_html = _html.escape(message).replace("\n", "<br>")
+    text = (
+        "Новое обращение в поддержку CaseMoney.\n\n"
+        f"Имя: {sender_name}\n"
+        f"Email: {sender_email}\n\n"
+        f"Сообщение:\n{message}\n"
+    )
+    html = f"""\
+<!doctype html>
+<html><body style="font-family: system-ui, sans-serif; background: #f6f2e9; padding: 32px;">
+  <div style="max-width: 620px; margin: 0 auto; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 28px;">
+    <h1 style="font-family: Georgia, serif; font-weight: 600; color: #173a54; font-size: 24px; margin: 0 0 16px;">
+      Обращение в поддержку CaseMoney
+    </h1>
+    <p style="color: #515c68; line-height: 1.5; margin: 0 0 12px;">
+      <strong>Имя:</strong> {name_html}<br>
+      <strong>Email:</strong> <a href="mailto:{email_html}" style="color: #9c7b3c;">{email_html}</a>
+    </p>
+    <div style="color: #1b2531; line-height: 1.6; white-space: normal; background: #fff; border-radius: 8px; padding: 16px;">
+      {message_html}
+    </div>
   </div>
 </body></html>
 """

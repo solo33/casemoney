@@ -6,9 +6,9 @@ import { COMMON_CURRENCIES, formatMoneyWithCurrency } from "../utils/money";
 export const TX_ADDED_EVENT = "casemoney:tx-added";
 
 const TYPE_OPTIONS = [
-  { value: "expense", label: "Расход", color: "#c0432b" },
-  { value: "transfer", label: "Перевод", color: "#2f6296" },
-  { value: "income", label: "Доход", color: "#167a4a" },
+  { value: "expense", label: "↘ Расход", color: "#c0432b" },
+  { value: "transfer", label: "⇄ Перевод", color: "#2f6296" },
+  { value: "income", label: "↗ Доход", color: "#167a4a" },
 ];
 
 export default function QuickAddFab() {

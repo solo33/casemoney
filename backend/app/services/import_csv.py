@@ -11,6 +11,7 @@ Rules:
 """
 import csv
 import io
+from html.parser import HTMLParser
 from dataclasses import dataclass, field
 from datetime import datetime, date
 from pathlib import Path
@@ -65,8 +66,14 @@ COLUMN_ALIASES = {
     "amount": "amount",
     "total": "amount",
     "сумма": "amount",
+    "expense": "expense",
+    "расход": "expense",
+    "income": "income",
+    "доход": "income",
     "currency": "currency",
     "валюта": "currency",
+    "record": "record",
+    "запись": "record",
     "description": "description",
     "note": "description",
     "comment": "description",
@@ -76,6 +83,7 @@ COLUMN_ALIASES = {
     "перевод": "transfer",
 }
 REQUIRED_COLUMNS = {"date", "account", "amount"}
+SPLIT_AMOUNT_COLUMNS = {"date", "account", "expense", "income"}
 POSITIONAL_COLUMNS = ["date", "account", "category", "amount", "currency", "description", "transfer"]
 
 
@@ -135,7 +143,8 @@ def _parse_rows(rows: list[list]) -> list[ParsedRow]:
         return []
 
     header_map = _normalize_header(rows[0])
-    has_header = REQUIRED_COLUMNS.issubset(set(header_map))
+    header_keys = set(header_map)
+    has_header = REQUIRED_COLUMNS.issubset(header_keys) or SPLIT_AMOUNT_COLUMNS.issubset(header_keys)
     if not has_header:
         header_map = {name: idx for idx, name in enumerate(POSITIONAL_COLUMNS)}
 
@@ -153,14 +162,37 @@ def _parse_rows(rows: list[list]) -> list[ParsedRow]:
 
         date_iso = _parse_date(get("date"))
         account = _stringify(get("account"))
+        raw_record = _stringify(get("record"))
         category_path = _stringify(get("category"))
         amount = _parse_amount(get("amount"))
+        if not amount and ("expense" in header_map or "income" in header_map):
+            expense = _parse_amount(get("expense"))
+            income = _parse_amount(get("income"))
+            amount = income if income else expense
         currency = (_stringify(get("currency")) or "RUB").upper()
         description = _stringify(get("description")) or None
         transfer_to = _stringify(get("transfer")) or None
 
+        record_lower = raw_record.lower()
+        if not category_path and raw_record:
+            if record_lower.startswith("расход:"):
+                category_path = raw_record.split(":", 1)[1].strip()
+            elif record_lower.startswith("доход:"):
+                category_path = raw_record.split(":", 1)[1].strip()
+        if not transfer_to and record_lower.startswith("перевод"):
+            if ":" in raw_record:
+                transfer_to = raw_record.split(":", 1)[1].strip()
+            else:
+                transfer_to = raw_record.replace("Перевод", "").replace("перевод", "").strip()
+
         if transfer_to:
             tx_type = "transfer"
+        elif record_lower.startswith("доход:"):
+            tx_type = "income"
+            amount = abs(amount)
+        elif record_lower.startswith("расход:"):
+            tx_type = "expense"
+            amount = -abs(amount)
         else:
             tx_type = "expense" if amount < 0 else ("income" if amount > 0 else "expense")
 
@@ -177,8 +209,6 @@ def _parse_rows(rows: list[list]) -> list[ParsedRow]:
             err = "не удалось распарсить дату"
         elif not account:
             err = "пустой счет"
-        elif amount == 0:
-            err = "нулевая сумма"
 
         parsed.append(ParsedRow(
             line_no=raw_idx,
@@ -236,6 +266,10 @@ def parse_xlsx(content: bytes) -> list[ParsedRow]:
 
 def parse_xls(content: bytes) -> list[ParsedRow]:
     """Parse legacy XLS content using the first worksheet."""
+    prefix = content[:256].lstrip().lower()
+    if prefix.startswith(b"<") or prefix.startswith(b"\xef\xbb\xbf<"):
+        return parse_html_table(content)
+
     try:
         import xlrd
     except ImportError as e:
@@ -254,6 +288,57 @@ def parse_xls(content: bytes) -> list[ParsedRow]:
             row.append(value)
         rows.append(row)
     return _parse_rows(rows)
+
+
+def parse_html_table(content: bytes) -> list[ParsedRow]:
+    """Parse bank exports saved as .xls but containing an HTML table."""
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "cp1251"):
+        try:
+            text = content.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise ValueError("Не удалось распознать кодировку HTML-таблицы")
+
+    parser = _SimpleTableParser()
+    parser.feed(text)
+    rows = parser.rows
+    if not rows:
+        return []
+    return _parse_rows(rows)
+
+
+class _SimpleTableParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.rows: list[list[str]] = []
+        self._row: list[str] | None = None
+        self._cell: list[str] | None = None
+        self._in_cell = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "tr":
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            self._cell = []
+            self._in_cell = True
+
+    def handle_data(self, data):
+        if self._in_cell and self._cell is not None:
+            self._cell.append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("td", "th") and self._row is not None and self._cell is not None:
+            value = " ".join("".join(self._cell).split())
+            self._row.append(value)
+            self._cell = None
+            self._in_cell = False
+        elif tag == "tr" and self._row is not None:
+            if any(str(c).strip() for c in self._row):
+                self.rows.append(self._row)
+            self._row = None
 
 
 def parse_file(filename: str, content: bytes) -> list[ParsedRow]:

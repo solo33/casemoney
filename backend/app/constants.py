@@ -1,3 +1,5 @@
+SUPPORT_EMAIL = "case.m0ney@ya.ru"
+
 DEFAULT_CATEGORIES = [
     # Доходы
     {"name": "Зарплата",         "type": "income",  "icon": "💰", "color": "#22c55e"},

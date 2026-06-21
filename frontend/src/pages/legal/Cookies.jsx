@@ -1,4 +1,5 @@
 import LegalLayout, { H2, P, Ul } from "./LegalLayout";
+import { SUPPORT_EMAIL } from "../../config/contacts";
 
 export default function Cookies() {
   return (
@@ -43,7 +44,7 @@ export default function Cookies() {
 
       <H2>6. Связь</H2>
       <P>
-        Вопросы по cookie и обработке данных можно направить на адрес <strong>[EMAIL]</strong>.
+        Вопросы по cookie и обработке данных можно направить на адрес <strong>{SUPPORT_EMAIL}</strong>.
       </P>
     </LegalLayout>
   );

@@ -94,6 +94,33 @@ export default function Login() {
             Категории с иерархией. Годовые отчеты с детализацией по клику.
           </p>
 
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 12,
+            marginBottom: 18,
+          }}>
+            <InfoCard eyebrow="Уже работает" title="Учёт, импорт и анализ">
+              Счета, валюты, категории, быстрые записи, CSV/Excel импорт и годовые отчёты уже доступны.
+            </InfoCard>
+            <InfoCard eyebrow="Скоро" title="Напоминания и автоплатежи">
+              Платёжный календарь, регулярные операции и более умная проверка импорта перед загрузкой.
+            </InfoCard>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
+            <button
+              type="button"
+              onClick={() => setForm({ email: "test@test.com", password: "test12345" })}
+              style={{ padding: "9px 14px", fontWeight: 700 }}
+            >
+              Заполнить демо-вход
+            </button>
+            <span style={{ alignSelf: "center", fontSize: 13, color: "#7a8590" }}>
+              test@test.com · test12345
+            </span>
+          </div>
+
           {/* Features */}
           <div style={{
             display: "grid",
@@ -122,26 +149,6 @@ export default function Login() {
             <PricingPill plan="Personal" desc="счета · категории · валюты · импорт · отчеты" highlight />
           </div>
 
-          <div style={{
-            background: "#fffdf7",
-            border: "1px solid #e4ddcd",
-            borderRadius: 10,
-            padding: 16,
-            maxWidth: 560,
-          }}>
-            <div style={{ color: "#9c7b3c", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
-              Скоро в CaseMoney
-            </div>
-            <h2 style={{ margin: "6px 0 8px", fontSize: 22, fontFamily: "var(--serif)", fontWeight: 600 }}>
-              Напоминания, автоплатежи и импорт с подтверждением
-            </h2>
-            <p style={{ margin: "0 0 10px", color: "#515c68", fontSize: 14, lineHeight: 1.5 }}>
-              Планируем платежный календарь, регулярные операции и более умный импорт CSV/Excel с проверкой категорий перед загрузкой.
-            </p>
-            <Link to="/roadmap" style={{ color: "#173a54", fontWeight: 600, fontSize: 14, textDecoration: "none" }}>
-              Смотреть роадмап →
-            </Link>
-          </div>
         </div>
 
         {/* Login form */}
@@ -266,6 +273,27 @@ function Feature({ icon, title, children }) {
       <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.4 }}>
         {children}
       </div>
+    </div>
+  );
+}
+
+function InfoCard({ eyebrow, title, children }) {
+  return (
+    <div style={{
+      background: "#fffdf7",
+      border: "1px solid #e4ddcd",
+      borderRadius: 10,
+      padding: 16,
+    }}>
+      <div style={{ color: "#9c7b3c", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        {eyebrow}
+      </div>
+      <h2 style={{ margin: "6px 0 8px", fontSize: 21, fontFamily: "var(--serif)", fontWeight: 600 }}>
+        {title}
+      </h2>
+      <p style={{ margin: 0, color: "#515c68", fontSize: 14, lineHeight: 1.5 }}>
+        {children}
+      </p>
     </div>
   );
 }

@@ -52,8 +52,10 @@ export default function AnnualReport() {
   const sym = currencySymbol(data?.main_currency || mainCurrency);
 
   // Фильтр пустых строк
+  const hasRowData = (row) =>
+    Math.abs(row.total) > 0.005 || row.monthly.some(v => Math.abs(v) > 0.005);
   const filterRows = (rows) => hideEmpty
-    ? rows.filter(r => Math.abs(r.total) > 0.005)
+    ? rows.filter(hasRowData)
     : rows;
 
   const incomeRows = useMemo(() => data ? filterRows(data.income) : [], [data, hideEmpty]);
@@ -130,6 +132,7 @@ export default function AnnualReport() {
       {data && !loading && (
         <div className="table-wrap" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
+          paddingTop: 4, paddingBottom: 4,
         }}>
           <table
             className={`report-table${hoverCol ? ` hc-${hoverCol}` : ""}`}
@@ -277,7 +280,7 @@ function RowLine({ row, sym, accent, onCellClick, months }) {
   const cols = months || row.monthly.map((_, i) => i);
   const isChild = !!row.parent_id;
   const cellStyle = (active) => ({
-    padding: "6px 10px",
+      padding: "8px 10px",
     textAlign: "right",
     color: active ? accent : "#c7cdd3",
     fontWeight: 400,
@@ -293,11 +296,12 @@ function RowLine({ row, sym, accent, onCellClick, months }) {
   return (
     <tr style={{
       borderTop: "1px solid #efe9db",
+      borderBottom: "1px solid #f6f2e9",
       background: isChild ? "#fafaf9" : "#fff",
     }}>
       <td
         style={{
-          padding: "6px 12px",
+          padding: "8px 12px",
           paddingLeft: isChild ? 36 : 12,
           fontWeight: row.is_parent ? 600 : 400,
           color: isChild ? "#515c68" : "#1b2531",

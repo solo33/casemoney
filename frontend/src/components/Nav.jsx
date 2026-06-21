@@ -11,15 +11,23 @@ const BASE_LINKS = [
   { to: "/goals", label: "Цели" },
 ];
 
+const RECORD_LINKS = [
+  { to: "/transactions", label: "Все записи" },
+  { to: "/import", label: "Импорт" },
+  { to: "/history", label: "История" },
+];
+
+const USEFUL_LINKS = [
+  { to: "/articles", label: "Статьи" },
+  { to: "/help", label: "Помощь" },
+  { to: "/roadmap", label: "Роадмап" },
+];
+
 // Раздел «Настройки» — выпадающее меню
 const SETTINGS_LINKS = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
-  { to: "/articles", label: "Статьи" },
-  { to: "/help", label: "Помощь" },
-  { to: "/roadmap", label: "Роадмап" },
-  { to: "/history", label: "История" },
 ];
 
 export default function Nav() {
@@ -98,9 +106,18 @@ export default function Nav() {
 
         <div style={{ display: "flex", gap: 2, flex: 1, alignItems: "center" }} className="nav-links-desktop">
           {links.map(l => (
-            <NavLink key={l.to} to={l.to} style={linkStyle}>
-              {l.label}
-            </NavLink>
+            l.to === "/transactions" ? (
+              <DropdownNav
+                key={l.to}
+                label="Записи"
+                links={RECORD_LINKS}
+                linkStyle={linkStyle}
+              />
+            ) : (
+              <NavLink key={l.to} to={l.to} style={linkStyle}>
+                {l.label}
+              </NavLink>
+            )
           ))}
 
           {/* Настройки — выпадающее меню */}
@@ -236,9 +253,43 @@ export default function Nav() {
             fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
             letterSpacing: 0.5, padding: "10px 11px 4px",
           }}>
+            Записи
+          </div>
+
+          <DropdownNav label="Полезное" links={USEFUL_LINKS} linkStyle={linkStyle} />
+          {RECORD_LINKS.slice(1).map(l => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              style={mobileLinkStyle}
+              onClick={() => setOpen(false)}
+            >
+              {l.label}
+            </NavLink>
+          ))}
+          <div style={{
+            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            letterSpacing: 0.5, padding: "10px 11px 4px",
+          }}>
             Настройки
           </div>
           {settingsLinks.map(l => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              style={mobileLinkStyle}
+              onClick={() => setOpen(false)}
+            >
+              {l.label}
+            </NavLink>
+          ))}
+          <div style={{
+            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            letterSpacing: 0.5, padding: "10px 11px 4px",
+          }}>
+            Полезное
+          </div>
+          {USEFUL_LINKS.map(l => (
             <NavLink
               key={l.to}
               to={l.to}
@@ -280,5 +331,52 @@ export default function Nav() {
         }
       `}</style>
     </nav>
+  );
+}
+
+function DropdownNav({ label, links, linkStyle }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          ...linkStyle({ isActive: false }),
+          border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 4,
+        }}
+      >
+        {label} <span style={{ fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
+          <div style={{
+            position: "absolute", top: "calc(100% + 6px)", left: 0,
+            background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
+            boxShadow: "0 8px 20px rgba(15,30,45,0.18)", padding: 4, zIndex: 91,
+            minWidth: 150,
+          }}>
+            {links.map(l => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                style={({ isActive }) => ({
+                  display: "block", padding: "8px 12px", borderRadius: 6,
+                  textDecoration: "none", fontSize: 14, whiteSpace: "nowrap",
+                  color: isActive ? "#173a54" : "#1b2531",
+                  fontWeight: isActive ? 600 : 400,
+                  background: isActive ? "#f6f2e9" : "transparent",
+                })}
+              >
+                {l.label}
+              </NavLink>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
