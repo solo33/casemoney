@@ -151,7 +151,7 @@ export default function QuickAddInline({
       overflow: "hidden",
     }}>
       {/* Tabs */}
-      <div style={{ display: "flex" }}>
+      <div style={{ display: "flex", justifyContent: "flex-start" }}>
         {TABS.map(t => {
           const active = t.value === type;
           return (
@@ -160,8 +160,7 @@ export default function QuickAddInline({
               key={t.value}
               onClick={() => { setType(t.value); setForm(f => ({ ...f, category_id: "" })); }}
               style={{
-                flex: 1,
-                padding: "12px 8px",
+                padding: "12px 20px",
                 background: active ? t.color : "#f6f2e9",
                 color: active ? "#fff" : "#7a8590",
                 border: "none",
@@ -254,7 +253,7 @@ export default function QuickAddInline({
             type="date"
             value={dateVal}
             onChange={e => setDateVal(e.target.value)}
-            style={{ gridColumn: "3 / span 2" }}
+            className="qai-date"
           />
         </div>
 
@@ -299,10 +298,12 @@ export default function QuickAddInline({
       </form>
 
       <style>{`
+        .qai-date { grid-column: 3 / span 2; }
         @media (max-width: 600px) {
           form > div[style*="grid-template-columns"] {
             grid-template-columns: 1fr !important;
           }
+          .qai-date { grid-column: auto !important; }
         }
       `}</style>
     </div>

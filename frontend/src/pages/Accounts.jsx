@@ -16,6 +16,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
@@ -31,10 +32,12 @@ const ACCOUNT_TYPES = [
 const UNGROUPED_KEY = "__ungrouped__";
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const { mainCurrency } = useUser();
   const [groups, setGroups] = useState([]);  // grouped response
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());  // group keys свёрнутые
 
   // Forms / state
   const [newGroupName, setNewGroupName] = useState("");
@@ -81,6 +84,18 @@ export default function Accounts() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const toggleGroup = (groupKey) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey); else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const goToAccountCurrency = (accId, currency) => {
+    navigate(`/transactions?account_id=${accId}&currency=${currency}`);
   };
 
   // --- Group ops ---
@@ -251,7 +266,14 @@ export default function Accounts() {
     }
   };
 
-  const grandTotal = groups.reduce((s, g) => s + (g.total_in_main || 0), 0);
+  // Итог группы (g.total_in_main) включает счета «не в балансе» — для общего
+  // баланса берём только учитываемые счета, как на дашборде.
+  const grandTotal = groups.reduce(
+    (s, g) => s + (g.accounts || [])
+      .filter(a => a.include_in_balance !== false)
+      .reduce((x, a) => x + (a.total_in_main || 0), 0),
+    0,
+  );
 
   if (loading) return <div className="page">Загрузка...</div>;
 
@@ -372,6 +394,8 @@ export default function Accounts() {
               mainCurrency={mainCurrency}
               expanded={expanded}
               onToggleExpand={toggleExpand}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={toggleGroup}
               onDeleteGroup={handleDeleteGroup}
               onDeleteAccount={handleDeleteAccount}
               onToggleInclude={handleToggleInclude}
@@ -382,6 +406,7 @@ export default function Accounts() {
               onAddCurrency={handleAddCurrency}
               onEditBalance={handleEditBalance}
               onDeleteCurrency={handleDeleteCurrency}
+              onCurrencyClick={goToAccountCurrency}
               activeDrag={activeDrag}
             />
           ))
@@ -411,9 +436,10 @@ export default function Accounts() {
 
 function GroupBucket({
   bucket, mainCurrency, expanded, onToggleExpand,
+  collapsedGroups, onToggleGroup,
   onDeleteGroup, onDeleteAccount, onToggleInclude,
   addingCurrencyTo, setAddingCurrencyTo, currencyForm, setCurrencyForm,
-  onAddCurrency, onEditBalance, onDeleteCurrency,
+  onAddCurrency, onEditBalance, onDeleteCurrency, onCurrencyClick,
   activeDrag,
 }) {
   const groupId = bucket.group.id;
@@ -426,6 +452,7 @@ function GroupBucket({
   const canAccept = activeDrag && activeDrag.groupKey !== groupKey;
   const dropHighlight = isOver && canAccept;
   const accountIds = bucket.accounts.map(a => a.id);
+  const collapsed = collapsedGroups.has(groupKey);
 
   return (
     <div ref={setNodeRef} style={{
@@ -440,10 +467,16 @@ function GroupBucket({
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 14px",
         background: "#f6f2e9",
-        borderRadius: "10px 10px 0 0",
-        borderBottom: bucket.accounts.length ? "1px solid #e4ddcd" : "none",
+        borderRadius: collapsed ? 10 : "10px 10px 0 0",
+        borderBottom: (!collapsed && bucket.accounts.length) ? "1px solid #e4ddcd" : "none",
       }}>
-        <span style={{ fontWeight: 600, color: "#44403c", flex: 1 }}>
+        <span
+          style={{ fontWeight: 600, color: "#44403c", flex: 1, cursor: "pointer", userSelect: "none" }}
+          onClick={() => onToggleGroup(groupKey)}
+        >
+          <span style={{ display: "inline-block", width: 14, color: "#a6afb8", fontSize: 11 }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
           {bucket.group.name}
           <span style={{ color: "#a6afb8", fontWeight: 400, marginLeft: 8, fontSize: 13 }}>
             ({bucket.accounts.length})
@@ -466,32 +499,35 @@ function GroupBucket({
       </div>
 
       {/* Accounts list */}
-      {bucket.accounts.length === 0 ? (
-        <div style={{ padding: 16, color: "#a6afb8", fontSize: 13 }}>
-          Перетащите счёт сюда
-        </div>
-      ) : (
-        <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
-          {bucket.accounts.map(acc => (
-            <AccountRow
-              key={acc.id}
-              acc={acc}
-              groupKey={groupKey}
-              mainCurrency={mainCurrency}
-              isExpanded={expanded.has(acc.id)}
-              onToggleExpand={() => onToggleExpand(acc.id)}
-              onDelete={onDeleteAccount}
-              onToggleInclude={onToggleInclude}
-              isAddingCurrency={addingCurrencyTo === acc.id}
-              setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
-              currencyForm={currencyForm}
-              setCurrencyForm={setCurrencyForm}
-              onAddCurrency={onAddCurrency}
-              onEditBalance={onEditBalance}
-              onDeleteCurrency={onDeleteCurrency}
-            />
-          ))}
-        </SortableContext>
+      {!collapsed && (
+        bucket.accounts.length === 0 ? (
+          <div style={{ padding: 16, color: "#a6afb8", fontSize: 13 }}>
+            Перетащите счёт сюда
+          </div>
+        ) : (
+          <SortableContext items={accountIds} strategy={verticalListSortingStrategy}>
+            {bucket.accounts.map(acc => (
+              <AccountRow
+                key={acc.id}
+                acc={acc}
+                groupKey={groupKey}
+                mainCurrency={mainCurrency}
+                isExpanded={expanded.has(acc.id)}
+                onToggleExpand={() => onToggleExpand(acc.id)}
+                onDelete={onDeleteAccount}
+                onToggleInclude={onToggleInclude}
+                isAddingCurrency={addingCurrencyTo === acc.id}
+                setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
+                currencyForm={currencyForm}
+                setCurrencyForm={setCurrencyForm}
+                onAddCurrency={onAddCurrency}
+                onEditBalance={onEditBalance}
+                onDeleteCurrency={onDeleteCurrency}
+                onCurrencyClick={onCurrencyClick}
+              />
+            ))}
+          </SortableContext>
+        )
       )}
     </div>
   );
@@ -503,7 +539,7 @@ function AccountRow({
   onDelete, onToggleInclude,
   isAddingCurrency, setAddingCurrency,
   currencyForm, setCurrencyForm,
-  onAddCurrency, onEditBalance, onDeleteCurrency,
+  onAddCurrency, onEditBalance, onDeleteCurrency, onCurrencyClick,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: acc.id,
@@ -528,7 +564,7 @@ function AccountRow({
     <div ref={setNodeRef} style={{ ...style }}>
       {/* Main row */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 10,
+        display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10,
         padding: "10px 14px",
         borderTop: "1px solid #ece6d8",
         background: excluded ? "#f6f2e9" : "#fff",
@@ -543,8 +579,14 @@ function AccountRow({
           ⋮⋮
         </span>
         {acc.icon && <span style={{ fontSize: 18 }}>{acc.icon}</span>}
-        <span style={{ fontWeight: 500, flex: 1, cursor: multiCurrency ? "pointer" : "default" }}
-              onClick={() => multiCurrency && onToggleExpand()}>
+        <span style={{
+          fontWeight: 500, flex: "1 1 120px", minWidth: 60, cursor: "pointer",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}
+              onClick={onToggleExpand}>
+          <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 11 }}>
+            {isExpanded ? "▾" : "▸"}
+          </span>
           {acc.name}
           {excluded && (
             <span style={{
@@ -558,7 +600,7 @@ function AccountRow({
           )}
           {multiCurrency && (
             <span style={{ marginLeft: 6, color: "#a6afb8", fontSize: 12 }}>
-              {isExpanded ? "▾" : "▸"} {acc.balances.length} валют
+              {acc.balances.length} валют
             </span>
           )}
         </span>
@@ -569,43 +611,54 @@ function AccountRow({
         }}>
           {formatMoney(acc.total_in_main)} {currencySymbol(mainCurrency)}
         </span>
-        <button
-          type="button"
-          onClick={() => onToggleInclude(acc)}
-          className="btn-ghost"
-          style={{ padding: "3px 8px", fontSize: 12 }}
-          title={excluded ? "Включить в общий баланс" : "Исключить из общего баланса"}
-        >
-          {excluded ? "↑ в баланс" : "↓ из баланса"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setAddingCurrency(!isAddingCurrency)}
-          className="btn-ghost"
-          style={{ padding: "3px 8px", fontSize: 12 }}
-          title="Добавить валюту"
-        >
-          + валюта
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(acc)}
-          className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 14, color: "#c0432b" }}
-          title="Удалить счёт"
-        >
-          ×
-        </button>
+        {/* Кнопки — единый блок: при нехватке места переносится целиком,
+            а не по одной кнопке (× не должен оказываться на своей строке) */}
+        <div style={{ display: "flex", gap: 10, flexShrink: 0, alignItems: "center" }}>
+          <button
+            type="button"
+            onClick={() => onToggleInclude(acc)}
+            className="btn-ghost"
+            style={{ padding: "3px 8px", fontSize: 12 }}
+            title={excluded ? "Включить в общий баланс" : "Исключить из общего баланса"}
+          >
+            {excluded ? "↑ в баланс" : "↓ из баланса"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddingCurrency(!isAddingCurrency)}
+            className="btn-ghost"
+            style={{ padding: "3px 8px", fontSize: 12 }}
+            title="Добавить валюту"
+          >
+            + валюта
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(acc)}
+            className="btn-ghost"
+            style={{ padding: "2px 8px", fontSize: 14, color: "#c0432b" }}
+            title="Удалить счёт"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Balances detail */}
-      {(isExpanded || !multiCurrency) && (acc.balances || []).length > 0 && (
+      {isExpanded && (acc.balances || []).length > 0 && (
         <div style={{ padding: "0 14px 8px 44px" }}>
           {acc.balances.map(b => (
-            <div key={b.currency} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "4px 0",
-              fontSize: 13, color: "#515c68",
-            }}>
+            <div
+              key={b.currency}
+              onClick={() => onCurrencyClick(acc.id, b.currency)}
+              title="Перейти к записям в этой валюте по этому счёту"
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "4px 4px",
+                fontSize: 13, color: "#515c68", cursor: "pointer", borderRadius: 6,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#f6f2e9"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >
               <span style={{ minWidth: 50, fontWeight: 600 }}>{b.currency}</span>
               <span style={{ flex: 1 }}>
                 {formatMoneyWithCurrency(b.balance, b.currency)}
@@ -617,7 +670,7 @@ function AccountRow({
               )}
               <button
                 type="button"
-                onClick={() => onEditBalance(acc, b)}
+                onClick={(e) => { e.stopPropagation(); onEditBalance(acc, b); }}
                 className="btn-ghost"
                 style={{ padding: "1px 6px", fontSize: 11 }}
               >
@@ -626,7 +679,7 @@ function AccountRow({
               {acc.balances.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => onDeleteCurrency(acc, b)}
+                  onClick={(e) => { e.stopPropagation(); onDeleteCurrency(acc, b); }}
                   className="btn-ghost"
                   style={{ padding: "1px 6px", fontSize: 11, color: "#c0432b" }}
                 >

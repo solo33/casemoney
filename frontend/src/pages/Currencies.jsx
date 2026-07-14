@@ -146,7 +146,7 @@ export default function Currencies() {
         </div>
 
         {/* Шапка таблицы */}
-        <div style={{
+        <div className="cur-head" style={{
           display: "grid",
           gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
           gap: 12, alignItems: "center",
@@ -159,6 +159,13 @@ export default function Currencies() {
           <span>Курс</span>
           <span></span>
         </div>
+        <style>{`
+          @media (max-width: 640px) {
+            .cur-head { display: none !important; }
+            .cur-row-grid { grid-template-columns: 1fr !important; gap: 4px !important; padding: 10px 4px !important; }
+            .cur-field-label { display: block !important; }
+          }
+        `}</style>
 
         {/* Список валют */}
         {data.currencies.map(uc => (
@@ -250,7 +257,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
   };
 
   return (
-    <div style={{
+    <div className="cur-row-grid" style={{
       display: "grid",
       gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
       gap: 12, alignItems: "center",
@@ -258,55 +265,67 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
       borderBottom: "1px solid #f6f2e9",
       opacity: saving ? 0.6 : 1,
     }}>
-      <input
-        type="text"
-        value={displayName}
-        onChange={e => setDisplayName(e.target.value)}
-        onBlur={handleBlurName}
-        placeholder={uc.currency}
-        style={{ fontSize: 14 }}
-      />
-      <span style={{ color: "#7a8590", fontSize: 13, fontWeight: 600 }}>{uc.currency}</span>
-      <input
-        type="text"
-        value={shortCode}
-        onChange={e => setShortCode(e.target.value)}
-        onBlur={handleBlurShort}
-        maxLength={10}
-        style={{ fontSize: 13 }}
-      />
+      <div>
+        <span className="cur-field-label" style={mobileLabelStyle}>Наименование</span>
+        <input
+          type="text"
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value)}
+          onBlur={handleBlurName}
+          placeholder={uc.currency}
+          style={{ fontSize: 14, width: "100%" }}
+        />
+      </div>
+      <div>
+        <span className="cur-field-label" style={mobileLabelStyle}>ISO</span>
+        <span style={{ color: "#7a8590", fontSize: 13, fontWeight: 600 }}>{uc.currency}</span>
+      </div>
+      <div>
+        <span className="cur-field-label" style={mobileLabelStyle}>Сокращение</span>
+        <input
+          type="text"
+          value={shortCode}
+          onChange={e => setShortCode(e.target.value)}
+          onBlur={handleBlurShort}
+          maxLength={10}
+          style={{ fontSize: 13, width: "100%" }}
+        />
+      </div>
 
       {/* Курс */}
-      {isMain ? (
-        <span style={{ color: "#a6afb8", fontSize: 13 }}>—</span>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <span style={{ color: "#7a8590", whiteSpace: "nowrap" }}>1 {uc.currency} =</span>
-          <input
-            type="text"
-            value={rateInput}
-            onChange={e => setRateInput(e.target.value)}
-            onBlur={handleBlurRate}
-            disabled={uc.auto}
-            style={{
-              width: 120, fontSize: 13,
-              color: uc.auto ? "#2f6296" : "#1b2531",
-              background: uc.auto ? "#ece6d8" : "#fff",
-              textDecoration: uc.auto ? "underline" : "none",
-              cursor: uc.auto ? "default" : "text",
-            }}
-          />
-          <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#515c68", fontSize: 12 }}>
+      <div>
+        <span className="cur-field-label" style={mobileLabelStyle}>Курс</span>
+        {isMain ? (
+          <span style={{ color: "#a6afb8", fontSize: 13 }}>—</span>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <span style={{ color: "#7a8590", whiteSpace: "nowrap" }}>1 {uc.currency} =</span>
             <input
-              type="checkbox"
-              checked={uc.auto}
-              onChange={handleToggleAuto}
-              style={{ width: 16, height: 16 }}
+              type="text"
+              value={rateInput}
+              onChange={e => setRateInput(e.target.value)}
+              onBlur={handleBlurRate}
+              disabled={uc.auto}
+              style={{
+                width: 120, fontSize: 13,
+                color: uc.auto ? "#2f6296" : "#1b2531",
+                background: uc.auto ? "#ece6d8" : "#fff",
+                textDecoration: uc.auto ? "underline" : "none",
+                cursor: uc.auto ? "default" : "text",
+              }}
             />
-            Авто
-          </label>
-        </div>
-      )}
+            <label style={{ display: "flex", alignItems: "center", gap: 4, color: "#515c68", fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={uc.auto}
+                onChange={handleToggleAuto}
+                style={{ width: 16, height: 16 }}
+              />
+              Авто
+            </label>
+          </div>
+        )}
+      </div>
 
       {!isMain && (
         <button
@@ -316,9 +335,15 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
           style={{ padding: "2px 8px", fontSize: 14, color: "#c0432b" }}
           title="Удалить"
         >
-          ×
+          × Удалить
         </button>
       )}
     </div>
   );
 }
+
+const mobileLabelStyle = {
+  display: "none",
+  fontSize: 11, color: "#a6afb8", textTransform: "uppercase",
+  letterSpacing: 0.4, marginBottom: 2,
+};

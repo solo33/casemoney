@@ -255,8 +255,6 @@ export default function Nav() {
           }}>
             Записи
           </div>
-
-          <DropdownNav label="Полезное" links={USEFUL_LINKS} linkStyle={linkStyle} />
           {RECORD_LINKS.slice(1).map(l => (
             <NavLink
               key={l.to}

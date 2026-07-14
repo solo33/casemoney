@@ -255,7 +255,17 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   h2 { font-size: 22px; }
   h3 { font-size: 16px; }
   .page { padding: 20px 16px 40px; }
+
+  /* Flex/grid-элементы по умолчанию не сжимаются уже своего контента
+     (min-width: auto) — на узких экранах это раздувает всю раскладку
+     вправо вместо переноса/обрезки текста внутри строки. Снимаем этот
+     пол везде на мобильном, чтобы переполнение оставалось локальным. */
+  .page *, .home-layout, .home-layout * { min-width: 0; }
 }
+
+/* Полосу страницы не должно уводить вбок ни при каких обстоятельствах —
+   если что-то всё же не влезло, пусть обрежется, а не создаст скролл. */
+html, body { overflow-x: hidden; }
 
 hr {
   border: none;
@@ -279,19 +289,30 @@ hr {
    !important нужен, чтобы перекрыть инлайновый фон закреплённой
    первой колонки и фоновых строк групп/итогов.
    ============================================================ */
-.report-table tbody tr:hover td { background: #efe2c9 !important; }
+/* Первый столбец (названия) и шапку не подсвечиваем — hc-1 отсутствует,
+   в правилах колонок нет th, в правиле строки исключён :first-child. */
+.report-table tbody tr:hover td:not(:first-child) { background: #efe2c9 !important; }
 
-.report-table.hc-1  td:nth-child(1),  .report-table.hc-1  th:nth-child(1)  { background: #efe2c9 !important; }
-.report-table.hc-2  td:nth-child(2),  .report-table.hc-2  th:nth-child(2)  { background: #efe2c9 !important; }
-.report-table.hc-3  td:nth-child(3),  .report-table.hc-3  th:nth-child(3)  { background: #efe2c9 !important; }
-.report-table.hc-4  td:nth-child(4),  .report-table.hc-4  th:nth-child(4)  { background: #efe2c9 !important; }
-.report-table.hc-5  td:nth-child(5),  .report-table.hc-5  th:nth-child(5)  { background: #efe2c9 !important; }
-.report-table.hc-6  td:nth-child(6),  .report-table.hc-6  th:nth-child(6)  { background: #efe2c9 !important; }
-.report-table.hc-7  td:nth-child(7),  .report-table.hc-7  th:nth-child(7)  { background: #efe2c9 !important; }
-.report-table.hc-8  td:nth-child(8),  .report-table.hc-8  th:nth-child(8)  { background: #efe2c9 !important; }
-.report-table.hc-9  td:nth-child(9),  .report-table.hc-9  th:nth-child(9)  { background: #efe2c9 !important; }
-.report-table.hc-10 td:nth-child(10), .report-table.hc-10 th:nth-child(10) { background: #efe2c9 !important; }
-.report-table.hc-11 td:nth-child(11), .report-table.hc-11 th:nth-child(11) { background: #efe2c9 !important; }
-.report-table.hc-12 td:nth-child(12), .report-table.hc-12 th:nth-child(12) { background: #efe2c9 !important; }
-.report-table.hc-13 td:nth-child(13), .report-table.hc-13 th:nth-child(13) { background: #efe2c9 !important; }
-.report-table.hc-14 td:nth-child(14), .report-table.hc-14 th:nth-child(14) { background: #efe2c9 !important; }
+.report-table.hc-2  td:nth-child(2)  { background: #efe2c9 !important; }
+.report-table.hc-3  td:nth-child(3)  { background: #efe2c9 !important; }
+.report-table.hc-4  td:nth-child(4)  { background: #efe2c9 !important; }
+.report-table.hc-5  td:nth-child(5)  { background: #efe2c9 !important; }
+.report-table.hc-6  td:nth-child(6)  { background: #efe2c9 !important; }
+.report-table.hc-7  td:nth-child(7)  { background: #efe2c9 !important; }
+.report-table.hc-8  td:nth-child(8)  { background: #efe2c9 !important; }
+.report-table.hc-9  td:nth-child(9)  { background: #efe2c9 !important; }
+.report-table.hc-10 td:nth-child(10) { background: #efe2c9 !important; }
+.report-table.hc-11 td:nth-child(11) { background: #efe2c9 !important; }
+.report-table.hc-12 td:nth-child(12) { background: #efe2c9 !important; }
+.report-table.hc-13 td:nth-child(13) { background: #efe2c9 !important; }
+.report-table.hc-14 td:nth-child(14) { background: #efe2c9 !important; }
+
+/* Отчётные таблицы: шапка и первый столбец закреплены при прокрутке
+   (на мобильном таблица прокручивается внутри .table-wrap).
+   background: inherit — sticky-ячейка берёт фон своей строки, иначе под ней
+   просвечивают проезжающие колонки. */
+.report-table thead th { position: sticky; top: 0; z-index: 3; background: inherit; }
+.report-table th:first-child,
+.report-table td:first-child { position: sticky; left: 0; z-index: 2; background: inherit; }
+.report-table thead th:first-child { z-index: 4; }
+.table-wrap { max-width: 100%; }
