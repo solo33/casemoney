@@ -13,7 +13,6 @@ import api from "../api/client";
 import SettingsTabs from "../components/SettingsTabs";
 
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b" };
-const TYPE_LABEL = { income: "Доходы", expense: "Расходы" };
 
 export default function Categories() {
   const [tree, setTree] = useState([]);

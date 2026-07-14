@@ -58,9 +58,8 @@ export default function Home() {
   const [summary, setSummary] = useState(null);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
-  const now = new Date();
-  const [flowMonth, setFlowMonth] = useState(() => now.getMonth() + 1);
-  const [flowYear, setFlowYear] = useState(() => now.getFullYear());
+  const flowMonth = new Date().getMonth() + 1;
+  const flowYear = new Date().getFullYear();
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
   const [categories, setCategories] = useState([]);
   const [editingTx, setEditingTx] = useState(null);
@@ -182,7 +181,6 @@ export default function Home() {
   const totalBalance = dashboard.total_balance;
   const monthIncome = summary?.total_income ?? dashboard.month_income ?? 0;
   const monthExpense = summary?.total_expense ?? dashboard.month_expense ?? 0;
-  const maxMonthFlow = Math.max(Math.abs(monthIncome), Math.abs(monthExpense)) || 1;
   const breakdownItems = summary?.category_breakdown || [];
   const breakdownTotal = breakdownType === "income"
     ? (summary?.total_income || 0)
@@ -287,10 +285,18 @@ export default function Home() {
             </p>
           ) : (
             grouped
-              .map(bucket => ({
-                ...bucket,
-                accounts: (bucket.accounts || []).filter(a => a.include_in_balance !== false),
-              }))
+              .map(bucket => {
+                const accounts = (bucket.accounts || [])
+                  .filter(a => a.include_in_balance !== false);
+                return {
+                  ...bucket,
+                  accounts,
+                  total_in_main: accounts.reduce(
+                    (sum, account) => sum + (account.total_in_main || 0),
+                    0,
+                  ),
+                };
+              })
               .filter(bucket => bucket.accounts.length > 0)
               .map(bucket => (
                 <GroupBlock key={bucket.group.id ?? "ungrouped"} bucket={bucket} sym={sym} onAccountClick={goToAccount} />
@@ -833,18 +839,25 @@ function GroupBlock({ bucket, sym, onAccountClick }) {
   const [collapsed, setCollapsed] = useState(IS_MOBILE);
   return (
     <div style={{
-      padding: "10px 16px",
-      borderTop: "1px solid #ece6d8",
+      margin: "10px 12px 12px",
+      border: "1px solid #ded3bc",
+      borderRadius: 9,
+      background: "#fff",
+      overflow: "hidden",
+      boxShadow: "0 4px 12px -12px rgba(23,58,84,0.45)",
     }}>
       <div
         onClick={() => setCollapsed(c => !c)}
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline",
-          marginBottom: collapsed ? 0 : 4, cursor: "pointer", userSelect: "none",
+          padding: "9px 11px",
+          cursor: "pointer", userSelect: "none",
+          background: "#f1eadb",
+          borderBottom: collapsed ? "none" : "1px solid #ded3bc",
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: 13, color: "#44403c" }}>
-          <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: "#173a54" }}>
+          <span style={{ display: "inline-block", width: 15, color: "#9c7b3c", fontSize: 10 }}>
             {collapsed ? "▸" : "▾"}
           </span>
           {bucket.group.name}
@@ -853,21 +866,24 @@ function GroupBlock({ bucket, sym, onAccountClick }) {
           {formatMoney(bucket.total_in_main)} {sym}
         </span>
       </div>
-      {!collapsed && bucket.accounts.map(acc => (
-        <AccountBlock key={acc.id} acc={acc} sym={sym} onClick={() => onAccountClick(acc.id)} />
-      ))}
+      {!collapsed && (
+        <div style={{ margin: "8px 8px 9px 14px", paddingLeft: 10, borderLeft: "2px solid #d9c79f" }}>
+          {bucket.accounts.map(acc => (
+            <AccountBlock key={acc.id} acc={acc} onClick={() => onAccountClick(acc.id)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function AccountBlock({ acc, sym, onClick }) {
+function AccountBlock({ acc, onClick }) {
   const balances = acc.balances || [];
   return (
     <div
       onClick={onClick}
       style={{
-        marginTop: 6,
-        paddingLeft: 4,
+        padding: "7px 8px",
         cursor: onClick ? "pointer" : "default",
         borderRadius: 6,
         transition: "background 0.15s",

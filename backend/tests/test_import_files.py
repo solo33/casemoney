@@ -60,3 +60,48 @@ def test_xlsx_import_scans_and_imports_transaction(client, auth):
     })
     assert r.status_code == 200, r.text
     assert r.json()["imported"] == 1
+
+
+def test_import_merges_cross_currency_transfer_and_registers_both_currencies(client, auth):
+    content = (
+        "date;account;category;amount;currency;description;transfer\n"
+        "03.06.2026;Cash;;-100,00;USD;Exchange;Bank\n"
+        "03.06.2026;Bank;;9000,00;RUB;Exchange;Cash\n"
+    ).encode("utf-8")
+
+    r = _preview(client, auth, content, "exchange.csv")
+    assert r.status_code == 200, r.text
+    preview = r.json()
+    assert preview["totals"]["ok"] == 1
+    assert preview["totals"]["errors"] == 0
+    assert "USD" in preview["currencies_to_add"]
+
+    r = client.post("/api/import/confirm", headers=auth, json={
+        "import_token": preview["import_token"],
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["imported"] == 1
+
+    accounts = client.get("/api/accounts/", headers=auth).json()
+    by_name = {a["name"]: a for a in accounts}
+    assert account_balance(client, auth, by_name["Cash"]["id"], "USD") == -100
+    assert account_balance(client, auth, by_name["Bank"]["id"], "RUB") == 9000
+
+    currencies = client.get("/api/currencies/", headers=auth).json()["currencies"]
+    assert {c["currency"] for c in currencies} >= {"RUB", "USD"}
+
+
+def test_import_rejects_ambiguous_mirrored_transfers(client, auth):
+    content = (
+        "date;account;category;amount;currency;description;transfer\n"
+        "04.06.2026;Cash;;-100,00;USD;First;Bank\n"
+        "04.06.2026;Cash;;-200,00;USD;Second;Bank\n"
+        "04.06.2026;Bank;;9000,00;RUB;First;Cash\n"
+        "04.06.2026;Bank;;18000,00;RUB;Second;Cash\n"
+    ).encode("utf-8")
+
+    r = _preview(client, auth, content, "ambiguous.csv")
+    assert r.status_code == 200, r.text
+    preview = r.json()
+    assert preview["totals"]["ok"] == 0
+    assert preview["totals"]["errors"] == 4

@@ -64,10 +64,14 @@ export default function QuickAddFab() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") close(); };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setError(null);
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   useEffect(() => {

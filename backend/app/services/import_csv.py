@@ -298,13 +298,48 @@ def _merge_mirrored_transfers(rows: list[ParsedRow]) -> list[ParsedRow]:
     match(transfer_idx, strict_key, drop, matched)
 
     # Проход 2 — по остатку: без валюты/суммы (перевод с конвертацией — суммы
-    # в ногах разные, точнее сопоставить нечем).
+    # в ногах разные). Склеиваем только уникальную пару. Если между теми же
+    # счетами в один день осталось несколько встречных строк, соответствие
+    # неоднозначно: помечаем их ошибкой вместо тихого искажения сумм.
     def loose_key(r):
         acc = r.account.strip().lower()
         to = r.transfer_to.strip().lower()
-        return (r.date, acc, to), (r.date, to, acc)
+        return (r.date, acc, to)
 
-    match([i for i in transfer_idx if i not in matched], loose_key, drop, matched)
+    pending_out: dict[tuple, list[int]] = {}
+    pending_in: dict[tuple, list[int]] = {}
+    for i in transfer_idx:
+        if i in matched:
+            continue
+        r = rows[i]
+        bucket = pending_out if r.amount < 0 else pending_in
+        bucket.setdefault(loose_key(r), []).append(i)
+
+    processed: set[tuple] = set()
+    for key, out_indices in pending_out.items():
+        date, acc, to = key
+        mirror = (date, to, acc)
+        pair_key = tuple(sorted((key, mirror)))
+        if pair_key in processed:
+            continue
+        processed.add(pair_key)
+        in_indices = pending_in.get(mirror, [])
+        if not in_indices:
+            continue
+        if len(out_indices) == 1 and len(in_indices) == 1:
+            out_idx, in_idx = out_indices[0], in_indices[0]
+            rows[out_idx].to_currency = rows[in_idx].currency
+            rows[out_idx].to_amount = rows[in_idx].abs_amount
+            drop.add(in_idx)
+            matched.update((out_idx, in_idx))
+            continue
+
+        error = (
+            "Неоднозначные зеркальные переводы: несколько операций между "
+            "одними счетами за один день"
+        )
+        for i in out_indices + in_indices:
+            rows[i].error = error
 
     return [r for i, r in enumerate(rows) if i not in drop]
 
@@ -465,6 +500,8 @@ def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPre
         ok_count += 1
 
         currencies.add(r.currency)
+        if r.to_currency:
+            currencies.add(r.to_currency)
         if r.account:
             if r.account in existing_accounts:
                 seen_accounts.add(r.account)
@@ -642,6 +679,7 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
                 # зачисление в той же валюте и на ту же сумму, что списание.
                 dest_currency = (r.to_currency or r.currency).upper()
                 dest_amount = r.to_amount if r.to_amount is not None else r.abs_amount
+                ensure_user_currency(dest_currency)
 
                 other = ensure_account(r.transfer_to)
                 ensure_balance(other, dest_currency)

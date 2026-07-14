@@ -58,8 +58,8 @@ export default function AnnualReport() {
     ? rows.filter(hasRowData)
     : rows;
 
-  const incomeRows = useMemo(() => data ? filterRows(data.income) : [], [data, hideEmpty]);
-  const expenseRows = useMemo(() => data ? filterRows(data.expense) : [], [data, hideEmpty]);
+  const incomeRows = data ? filterRows(data.income) : [];
+  const expenseRows = data ? filterRows(data.expense) : [];
 
   // Колонки-месяцы масштабируются по данным: показываем только те месяцы,
   // где есть хоть какой-то доход или расход (итоги покрывают все строки).

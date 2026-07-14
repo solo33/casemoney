@@ -160,12 +160,20 @@ def get_rate_to_rub(db: Session, currency: str) -> float:
         return cached.rate
 
     # Refresh: фиат через CBR, крипта через CoinGecko
-    if currency in CRYPTO_IDS:
-        rates = fetch_coingecko_to_rub([currency])
-        source = "coingecko"
-    else:
-        rates = fetch_cbr_to_rub()
-        source = "cbr"
+    try:
+        if currency in CRYPTO_IDS:
+            rates = fetch_coingecko_to_rub([currency])
+            source = "coingecko"
+        else:
+            rates = fetch_cbr_to_rub()
+            source = "cbr"
+    except ExchangeError:
+        # Внешний источник может быть временно недоступен. Для финансового
+        # интерфейса последний известный курс полезнее нулевого баланса или
+        # полностью упавшего отчёта, поэтому используем stale-запись из БД.
+        if cached:
+            return cached.rate
+        raise
 
     if currency not in rates:
         # Если в источнике нет валюты — возвращаем stale, если есть, иначе ошибка

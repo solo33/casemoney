@@ -223,7 +223,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
     setDisplayName(uc.display_name || "");
     setShortCode(uc.short_code || uc.currency);
     setRateInput(String(uc.effective_rate));
-  }, [uc.id, uc.effective_rate, uc.display_name, uc.short_code]);
+  }, [uc.id, uc.currency, uc.effective_rate, uc.display_name, uc.short_code]);
 
   const handleBlurName = () => {
     if (displayName !== (uc.display_name || "")) {

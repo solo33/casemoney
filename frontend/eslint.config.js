@@ -17,5 +17,13 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Загрузка API-данных при монтировании — принятый паттерн приложения.
+      // Новое compiler-oriented правило ошибочно считает такие эффекты каскадными.
+      'react-hooks/set-state-in-effect': 'off',
+      // Несколько модулей намеренно экспортируют компонент вместе с константой
+      // или хелпером; это безопасно, но ограничивает только Fast Refresh в dev.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])

@@ -225,10 +225,27 @@ def get_transactions(
     user_id: int = Depends(get_current_user_id),
 ):
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
-    if account_id:
-        query = query.filter(Transaction.account_id == account_id)
-    if currency:
-        query = query.filter(Transaction.currency == currency.upper())
+    normalized_currency = currency.upper() if currency else None
+    if account_id and normalized_currency:
+        # Перевод хранится одной записью: исходная сторона в account/currency,
+        # входящая — в to_account/to_currency. Фильтруем согласованные пары,
+        # чтобы валюта другой стороны не попала к выбранному счёту.
+        query = query.filter(or_(
+            (Transaction.account_id == account_id) &
+            (Transaction.currency == normalized_currency),
+            (Transaction.to_account_id == account_id) &
+            (Transaction.to_currency == normalized_currency),
+        ))
+    elif account_id:
+        query = query.filter(or_(
+            Transaction.account_id == account_id,
+            Transaction.to_account_id == account_id,
+        ))
+    elif normalized_currency:
+        query = query.filter(or_(
+            Transaction.currency == normalized_currency,
+            Transaction.to_currency == normalized_currency,
+        ))
     if type:
         try:
             query = query.filter(Transaction.type == TransactionType[type])

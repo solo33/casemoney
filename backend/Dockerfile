@@ -22,4 +22,4 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Применяем миграции, затем запускаем сервер (без --reload).
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 2"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers ${WEB_CONCURRENCY:-1}"]

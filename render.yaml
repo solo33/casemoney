@@ -1,20 +1,15 @@
 # Render.com Blueprint — бесплатный тестовый деплой CaseMoney.
-# Создаёт: Postgres + backend (Docker) + статичный фронт.
+# Создаёт backend (Docker) + статичный фронт. PostgreSQL размещается в Neon:
+# бесплатная база Render удаляется через 30 дней, поэтому здесь она не создаётся.
 # Заливается через https://dashboard.render.com → New → Blueprint → этот репозиторий.
 #
 # ВАЖНО: SECRET_KEY сгенерируется автоматически (generateValue). SMTP-переменные
 # при необходимости добавьте вручную в дашборде сервиса casemoney-api.
 
-databases:
-  - name: casemoney-db
-    plan: free
-    databaseName: casemoney
-    user: casemoney
-
 services:
   # --- Backend (FastAPI, Docker) ---
   - type: web
-    name: casemoney-api
+    name: casemoney-api-solo33
     runtime: docker
     plan: free
     rootDir: backend
@@ -22,21 +17,21 @@ services:
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: casemoney-db
-          property: connectionString
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: APP_URL
-        value: https://casemoney-web.onrender.com
+        value: https://casemoney-web-solo33.onrender.com
       - key: CORS_ORIGINS
-        value: https://casemoney-web.onrender.com
+        value: https://casemoney-web-solo33.onrender.com
       - key: PORT
         value: "8000"
+      - key: WEB_CONCURRENCY
+        value: "1"
 
   # --- Frontend (Vite static) ---
   - type: web
-    name: casemoney-web
+    name: casemoney-web-solo33
     runtime: static
     plan: free
     rootDir: frontend
@@ -44,7 +39,7 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
-        value: https://casemoney-api.onrender.com
+        value: https://casemoney-api-solo33.onrender.com
     routes:
       # SPA fallback — все маршруты на index.html
       - type: rewrite
