@@ -1,7 +1,7 @@
 """add color and is_default to categories
 
 Revision ID: a38a30d36fcb
-Revises: 
+Revises: 000000000001
 Create Date: 2026-05-22 19:35:21.832121
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a38a30d36fcb'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = '000000000001'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
