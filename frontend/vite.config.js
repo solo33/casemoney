@@ -39,20 +39,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],
         runtimeCaching: [
-          {
-            // API: сначала сеть, при провале — кэш (для офлайн просмотра)
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 5,
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 1 день
-              },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+          // /api/ НЕ кэшируем: ответы привязаны к JWT, а cache SW общий на
+          // origin — после смены аккаунта офлайн-режим мог отдать чужие данные.
           {
             // Иконки/изображения
             urlPattern: ({ request }) => request.destination === 'image',

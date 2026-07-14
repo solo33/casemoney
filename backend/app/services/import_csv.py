@@ -42,6 +42,11 @@ class ParsedRow:
     transfer_to: Optional[str]            # имя счёта-противоположной стороны
     tx_type: str                          # "income" | "expense" | "transfer"
     error: Optional[str] = None
+    # Для переводов, у которых нашлась зеркальная строка (доход на встречном
+    # счёте) — валюта/сумма зачисления, если она отличается от исходной
+    # (конвертация валют внутри перевода). None = зачисление в той же валюте.
+    to_currency: Optional[str] = None
+    to_amount: Optional[float] = None
 
 
 @dataclass
@@ -225,7 +230,83 @@ def _parse_rows(rows: list[list]) -> list[ParsedRow]:
             tx_type=tx_type,
             error=err,
         ))
-    return parsed
+    return _merge_mirrored_transfers(parsed)
+
+
+def _merge_mirrored_transfers(rows: list[ParsedRow]) -> list[ParsedRow]:
+    """Некоторые экспорты (напр. HomeMoney) кладут один перевод двумя строками —
+    расход на счёте-источнике и доход на счёте-получателе, — причём при обмене
+    валюты суммы и валюты в этих строках отличаются (курс на момент перевода).
+    Обе строки описывают одно и то же движение денег; без объединения перевод
+    применяется дважды, а без учёта расхождения валют зачисление считается в
+    валюте списания. Здесь исходящая строка (amount < 0) ищет зеркальную
+    входящую (amount > 0, тот же день, встречные account/transfer_to) и
+    забирает её валюту/сумму в to_currency/to_amount; входящая строка-зеркало
+    выбрасывается. Строки без пары (одна нога перевода в исходных данных)
+    остаются как есть — зачисление считается в валюте списания, как раньше."""
+    def match(rows_idx: list[int], key_fn, drop: set[int], matched: set[int]):
+        """Один проход сопоставления. key_fn(row) → (my_key, mirror_key)."""
+        pending_out: dict[tuple, list[int]] = {}
+        pending_in: dict[tuple, list[int]] = {}
+        for i in rows_idx:
+            r = rows[i]
+            my_key, mirror_key = key_fn(r)
+            if r.amount < 0:
+                waiting = pending_in.get(mirror_key)
+                if waiting:
+                    in_idx = waiting.pop(0)
+                    if not waiting:
+                        del pending_in[mirror_key]
+                    in_row = rows[in_idx]
+                    r.to_currency = in_row.currency
+                    r.to_amount = in_row.abs_amount
+                    drop.add(in_idx)
+                    matched.add(i)
+                    matched.add(in_idx)
+                else:
+                    pending_out.setdefault(my_key, []).append(i)
+            else:
+                waiting = pending_out.get(mirror_key)
+                if waiting:
+                    out_idx = waiting.pop(0)
+                    if not waiting:
+                        del pending_out[mirror_key]
+                    out_row = rows[out_idx]
+                    out_row.to_currency = r.currency
+                    out_row.to_amount = r.abs_amount
+                    drop.add(i)
+                    matched.add(i)
+                    matched.add(out_idx)
+                else:
+                    pending_in.setdefault(my_key, []).append(i)
+
+    transfer_idx = [
+        i for i, r in enumerate(rows)
+        if not r.error and r.transfer_to and r.tx_type == "transfer"
+    ]
+    drop: set[int] = set()
+    matched: set[int] = set()
+
+    # Проход 1 — строгий: та же валюта и сумма. Не даёт склеить два РАЗНЫХ
+    # встречных перевода одного дня (A→B 100 и B→A 50 останутся раздельными).
+    def strict_key(r):
+        acc = r.account.strip().lower()
+        to = r.transfer_to.strip().lower()
+        amt = round(r.abs_amount, 2)
+        return (r.date, acc, to, r.currency, amt), (r.date, to, acc, r.currency, amt)
+
+    match(transfer_idx, strict_key, drop, matched)
+
+    # Проход 2 — по остатку: без валюты/суммы (перевод с конвертацией — суммы
+    # в ногах разные, точнее сопоставить нечем).
+    def loose_key(r):
+        acc = r.account.strip().lower()
+        to = r.transfer_to.strip().lower()
+        return (r.date, acc, to), (r.date, to, acc)
+
+    match([i for i in transfer_idx if i not in matched], loose_key, drop, matched)
+
+    return [r for i, r in enumerate(rows) if i not in drop]
 
 
 def parse_csv(content: bytes) -> list[ParsedRow]:
@@ -555,8 +636,15 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
 
             to_account_id = to_amount = to_currency = None
             if r.transfer_to:
+                # Зачисление может быть в другой валюте (обмен при переводе) —
+                # если зеркальная строка нашлась, используем её валюту/сумму;
+                # иначе (перевод без пары в исходных данных) считаем как раньше —
+                # зачисление в той же валюте и на ту же сумму, что списание.
+                dest_currency = (r.to_currency or r.currency).upper()
+                dest_amount = r.to_amount if r.to_amount is not None else r.abs_amount
+
                 other = ensure_account(r.transfer_to)
-                ensure_balance(other, r.currency)
+                ensure_balance(other, dest_currency)
                 if r.amount < 0:
                     source = account
                     target = other
@@ -566,8 +654,8 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
                 account = source
                 bal = ensure_balance(source, r.currency)
                 to_account_id = target.id
-                to_amount = r.abs_amount
-                to_currency = r.currency.upper()
+                to_amount = dest_amount
+                to_currency = dest_currency
 
             tx = Transaction(
                 amount=r.abs_amount,
@@ -586,8 +674,8 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
 
             if tx_type == TransactionType.transfer:
                 bal.balance -= r.abs_amount
-                target_bal = ensure_balance(target, r.currency)
-                target_bal.balance += r.abs_amount
+                target_bal = ensure_balance(target, to_currency)
+                target_bal.balance += to_amount
             elif r.amount < 0:
                 bal.balance -= r.abs_amount
             else:

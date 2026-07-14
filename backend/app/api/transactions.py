@@ -77,6 +77,15 @@ def _category_path(db: Session, user_id: int, category_id: Optional[int]) -> Opt
     return c.name
 
 
+def _ensure_own_category(db: Session, user_id: int, category_id: int) -> None:
+    """Категория в транзакции должна принадлежать этому пользователю."""
+    cat = db.query(Category).filter(
+        Category.id == category_id, Category.user_id == user_id
+    ).first()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+
 def _account_name(db: Session, account_id: int) -> str:
     a = db.query(Account).filter(Account.id == account_id).first()
     return a.name if a else "—"
@@ -204,6 +213,7 @@ def get_history(
 @router.get("/", response_model=TransactionsPage)
 def get_transactions(
     account_id: Optional[int] = Query(None),
+    currency: Optional[str] = Query(None),
     type: Optional[str] = Query(None, description="income | expense | transfer"),
     category_id: Optional[int] = Query(None, description="вкл. подкатегории"),
     date_from: Optional[date] = Query(None),
@@ -217,6 +227,8 @@ def get_transactions(
     query = db.query(Transaction).filter(Transaction.user_id == user_id)
     if account_id:
         query = query.filter(Transaction.account_id == account_id)
+    if currency:
+        query = query.filter(Transaction.currency == currency.upper())
     if type:
         try:
             query = query.filter(Transaction.type == TransactionType[type])
@@ -272,6 +284,9 @@ def create_transaction(
             data.to_account_id, data.to_currency, data.to_amount,
         )
 
+    if data.category_id is not None and tx_type != TransactionType.transfer:
+        _ensure_own_category(db, user_id, data.category_id)
+
     transaction = Transaction(
         amount=data.amount,
         currency=currency,
@@ -321,6 +336,10 @@ def update_transaction(
         ).first()
         if not acc:
             raise HTTPException(status_code=404, detail="Account not found")
+
+    # То же для категории — иначе можно привязаться к чужой категории
+    if "category_id" in update and update["category_id"] is not None:
+        _ensure_own_category(db, user_id, update["category_id"])
 
     # Откатываем эффект старого состояния полностью (обе стороны для перевода)
     _apply_tx_effect(db, tx, reverse=True)

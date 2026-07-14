@@ -12,7 +12,9 @@ load_dotenv(_ENV_PATH)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Личное приложение, не банк — держим сессию долгоживущей, чтобы не просить
+# пароль заново на том же устройстве каждые полчаса. 30 дней.
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
 # Защита от запуска без секрета / с тестовыми значениями
 _BANNED_SECRETS = {"supersecretkey123", "secret", "changeme", "test", "changeme_long_random_string"}
@@ -50,12 +52,19 @@ def create_access_token(data: dict) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Декодирует JWT токен, возвращает payload"""
+    """Декодирует access-токен, возвращает payload.
+
+    Токены активации/сброса пароля подписаны тем же ключом, но несут поле
+    purpose — их нельзя принимать как Bearer, иначе ссылка из письма даёт
+    полный доступ к API.
+    """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
     except JWTError:
         return None
+    if payload.get("purpose"):
+        return None
+    return payload
 
 
 # === Активация email ===

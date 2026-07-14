@@ -44,3 +44,6 @@ CaseMoney_TestCases.docx
 backend/*.log
 backend/*.err.log
 backend/*.out.log
+
+# Локальный self-signed SSL для HTTPS-разработки (localhost/LAN)
+certs/

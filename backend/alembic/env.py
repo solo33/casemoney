@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from logging.config import fileConfig
 
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
@@ -13,6 +14,15 @@ from alembic import context
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# DATABASE_URL из окружения (или backend/.env) имеет приоритет над alembic.ini —
+# в проде (Docker/Amvera) URL задаётся только переменной окружения, значение в
+# alembic.ini указывает на localhost и годится лишь для локальной разработки.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
+_db_url = os.getenv("DATABASE_URL")
+if _db_url:
+    # configparser интерпретирует % как интерполяцию — экранируем
+    config.set_main_option("sqlalchemy.url", _db_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
