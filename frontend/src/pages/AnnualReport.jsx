@@ -392,9 +392,9 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick, months })
 
 function NetRow({ label, monthly, total, sym, onCellClick, months }) {
   const cols = months || monthly.map((_, i) => i);
-  const overallColor = total >= 0 ? "#bbf7d0" : "#fecaca";
+  const overallColor = total >= 0 ? "#4ade80" : "#f87171";
   return (
-    <tr style={{ background: "#a6afb8" }}>
+    <tr style={{ background: "#173a54" }}>
       <td
         style={{
           padding: "10px 12px", fontWeight: 700, color: "#fff",
@@ -406,7 +406,7 @@ function NetRow({ label, monthly, total, sym, onCellClick, months }) {
       </td>
       {cols.map((i) => {
         const v = monthly[i];
-        const color = Math.abs(v) < 0.005 ? "#e4ddcd" : (v >= 0 ? "#bbf7d0" : "#fecaca");
+        const color = Math.abs(v) < 0.005 ? "#7a8590" : (v >= 0 ? "#4ade80" : "#f87171");
         const active = Math.abs(v) > 0.005;
         return (
           <td

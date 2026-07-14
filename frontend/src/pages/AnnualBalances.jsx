@@ -102,8 +102,8 @@ export default function AnnualBalances() {
               onMouseLeave={() => setHoverCol(null)}
             >
               <thead>
-                <tr>
-                  <th style={{ padding: "8px 10px", textAlign: "left", position: "sticky", left: 0, background: "#efe9db", zIndex: 1 }}>
+                <tr style={{ background: "#efe9db" }}>
+                  <th style={{ padding: "8px 10px", textAlign: "left", position: "sticky", left: 0, background: "#efe9db", zIndex: 4 }}>
                     Счёт
                   </th>
                   {visibleMonths.map(i => (

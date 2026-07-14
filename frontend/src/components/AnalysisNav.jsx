@@ -5,6 +5,7 @@ const TABS = [
   { to: "/reports", label: "Сводка", end: true },
   { to: "/reports/annual", label: "Денежный поток" },
   { to: "/reports/balances", label: "Годовые балансы" },
+  { to: "/reports/yoy", label: "Год к году" },
 ];
 
 export default function AnalysisNav() {

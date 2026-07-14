@@ -18,6 +18,7 @@ const Home = lazy(() => import('./pages/Home'))
 const Reports = lazy(() => import('./pages/Reports'))
 const AnnualReport = lazy(() => import('./pages/AnnualReport'))
 const AnnualBalances = lazy(() => import('./pages/AnnualBalances'))
+const YoyReport = lazy(() => import('./pages/YoyReport'))
 const Goals = lazy(() => import('./pages/Goals'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Accounts = lazy(() => import('./pages/Accounts'))
@@ -108,6 +109,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AnnualBalances />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reports/yoy"
+          element={
+            <ProtectedRoute>
+              <YoyReport />
             </ProtectedRoute>
           }
         />

@@ -620,3 +620,86 @@ def get_monthly_trend(
     ]
 
     return MonthlyTrendResponse(main_currency=main, months=months, points=points)
+
+
+# --- Сравнение год к году ---
+
+class YoyRow(BaseModel):
+    month: int                 # 1..12
+    label: str                 # "Январь"
+    values: dict[int, float]   # год → сумма в main_currency
+
+
+class YoyResponse(BaseModel):
+    main_currency: str
+    type: str                  # income | expense
+    years: List[int]
+    rows: List[YoyRow]         # всегда 12 строк-месяцев
+    totals: dict[int, float]   # год → сумма за год
+
+
+def _parse_ids(csv: Optional[str]) -> Optional[set[int]]:
+    if not csv:
+        return None
+    out = set()
+    for part in csv.split(","):
+        part = part.strip()
+        if part.isdigit():
+            out.add(int(part))
+    return out or None
+
+
+@router.get("/yoy", response_model=YoyResponse)
+def get_yoy(
+    type: Literal["income", "expense"] = Query("expense"),
+    account_ids: Optional[str] = Query(None, description="CSV id счетов"),
+    category_ids: Optional[str] = Query(None, description="CSV id категорий (вкл. подкатегории)"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Сравнение год к году: строки — месяцы, колонки — все годы с данными.
+
+    Фильтры по счетам и категориям опциональны; для категорий автоматически
+    включаются подкатегории выбранных.
+    """
+    main = accounts_svc.get_user_main_currency(db, user_id)
+    tx_type = TransactionType[type]
+
+    query = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
+        Transaction.type == tx_type,
+    )
+
+    acc_ids = _parse_ids(account_ids)
+    if acc_ids:
+        query = query.filter(Transaction.account_id.in_(acc_ids))
+
+    cat_ids = _parse_ids(category_ids)
+    if cat_ids:
+        # Разворачиваем в подкатегории (иерархия у категорий 2 уровня)
+        all_cats = db.query(Category).filter(Category.user_id == user_id).all()
+        expanded = set(cat_ids)
+        for c in all_cats:
+            if c.parent_id in cat_ids:
+                expanded.add(c.id)
+        query = query.filter(Transaction.category_id.in_(expanded))
+
+    agg: dict[tuple[int, int], float] = {}
+    for t in query.all():
+        key = (t.date.year, t.date.month)
+        agg[key] = agg.get(key, 0.0) + _to_main(db, user_id, t.amount, t.currency, main)
+
+    years = sorted({y for y, _ in agg})
+    rows = [
+        YoyRow(
+            month=m,
+            label=RU_MONTHS[m].capitalize(),
+            values={y: round(agg.get((y, m), 0.0), 2) for y in years},
+        )
+        for m in range(1, 13)
+    ]
+    totals = {
+        y: round(sum(agg.get((y, m), 0.0) for m in range(1, 13)), 2)
+        for y in years
+    }
+    return YoyResponse(main_currency=main, type=type, years=years, rows=rows, totals=totals)
