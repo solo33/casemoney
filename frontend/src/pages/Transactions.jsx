@@ -25,6 +25,7 @@ export default function Transactions() {
   // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
   const [filters, setFilters] = useState(() => ({
     account_id: searchParams.get("account_id") || "",
+    currency: searchParams.get("currency") || "",
     category_id: searchParams.get("category_id") || "",
     type: searchParams.get("type") || "",
     date_from: searchParams.get("date_from") || "",
@@ -37,6 +38,7 @@ export default function Transactions() {
   useEffect(() => {
     setFilters({
       account_id: searchParams.get("account_id") || "",
+      currency: searchParams.get("currency") || "",
       category_id: searchParams.get("category_id") || "",
       type: searchParams.get("type") || "",
       date_from: searchParams.get("date_from") || "",
@@ -182,7 +184,7 @@ export default function Transactions() {
   };
 
   const resetFilters = () => {
-    setFilters({ account_id: "", category_id: "", type: "", date_from: "", date_to: "", q: "" });
+    setFilters({ account_id: "", currency: "", category_id: "", type: "", date_from: "", date_to: "", q: "" });
     setPage(0);
     setSearchParams({}, { replace: true });
   };
@@ -314,6 +316,21 @@ export default function Transactions() {
           onChange={e => setFilter("date_to", e.target.value)}
           title="по"
         />
+        {filters.currency && (
+          <span style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontSize: 13, padding: "6px 10px", borderRadius: 999,
+            background: "#f6f2e9", border: "1px solid #e4ddcd", color: "#515c68",
+          }}>
+            Валюта: {filters.currency}
+            <button
+              type="button"
+              onClick={() => setFilter("currency", "")}
+              className="btn-ghost"
+              style={{ padding: "0 4px", fontSize: 13, border: "none" }}
+            >×</button>
+          </span>
+        )}
         {hasFilters && (
           <button className="btn-ghost" onClick={resetFilters}>Сбросить</button>
         )}
