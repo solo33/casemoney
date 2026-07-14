@@ -58,9 +58,21 @@ app.add_middleware(SlowAPIMiddleware)
 _default_origins = "http://localhost:5173,http://127.0.0.1:5173"
 _origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 
+# Локальная сеть (192.168.x.x / 10.x.x.x / 172.16-31.x.x) на любом порту —
+# чтобы IP машины, который меняет DHCP роутера, не приходилось прописывать
+# в CORS_ORIGINS вручную при каждом переподключении к сети.
+_LAN_ORIGIN_REGEX = (
+    r"^https?://(localhost|127\.0\.0\.1"
+    r"|192\.168\.\d{1,3}\.\d{1,3}"
+    r"|10(\.\d{1,3}){3}"
+    r"|172\.(1[6-9]|2\d|3[0-1])(\.\d{1,3}){2})"
+    r"(:\d+)?$"
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
+    allow_origin_regex=_LAN_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

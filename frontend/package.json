@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "icons": "node scripts/generate-icons.mjs"
+    "icons": "node scripts/generate-icons.mjs",
+    "redirect": "node scripts/redirect-server.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
