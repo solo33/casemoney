@@ -2,12 +2,18 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { login, getPublicConfig } from "../api/auth";
 
+const DEMO_EMAIL = "test@test.com";
+const REAL_LOGIN_FLAG = "cm_used_real_login";
+
 export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
+  // Кнопку демо-входа показываем, только если с этого устройства ещё ни разу
+  // не логинились под настоящим аккаунтом (флаг переживает разлогин).
+  const [showDemo] = useState(() => localStorage.getItem(REAL_LOGIN_FLAG) !== "1");
 
   useEffect(() => {
     getPublicConfig()
@@ -24,6 +30,9 @@ export default function Login() {
     try {
       const res = await login(form);
       localStorage.setItem("token", res.data.access_token);
+      if (form.email.trim().toLowerCase() !== DEMO_EMAIL) {
+        localStorage.setItem(REAL_LOGIN_FLAG, "1");
+      }
       navigate("/home");
     } catch (err) {
       setError(err.response?.data?.detail || "Неверный email или пароль");
@@ -74,7 +83,7 @@ export default function Login() {
         display: "grid",
         gridTemplateColumns: "1.4fr 1fr",
         gap: 60,
-        alignItems: "center",
+        alignItems: "start",
       }} className="login-grid">
         <div>
           <h1 style={{
@@ -108,37 +117,18 @@ export default function Login() {
             </InfoCard>
           </div>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-            <button
-              type="button"
-              onClick={() => setForm({ email: "test@test.com", password: "test12345" })}
-              style={{ padding: "9px 14px", fontWeight: 700 }}
-            >
-              Заполнить демо-вход
-            </button>
-            <span style={{ alignSelf: "center", fontSize: 13, color: "#7a8590" }}>
-              test@test.com · test12345
-            </span>
-          </div>
-
           {/* Features */}
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: 12, marginBottom: 32,
           }}>
-            <Feature icon="💱" title="Мультивалютность">
-              Фиат и крипта. Курсы ЦБ РФ и CoinGecko, обновление каждый час.
-            </Feature>
-            <Feature icon="🌳" title="Иерархия категорий">
-              Покупки → Подарки, Еда → Кафе. Перетаскивание, детализация в отчетах.
-            </Feature>
-            <Feature icon="📊" title="Годовой анализ">
-              12 месяцев в одной таблице. Клик по сумме открывает операции.
-            </Feature>
-            <Feature icon="📥" title="Импорт из файлов">
-              CSV и Excel загружаются за пару кликов с предварительной проверкой.
-            </Feature>
+            <FeatureLink icon="❓" title="Помощь" to="/help">
+              Ответы на частые вопросы: счета, категории, импорт, отчёты.
+            </FeatureLink>
+            <FeatureLink icon="🗺️" title="Роадмап" to="/roadmap">
+              Что уже готово и что планируется дальше в CaseMoney.
+            </FeatureLink>
           </div>
 
           {/* Pricing teaser */}
@@ -152,7 +142,7 @@ export default function Login() {
         </div>
 
         {/* Login form */}
-        <div style={{
+        <div className="login-form-card" style={{
           background: "#fffdf7",
           border: "1px solid #e4ddcd",
           borderRadius: 12,
@@ -164,9 +154,28 @@ export default function Login() {
           }}>
             Войти
           </h2>
-          <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 20px" }}>
+          <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 16px" }}>
             Используйте свой email и пароль.
           </p>
+
+          {showDemo && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+              marginBottom: 20, padding: "10px 12px",
+              background: "#f6f2e9", border: "1px solid #e4ddcd", borderRadius: 8,
+            }}>
+              <button
+                type="button"
+                onClick={() => setForm({ email: DEMO_EMAIL, password: "test12345" })}
+                style={{ padding: "7px 12px", fontSize: 13, fontWeight: 700 }}
+              >
+                Заполнить демо-вход
+              </button>
+              <span style={{ fontSize: 12.5, color: "#7a8590" }}>
+                {DEMO_EMAIL} · test12345
+              </span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <label style={lbl}>
@@ -252,28 +261,38 @@ export default function Login() {
             gap: 32px !important;
           }
           .login-grid h1 { font-size: 38px !important; }
+          /* На телефоне форма входа — первым экраном, до маркетинга */
+          .login-form-card { order: -1; }
         }
       `}</style>
     </div>
   );
 }
 
-function Feature({ icon, title, children }) {
+function FeatureLink({ icon, title, to, children }) {
   return (
-    <div style={{
-      background: "#fffdf7",
-      border: "1px solid #e4ddcd",
-      borderRadius: 10,
-      padding: 14,
-    }}>
+    <Link
+      to={to}
+      style={{
+        display: "block",
+        background: "#fffdf7",
+        border: "1px solid #e4ddcd",
+        borderRadius: 10,
+        padding: 14,
+        textDecoration: "none",
+        transition: "border-color 150ms, box-shadow 150ms",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = "#9c7b3c"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "#e4ddcd"; }}
+    >
       <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
       <div style={{ fontWeight: 600, fontSize: 14, color: "#1b2531", marginBottom: 4 }}>
-        {title}
+        {title} →
       </div>
       <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.4 }}>
         {children}
       </div>
-    </div>
+    </Link>
   );
 }
 

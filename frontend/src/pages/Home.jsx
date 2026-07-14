@@ -48,12 +48,15 @@ function aggregateByCurrency(groups) {
     .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
 }
 
+const IS_MOBILE = typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
+
 export default function Home() {
   const { mainCurrency } = useUser();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [grouped, setGrouped] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
   const now = new Date();
   const [flowMonth, setFlowMonth] = useState(() => now.getMonth() + 1);
@@ -64,6 +67,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
+  const [breakdownCollapsed, setBreakdownCollapsed] = useState(IS_MOBILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -81,16 +85,18 @@ export default function Home() {
         month: flowMonth,
         breakdown_type: breakdownType,
       };
-      const [d, g, s, c] = await Promise.all([
+      const [d, g, s, c, t] = await Promise.all([
         api.get("/api/dashboard/"),
         api.get("/api/accounts/grouped"),
         api.get("/api/reports/summary", { params }),
         api.get("/api/categories/"),
+        api.get("/api/reports/monthly-trend", { params: { months: 3 } }),
       ]);
       setDashboard(d.data);
       setGrouped(g.data);
       setSummary(s.data);
       setCategories(c.data);
+      setMonthlyTrend(t.data.points || []);
     } catch {
       setError("Ошибка загрузки");
     } finally {
@@ -154,11 +160,8 @@ export default function Home() {
   // breakdown сумм по валютам по всем счетам (только учитываемые в балансе)
   const byCurrency = useMemo(() => aggregateByCurrency(grouped), [grouped]);
 
-  // последние 3 месяца из dashboard.monthly_stats
-  const last3 = useMemo(() => {
-    if (!dashboard?.monthly_stats) return [];
-    return dashboard.monthly_stats.slice(-3).reverse();
-  }, [dashboard]);
+  // Гистограмма движения денег: 3 месяца, свежие сверху (текущий — «Этот месяц»)
+  const trendDesc = useMemo(() => [...monthlyTrend].reverse(), [monthlyTrend]);
 
   // записи за выбранный день (для правой колонки), обогащённые именами
   const todayTx = useMemo(() => dayTx.map(enrichTx), [dayTx, enrichTx]);
@@ -223,6 +226,8 @@ export default function Home() {
       <style>{`
         @media (max-width: 900px) {
           .home-layout { grid-template-columns: 1fr !important; }
+          /* На телефоне форма ввода — первым экраном, баланс и счета ниже */
+          .home-main { order: -1; }
         }
       `}</style>
 
@@ -237,25 +242,37 @@ export default function Home() {
         </div>
       )}
 
-      <div style={{ gridColumn: "1 / -1" }}>
-        <DashboardOverview
-          totalBalance={totalBalance}
-          mainCurrency={mainCurrency}
-          monthIncome={monthIncome}
-          monthExpense={monthExpense}
-          maxMonthFlow={maxMonthFlow}
-          sym={sym}
-          byCurrency={byCurrency}
-          flowMonth={flowMonth}
-          flowYear={flowYear}
-          setFlowMonth={setFlowMonth}
-          setFlowYear={setFlowYear}
-          navigate={navigate}
-        />
-      </div>
-
       {/* ============== LEFT SIDEBAR ============== */}
-      <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
+        <Card>
+          <h3 style={sectionTitle}>Баланс</h3>
+          <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
+            {formatMoney(totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
+          </div>
+          {byCurrency.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              {byCurrency.map(c => (
+                <div key={c.currency} style={{
+                  display: "flex", justifyContent: "flex-end", gap: 6,
+                  fontSize: 13, color: "#515c68", padding: "1px 0",
+                  fontVariantNumeric: "tabular-nums",
+                }}>
+                  <span>{formatMoney(c.balance, { maxFraction: 2 })}</span>
+                  <span style={{ color: "#a6afb8" }}>{c.currency}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {trendDesc.length > 0 && (
+            <>
+              <div style={{ borderTop: "1px solid #ece6d8", margin: "14px 0 10px" }} />
+              <MonthBars points={trendDesc} sym={sym} />
+            </>
+          )}
+        </Card>
+
         {/* Accounts grouped — только учитываемые в балансе */}
         <Card noPadding>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -283,7 +300,7 @@ export default function Home() {
       </aside>
 
       {/* ============== RIGHT MAIN ============== */}
-      <main style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <main className="home-main" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Inline quick-add form — дата синхронизирована с лентой за день */}
         <QuickAddInline
           date={selectedDate}
@@ -295,7 +312,7 @@ export default function Home() {
         {/* Записи: табы Сегодня / Последние изменённые */}
         <Card noPadding>
           <div style={{
-            display: "flex", alignItems: "stretch",
+            display: "flex", alignItems: "stretch", flexWrap: "wrap",
             borderBottom: "1px solid #ece6d8",
           }}>
             <TabHead
@@ -346,10 +363,17 @@ export default function Home() {
           })()}
         </Card>
 
-        {/* Разбивка по категориям с переключателем Расходы/Доходы */}
+        {/* Разбивка по категориям с переключателем Расходы/Доходы.
+            На телефоне свёрнута по умолчанию — разворачивается по тапу. */}
         <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 8, flexWrap: "wrap" }}>
-            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: breakdownCollapsed ? 0 : 12, gap: 8, flexWrap: "wrap" }}>
+            <h3
+              onClick={() => setBreakdownCollapsed(c => !c)}
+              style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}
+            >
+              <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>
+                {breakdownCollapsed ? "▸" : "▾"}
+              </span>
               {breakdownWord} за {monthLabel.toLowerCase()}
             </h3>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -360,7 +384,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          {breakdownItems.length === 0 ? (
+          {breakdownCollapsed ? null : breakdownItems.length === 0 ? (
             <p style={{ color: "#a6afb8", fontSize: 14 }}>
               Нет {breakdownType === "income" ? "доходов" : "расходов"} за этот месяц
             </p>
@@ -472,112 +496,6 @@ function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
   );
 }
 
-function DashboardOverview({
-  totalBalance,
-  mainCurrency,
-  monthIncome,
-  monthExpense,
-  maxMonthFlow,
-  sym,
-  byCurrency,
-  flowMonth,
-  flowYear,
-  setFlowMonth,
-  setFlowYear,
-  navigate,
-}) {
-  return (
-    <div className="overview-grid-fix" style={{
-      background: "#fffdf7",
-      border: "1px solid #e4ddcd",
-      borderRadius: 12,
-      padding: 18,
-      display: "grid",
-      gridTemplateColumns: "minmax(280px, 1.1fr) minmax(260px, 1fr) minmax(220px, 0.8fr)",
-      gap: 18,
-      alignItems: "stretch",
-      boxShadow: "0 10px 28px -22px rgba(15,30,45,0.35)",
-    }}>
-      <style>{`
-        @media (max-width: 980px) {
-          .overview-actions { grid-template-columns: 1fr 1fr !important; }
-        }
-        @media (max-width: 760px) {
-          .overview-grid-fix { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-      <div style={{ display: "contents" }}>
-        <section>
-          <h3 style={sectionTitle}>Обзор</h3>
-          <div className="money-hero tabular" style={{ fontSize: 44, color: "#1b2531", lineHeight: 1.05 }}>
-            {formatMoney(totalBalance)} <span style={{ fontSize: 18, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
-          </div>
-          {byCurrency.length > 0 && (
-            <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {byCurrency.slice(0, 4).map(c => (
-                <span key={c.currency} style={{
-                  padding: "5px 9px",
-                  borderRadius: 999,
-                  background: "#f6f2e9",
-                  color: "#515c68",
-                  fontSize: 12,
-                  fontWeight: 600,
-                }}>
-                  {formatMoney(c.balance, { maxFraction: 2 })} {c.currency}
-                </span>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section style={{ borderLeft: "1px solid #ece6d8", paddingLeft: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10 }}>
-            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Движение денег</h3>
-            <div style={{ display: "flex", gap: 4 }}>
-              <select value={flowMonth} onChange={e => setFlowMonth(Number(e.target.value))} style={{ fontSize: 12, padding: "4px 7px" }}>
-                {RU_MONTHS_FULL.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </select>
-              <input type="number" value={flowYear} onChange={e => setFlowYear(Number(e.target.value) || new Date().getFullYear())} style={{ width: 74, fontSize: 12, padding: "4px 7px" }} />
-            </div>
-          </div>
-          <Bar value={monthIncome} max={maxMonthFlow} color="#167a4a" sym={sym} sign="+" />
-          <Bar value={monthExpense} max={maxMonthFlow} color="#c0432b" sym={sym} sign="−" />
-        </section>
-
-        <section style={{ borderLeft: "1px solid #ece6d8", paddingLeft: 18 }}>
-          <h3 style={sectionTitle}>Быстрый путь</h3>
-          <div className="overview-actions" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
-            <QuickLink onClick={() => navigate("/transactions")} title="Записи" text="Добавить или найти операцию" />
-            <QuickLink onClick={() => navigate("/import")} title="Импорт" text="Загрузить CSV/XLS/XLSX" />
-            <QuickLink onClick={() => navigate("/reports")} title="Анализ" text="Понять категории и динамику" />
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function QuickLink({ title, text, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        textAlign: "left",
-        background: "#f6f2e9",
-        border: "1px solid #e4ddcd",
-        borderRadius: 8,
-        padding: "10px 12px",
-        color: "#1b2531",
-        cursor: "pointer",
-      }}
-    >
-      <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>{title}</span>
-      <span style={{ display: "block", color: "#7a8590", fontSize: 12, marginTop: 2 }}>{text}</span>
-    </button>
-  );
-}
-
 function TabHead({ active, onClick, children }) {
   return (
     <button
@@ -595,6 +513,10 @@ function TabHead({ active, onClick, children }) {
         textTransform: "uppercase",
         letterSpacing: 0.4,
         whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        minWidth: 0,
+        flex: "0 1 auto",
       }}
     >
       {children}
@@ -647,7 +569,7 @@ function ToggleBtn({ active, onClick, children }) {
 }
 
 function TxRow({ tx, first, showDate, onEdit, onDelete }) {
-  const dateStr = new Date(tx.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  const dateStr = new Date(tx.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
   return (
     <div
       style={{
@@ -860,8 +782,10 @@ function MonthBars({ points, sym }) {
   return (
     <div>
       {points.map((p, idx) => {
+        const now = new Date();
+        const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
         const m = parseInt(p.month.split("-")[1], 10);
-        const label = idx === 0
+        const label = p.month === curKey
           ? "Этот месяц"
           : RU_MONTHS_FULL[m - 1].charAt(0).toUpperCase() + RU_MONTHS_FULL[m - 1].slice(1);
         return (
@@ -905,23 +829,31 @@ function Bar({ value, max, color, sym, sign }) {
 }
 
 function GroupBlock({ bucket, sym, onAccountClick }) {
+  // На телефоне группы свёрнуты по умолчанию — важен итог, детали по тапу
+  const [collapsed, setCollapsed] = useState(IS_MOBILE);
   return (
     <div style={{
       padding: "10px 16px",
       borderTop: "1px solid #ece6d8",
     }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "baseline",
-        marginBottom: 4,
-      }}>
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          marginBottom: collapsed ? 0 : 4, cursor: "pointer", userSelect: "none",
+        }}
+      >
         <span style={{ fontWeight: 600, fontSize: 13, color: "#44403c" }}>
+          <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>
+            {collapsed ? "▸" : "▾"}
+          </span>
           {bucket.group.name}
         </span>
         <span style={{ fontWeight: 600, fontSize: 13, color: "#515c68" }}>
           {formatMoney(bucket.total_in_main)} {sym}
         </span>
       </div>
-      {bucket.accounts.map(acc => (
+      {!collapsed && bucket.accounts.map(acc => (
         <AccountBlock key={acc.id} acc={acc} sym={sym} onClick={() => onAccountClick(acc.id)} />
       ))}
     </div>

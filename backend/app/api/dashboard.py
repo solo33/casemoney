@@ -169,12 +169,17 @@ def get_dashboard(
 
     recent_transactions = [_serialize_tx(t) for t in recent_rows]
 
-    # 6. Последние изменённые — по updated_at (fallback на date через coalesce)
+    # 6. Последние изменённые — по updated_at (fallback на date через coalesce).
+    # После импорта у тысяч записей updated_at совпадает с точностью до секунды —
+    # без tie-break по дате операции порядок внутри пачки произвольный (могут
+    # всплыть записи 2012 года). Свежие операции — выше.
     changed_rows = (
         db.query(Transaction)
         .filter(Transaction.user_id == user_id)
         .order_by(
-            func.coalesce(Transaction.updated_at, Transaction.date).desc()
+            func.coalesce(Transaction.updated_at, Transaction.date).desc(),
+            Transaction.date.desc(),
+            Transaction.id.desc(),
         )
         .limit(8)
         .all()

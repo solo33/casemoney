@@ -1,8 +1,14 @@
 import axios from 'axios'
 
-// Базовый URL нашего FastAPI backend
+// Базовый URL нашего FastAPI backend.
+// Если VITE_API_URL не задан — берём тот же хост, с которого открыт фронт
+// (localhost, 127.0.0.1 или IP в локальной сети), и порт 8000. Так при смене
+// IP машины роутером (DHCP) не нужно править .env — просто открой фронт по
+// новому адресу, бэкенд найдётся сам.
+const DEFAULT_API_URL = `${window.location.protocol}//${window.location.hostname}:8000`
+
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,
 })
 
 // Перехватчик запросов — автоматически добавляет JWT токен в каждый запрос
@@ -19,6 +25,11 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (res) => res,
   (error) => {
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      return new Promise(() => {})  // редирект уже идёт, дальше обрабатывать нечего
+    }
     if (!error.response) {
       // Сеть/таймаут/бэкенд не запущен — ответа нет вообще
       error.response = {

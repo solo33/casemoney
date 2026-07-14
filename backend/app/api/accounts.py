@@ -99,9 +99,10 @@ def get_accounts_grouped(
         result.append(AccountGroupBucket(
             group=GroupSummary(id=g.id, name=g.name, sort_order=g.sort_order),
             accounts=serialized,
-            total_in_main=round(sum(
-                a.total_in_main for a in serialized if a.include_in_balance
-            ), 2),
+            # Итог группы — сумма ВСЕХ счетов группы, независимо от include_in_balance.
+            # Общий баланс дашборда (dashboard.total_balance) фильтрует по этому флагу
+            # отдельно — здесь это просто справочная сумма по группе.
+            total_in_main=round(sum(a.total_in_main for a in serialized), 2),
         ))
 
     ungrouped = by_group.get(None, [])
@@ -110,9 +111,7 @@ def get_accounts_grouped(
         result.append(AccountGroupBucket(
             group=GroupSummary(id=None, name="Без группы", sort_order=10_000),
             accounts=serialized,
-            total_in_main=round(sum(
-                a.total_in_main for a in serialized if a.include_in_balance
-            ), 2),
+            total_in_main=round(sum(a.total_in_main for a in serialized), 2),
         ))
 
     return result
