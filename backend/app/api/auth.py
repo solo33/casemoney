@@ -99,7 +99,6 @@ def _create_user(db: Session, email: str, username: str, hashed_password: str) -
 def register(
     request: Request,
     data: UserRegister,
-    background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     cfg = get_config(db)
@@ -140,14 +139,18 @@ def register(
     pending.expires_at = now + timedelta(minutes=CODE_TTL_MIN)
     pending.attempts = 0
     pending.last_sent_at = now
-    db.commit()
+    db.flush()
 
-    def _send():
-        try:
-            send_code_email(data.email, data.username, code)
-        except Exception:
-            pass
-    background.add_task(_send)
+    # Confirmation codes must report delivery failures to the UI.  Previously
+    # this ran as a background task, so the page claimed success even when the
+    # email provider rejected the message.
+    if not send_code_email(data.email, data.username, code):
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Не удалось отправить код. Попробуйте ещё раз через несколько минут.",
+        )
+    db.commit()
 
     return RegisterResponse(requires_code=True, smtp_configured=is_smtp_configured())
 

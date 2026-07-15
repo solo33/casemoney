@@ -16,8 +16,11 @@ import os
 import smtplib
 import logging
 import html as _html
+from email.utils import parseaddr
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+import httpx
 
 log = logging.getLogger("casemoney.email")
 
@@ -39,8 +42,58 @@ def app_url() -> str:
 
 
 def is_smtp_configured() -> bool:
+    """Return whether any real email transport is configured.
+
+    The legacy name is kept because it is part of the public auth/admin
+    responses.  Brevo's HTTPS API is preferred when its key is present; SMTP
+    remains available for local and paid deployments.
+    """
+    if _brevo_configured():
+        return True
     cfg = _smtp_config()
     return bool(cfg["host"] and cfg["user"] and cfg["password"])
+
+
+def _brevo_configured() -> bool:
+    return bool(os.getenv("BREVO_API_KEY") and _sender()[1])
+
+
+def _sender() -> tuple[str, str]:
+    configured_from = os.getenv("SMTP_FROM", "")
+    parsed_name, parsed_email = parseaddr(configured_from)
+    name = os.getenv("BREVO_SENDER_NAME") or parsed_name or "CaseMoney"
+    email = os.getenv("BREVO_SENDER_EMAIL") or parsed_email or os.getenv("SMTP_USER", "")
+    return name, email
+
+
+def _send_via_brevo(to: str, subject: str, text: str, html: str | None) -> bool:
+    sender_name, sender_email = _sender()
+    payload = {
+        "sender": {"name": sender_name, "email": sender_email},
+        "to": [{"email": to}],
+        "subject": subject,
+        "textContent": text,
+    }
+    if html:
+        payload["htmlContent"] = html
+
+    try:
+        response = httpx.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": os.environ["BREVO_API_KEY"],
+                "content-type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        log.info("Sent email to %s via Brevo: %s", to, subject)
+        return True
+    except Exception as exc:
+        log.error("Failed to send email to %s via Brevo: %s", to, exc)
+        return False
 
 
 def send_email(to: str, subject: str, text: str, html: str | None = None) -> bool:
@@ -48,6 +101,10 @@ def send_email(to: str, subject: str, text: str, html: str | None = None) -> boo
     Если SMTP не настроен — печатает письмо в консоль.
     """
     cfg = _smtp_config()
+
+    # Render Free blocks outbound SMTP ports, but HTTPS APIs remain available.
+    if _brevo_configured():
+        return _send_via_brevo(to, subject, text, html)
 
     if not is_smtp_configured():
         print("\n" + "=" * 60)

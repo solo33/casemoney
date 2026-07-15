@@ -1,6 +1,20 @@
 from tests.conftest import register_and_login, TestingSessionLocal
 
 
+def test_register_reports_email_delivery_failure(client, monkeypatch):
+    monkeypatch.setattr("app.api.auth.send_code_email", lambda *args, **kwargs: False)
+
+    r = client.post("/api/auth/register", json={
+        "email": "delivery-failure@test.com",
+        "username": "delivery-failure",
+        "password": "secret1",
+    })
+
+    assert r.status_code == 503
+    assert "Не удалось отправить код" in r.json()["detail"]
+    assert _get_code("delivery-failure@test.com") is None
+
+
 def _get_code(email):
     from app.models.pending_registration import PendingRegistration
     db = TestingSessionLocal()
