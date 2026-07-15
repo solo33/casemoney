@@ -91,7 +91,7 @@ def test_import_merges_cross_currency_transfer_and_registers_both_currencies(cli
     assert {c["currency"] for c in currencies} >= {"RUB", "USD"}
 
 
-def test_import_rejects_ambiguous_mirrored_transfers(client, auth):
+def test_import_merges_multiple_mirrored_transfers_in_source_order(client, auth):
     content = (
         "date;account;category;amount;currency;description;transfer\n"
         "04.06.2026;Cash;;-100,00;USD;First;Bank\n"
@@ -100,8 +100,25 @@ def test_import_rejects_ambiguous_mirrored_transfers(client, auth):
         "04.06.2026;Bank;;18000,00;RUB;Second;Cash\n"
     ).encode("utf-8")
 
-    r = _preview(client, auth, content, "ambiguous.csv")
+    r = _preview(client, auth, content, "multiple-exchanges.csv")
     assert r.status_code == 200, r.text
     preview = r.json()
-    assert preview["totals"]["ok"] == 0
-    assert preview["totals"]["errors"] == 4
+    assert preview["totals"]["ok"] == 2
+    assert preview["totals"]["errors"] == 0
+    assert preview["totals"]["transfers"] == 2
+
+
+def test_import_repairs_unquoted_newline_in_description(client, auth):
+    content = (
+        "date;account;category;amount;currency;description;transfer\n"
+        "25.04.2014;Wallet;Food;-30,00;UAH;Greens and \n"
+        "Eggs;\n"
+        "26.04.2014;Wallet;Food;-20,00;UAH;Milk;\n"
+    ).encode("utf-8")
+
+    r = _preview(client, auth, content, "wrapped-description.csv")
+    assert r.status_code == 200, r.text
+    preview = r.json()
+    assert preview["totals"]["ok"] == 2
+    assert preview["totals"]["errors"] == 0
+    assert preview["rows"][0]["description"] == "Greens and Eggs"

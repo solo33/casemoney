@@ -298,9 +298,10 @@ def _merge_mirrored_transfers(rows: list[ParsedRow]) -> list[ParsedRow]:
     match(transfer_idx, strict_key, drop, matched)
 
     # Проход 2 — по остатку: без валюты/суммы (перевод с конвертацией — суммы
-    # в ногах разные). Склеиваем только уникальную пару. Если между теми же
-    # счетами в один день осталось несколько встречных строк, соответствие
-    # неоднозначно: помечаем их ошибкой вместо тихого искажения сумм.
+    # в ногах разные). Экспорты HomeMoney записывают зеркальные ноги в одном
+    # порядке, поэтому несколько обменов между теми же счетами за день можно
+    # детерминированно сопоставить по очереди. Лишняя строка остаётся отдельным
+    # односторонним переводом — это уже поддерживаемое поведение импортёра.
     def loose_key(r):
         acc = r.account.strip().lower()
         to = r.transfer_to.strip().lower()
@@ -315,33 +316,55 @@ def _merge_mirrored_transfers(rows: list[ParsedRow]) -> list[ParsedRow]:
         bucket = pending_out if r.amount < 0 else pending_in
         bucket.setdefault(loose_key(r), []).append(i)
 
-    processed: set[tuple] = set()
     for key, out_indices in pending_out.items():
         date, acc, to = key
         mirror = (date, to, acc)
-        pair_key = tuple(sorted((key, mirror)))
-        if pair_key in processed:
-            continue
-        processed.add(pair_key)
         in_indices = pending_in.get(mirror, [])
-        if not in_indices:
-            continue
-        if len(out_indices) == 1 and len(in_indices) == 1:
-            out_idx, in_idx = out_indices[0], in_indices[0]
+        for out_idx, in_idx in zip(out_indices, in_indices):
             rows[out_idx].to_currency = rows[in_idx].currency
             rows[out_idx].to_amount = rows[in_idx].abs_amount
             drop.add(in_idx)
             matched.update((out_idx, in_idx))
-            continue
-
-        error = (
-            "Неоднозначные зеркальные переводы: несколько операций между "
-            "одними счетами за один день"
-        )
-        for i in out_indices + in_indices:
-            rows[i].error = error
 
     return [r for i, r in enumerate(rows) if i not in drop]
+
+
+def _repair_wrapped_csv_descriptions(rows: list[list]) -> None:
+    """Восстановить перенос строки в некавычённом поле description.
+
+    Некоторые старые экспорты HomeMoney содержат физический перевод строки
+    внутри описания без обязательных CSV-кавычек. ``csv.reader`` видит хвост
+    такого описания отдельной строкой вида ``["Яйца", ""]``. Оставляем строку
+    на месте (чтобы номера последующих строк не сдвигались), переносим текст в
+    описание предыдущей операции и очищаем ложную строку.
+    """
+    if len(rows) < 3:
+        return
+
+    header_map = _normalize_header(rows[0])
+    if not REQUIRED_COLUMNS.issubset(set(header_map)):
+        return
+    date_idx = header_map["date"]
+    description_idx = header_map.get("description")
+    if description_idx is None:
+        return
+
+    for idx in range(1, len(rows)):
+        raw = rows[idx]
+        non_empty = [(col, _stringify(value)) for col, value in enumerate(raw) if _stringify(value)]
+        if len(non_empty) != 1 or non_empty[0][0] != date_idx or _parse_date(raw[date_idx]):
+            continue
+
+        previous = rows[idx - 1]
+        if date_idx >= len(previous) or not _parse_date(previous[date_idx]):
+            continue
+
+        while len(previous) <= description_idx:
+            previous.append("")
+        continuation = non_empty[0][1]
+        previous_description = _stringify(previous[description_idx])
+        previous[description_idx] = " ".join(part for part in (previous_description, continuation) if part)
+        rows[idx] = [""] * len(raw)
 
 
 def parse_csv(content: bytes) -> list[ParsedRow]:
@@ -364,6 +387,7 @@ def parse_csv(content: bytes) -> list[ParsedRow]:
         delimiter = ";"
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     rows = list(reader)
+    _repair_wrapped_csv_descriptions(rows)
     return _parse_rows(rows)
 
 
