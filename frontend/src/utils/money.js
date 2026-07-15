@@ -27,7 +27,10 @@ export function currencySymbol(code) {
 export function formatMoney(amount, opts = {}) {
   const { maxFraction = 2 } = opts;
   if (amount === null || amount === undefined || Number.isNaN(amount)) return "0";
-  return Number(amount).toLocaleString("ru-RU", {
+  const numericAmount = Number(amount);
+  const zeroThreshold = 0.5 * (10 ** -maxFraction);
+  const displayAmount = Math.abs(numericAmount) < zeroThreshold ? 0 : numericAmount;
+  return displayAmount.toLocaleString("ru-RU", {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxFraction,
   });

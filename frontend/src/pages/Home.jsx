@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
@@ -55,6 +55,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [grouped, setGrouped] = useState([]);
+  const [accountOptions, setAccountOptions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
@@ -67,8 +68,12 @@ export default function Home() {
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
   const [breakdownCollapsed, setBreakdownCollapsed] = useState(IS_MOBILE);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const loadVersion = useRef(0);
 
   const dismissOnboarding = () => {
     localStorage.setItem("cm_onb_done", "1");
@@ -76,36 +81,71 @@ export default function Home() {
   };
 
   const fetchAll = useCallback(async () => {
+    const version = ++loadVersion.current;
+    const isCurrent = () => loadVersion.current === version;
     setError(null);
+    setInitialLoading(true);
+    setBalanceLoading(true);
+    setTrendLoading(true);
+    setAccountsLoading(true);
+
+    const params = {
+      period: "month",
+      year: flowYear,
+      month: flowMonth,
+      breakdown_type: breakdownType,
+    };
+
+    // Этап 1: данные правой колонки и лёгкие опции счетов — без конвертации.
+    const firstStage = await Promise.allSettled([
+      api.get("/api/reports/summary", { params }),
+      api.get("/api/categories/"),
+      api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
+    ]);
+    if (!isCurrent()) return;
+    if (firstStage[0].status === "fulfilled") setSummary(firstStage[0].value.data);
+    if (firstStage[1].status === "fulfilled") setCategories(firstStage[1].value.data);
+    if (firstStage[2].status === "fulfilled") setAccountOptions(firstStage[2].value.data);
+    if (firstStage.some(result => result.status === "rejected")) {
+      setError("Часть данных главной страницы пока недоступна");
+    }
+    setInitialLoading(false);
+
+    // Этап 2: общий баланс и последние изменённые записи.
     try {
-      const params = {
-        period: "month",
-        year: flowYear,
-        month: flowMonth,
-        breakdown_type: breakdownType,
-      };
-      const [d, g, s, c, t] = await Promise.all([
-        api.get("/api/dashboard/"),
-        api.get("/api/accounts/grouped"),
-        api.get("/api/reports/summary", { params }),
-        api.get("/api/categories/"),
-        api.get("/api/reports/monthly-trend", { params: { months: 3 } }),
-      ]);
-      setDashboard(d.data);
-      setGrouped(g.data);
-      setSummary(s.data);
-      setCategories(c.data);
-      setMonthlyTrend(t.data.points || []);
+      const d = await api.get("/api/dashboard/");
+      if (isCurrent()) setDashboard(d.data);
     } catch {
-      setError("Ошибка загрузки");
+      if (isCurrent()) setError("Не удалось обновить общий баланс");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setBalanceLoading(false);
+    }
+
+    // Этап 3: компактная статистика за последние месяцы.
+    try {
+      const t = await api.get("/api/reports/monthly-trend", { params: { months: 3 } });
+      if (isCurrent()) setMonthlyTrend(t.data.points || []);
+    } catch {
+      if (isCurrent()) setError("Не удалось обновить статистику по месяцам");
+    } finally {
+      if (isCurrent()) setTrendLoading(false);
+    }
+
+    // Этап 4: полный список счетов с пересчётом в основную валюту.
+    try {
+      const g = await api.get("/api/accounts/grouped");
+      if (isCurrent()) setGrouped(g.data);
+    } catch {
+      if (isCurrent()) setError("Не удалось обновить счета");
+    } finally {
+      if (isCurrent()) setAccountsLoading(false);
     }
   }, [breakdownType, flowMonth, flowYear]);
 
+  const effectiveAccountGroups = grouped.length > 0 ? grouped : accountOptions;
   const flatAccounts = useMemo(
-    () => grouped.flatMap(b => b.accounts || []),
-    [grouped]
+    () => effectiveAccountGroups.flatMap(b => b.accounts || []),
+    [effectiveAccountGroups]
   );
 
   // Обогащаем сырую транзакцию (из /api/transactions) именами счёта/категории
@@ -175,12 +215,9 @@ export default function Home() {
 
   const recentlyChanged = dashboard?.recently_changed || [];
 
-  if (loading) return <div className="page">Загрузка...</div>;
-  if (error) return <div className="page" style={{ color: "#c0432b" }}>{error}</div>;
-
-  const totalBalance = dashboard.total_balance;
-  const monthIncome = summary?.total_income ?? dashboard.month_income ?? 0;
-  const monthExpense = summary?.total_expense ?? dashboard.month_expense ?? 0;
+  const totalBalance = dashboard?.total_balance ?? null;
+  const monthIncome = summary?.total_income ?? dashboard?.month_income ?? 0;
+  const monthExpense = summary?.total_expense ?? dashboard?.month_expense ?? 0;
   const breakdownItems = summary?.category_breakdown || [];
   const breakdownTotal = breakdownType === "income"
     ? (summary?.total_income || 0)
@@ -196,7 +233,7 @@ export default function Home() {
   const hasTx = (dashboard?.recent_transactions?.length || 0) > 0
     || monthIncome > 0 || monthExpense > 0
     || (dashboard?.recently_changed?.length || 0) > 0;
-  const showOnboarding = !onbDismissed && (!hasAccounts || !hasTx);
+  const showOnboarding = !initialLoading && !accountsLoading && !onbDismissed && (!hasAccounts || !hasTx);
 
   // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
   const goToCategory = (catId) => {
@@ -229,6 +266,15 @@ export default function Home() {
         }
       `}</style>
 
+      {error && (
+        <div style={{
+          gridColumn: "1 / -1", color: "#9a5a16", background: "#fff6df",
+          border: "1px solid #e8cf98", borderRadius: 8, padding: "8px 12px", fontSize: 13,
+        }}>
+          {error}. Остальные разделы продолжают загружаться.
+        </div>
+      )}
+
       {showOnboarding && (
         <div style={{ gridColumn: "1 / -1" }}>
           <Onboarding
@@ -246,7 +292,11 @@ export default function Home() {
         <Card>
           <h3 style={sectionTitle}>Баланс</h3>
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
-            {formatMoney(totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span>
+            {balanceLoading || totalBalance == null ? (
+              <span style={{ fontSize: 14, color: "#a6afb8", fontWeight: 400 }}>Обновляем остатки…</span>
+            ) : (
+              <>{formatMoney(totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span></>
+            )}
           </div>
           {byCurrency.length > 0 && (
             <div style={{ marginTop: 8 }}>
@@ -263,7 +313,12 @@ export default function Home() {
             </div>
           )}
 
-          {trendDesc.length > 0 && (
+          {trendLoading ? (
+            <>
+              <div style={{ borderTop: "1px solid #ece6d8", margin: "14px 0 10px" }} />
+              <p style={{ margin: 0, color: "#a6afb8", fontSize: 12 }}>Обновляем статистику по месяцам…</p>
+            </>
+          ) : trendDesc.length > 0 && (
             <>
               <div style={{ borderTop: "1px solid #ece6d8", margin: "14px 0 10px" }} />
               <MonthBars points={trendDesc} sym={sym} />
@@ -279,7 +334,11 @@ export default function Home() {
               Настроить →
             </Link>
           </div>
-          {grouped.length === 0 ? (
+          {accountsLoading ? (
+            <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
+              Загружаем счета…
+            </p>
+          ) : grouped.length === 0 ? (
             <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
               Нет счетов. <Link to="/accounts">Добавить</Link>
             </p>
@@ -311,7 +370,7 @@ export default function Home() {
         <QuickAddInline
           date={selectedDate}
           onDateChange={setSelectedDate}
-          accountGroups={grouped}
+          accountGroups={accountOptions}
           categories={categories}
         />
 
@@ -390,7 +449,9 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          {breakdownCollapsed ? null : breakdownItems.length === 0 ? (
+          {breakdownCollapsed ? null : initialLoading ? (
+            <p style={{ color: "#a6afb8", fontSize: 14 }}>Загружаем категории…</p>
+          ) : breakdownItems.length === 0 ? (
             <p style={{ color: "#a6afb8", fontSize: 14 }}>
               Нет {breakdownType === "income" ? "доходов" : "расходов"} за этот месяц
             </p>

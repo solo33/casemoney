@@ -17,7 +17,8 @@ from app.services.auth import (
     create_reset_token, verify_reset_token,
 )
 from app.services.email import (
-    send_activation_email, send_reset_email, app_url, is_smtp_configured,
+    send_activation_email, send_registration_notification,
+    send_reset_email, app_url, is_smtp_configured,
 )
 from app.services.app_config import get_config
 from app.seeds import seed_default_categories, seed_default_accounts
@@ -49,6 +50,15 @@ def _send_activation(user: User):
         send_activation_email(user.email, user.username, _build_activation_url(user.id))
     except Exception:
         pass  # ошибка отправки не должна валить запрос
+
+
+def _notify_registration(email: str, username: str, created_at: datetime) -> None:
+    """Background task: notify the owner without affecting registration."""
+    try:
+        registered_at = _as_utc(created_at).isoformat()
+        send_registration_notification(email, username, registered_at)
+    except Exception:
+        pass
 
 
 class RegisterResponse(BaseModel):
@@ -142,6 +152,7 @@ def _can_resend_verification(user: User) -> bool:
 def register(
     request: Request,
     data: UserRegister,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     cfg = get_config(db)
@@ -166,6 +177,12 @@ def register(
         hashed,
         email_verified=not cfg.require_email_verification,
     )
+    background.add_task(
+        _notify_registration,
+        user.email,
+        user.username,
+        user.created_at or _now(),
+    )
     email_sent = False
     if cfg.require_email_verification:
         _record_verification_email_attempt(db, user)
@@ -185,7 +202,12 @@ def register(
 
 @router.post("/verify-code", response_model=Token)
 @limiter.limit("20/hour")
-def verify_code(request: Request, data: VerifyCodeRequest, db: Session = Depends(get_db)):
+def verify_code(
+    request: Request,
+    data: VerifyCodeRequest,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """Проверяет код и создаёт пользователя. Возвращает токен (автологин)."""
     pending = db.query(PendingRegistration).filter(
         PendingRegistration.email == data.email
@@ -214,6 +236,12 @@ def verify_code(request: Request, data: VerifyCodeRequest, db: Session = Depends
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
     user = _create_user(db, pending.email, pending.username, pending.hashed_password)
+    background.add_task(
+        _notify_registration,
+        user.email,
+        user.username,
+        user.created_at or _now(),
+    )
     db.delete(pending)
     db.commit()
 

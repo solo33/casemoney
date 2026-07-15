@@ -15,6 +15,48 @@ function isoToday() {
   return new Date(d - tz).toISOString().slice(0, 10);
 }
 
+function CategoryOptions({ categories }) {
+  const byParent = new Map();
+  categories.forEach(category => {
+    if (category.parent_id != null) {
+      const children = byParent.get(category.parent_id) || [];
+      children.push(category);
+      byParent.set(category.parent_id, children);
+    }
+  });
+
+  const roots = categories.filter(category => category.parent_id == null);
+  const knownRootIds = new Set(roots.map(category => category.id));
+  const orphanedChildren = categories.filter(
+    category => category.parent_id != null && !knownRootIds.has(category.parent_id)
+  );
+  const label = category => `${category.icon ? `${category.icon} ` : ""}${category.name}`;
+
+  return (
+    <>
+      {roots.map(parent => {
+        const children = byParent.get(parent.id) || [];
+        if (children.length === 0) {
+          return <option key={parent.id} value={parent.id}>{label(parent)}</option>;
+        }
+        return (
+          <optgroup key={parent.id} label={label(parent)}>
+            <option value={parent.id}>Вся группа · {parent.name}</option>
+            {children.map(child => (
+              <option key={child.id} value={child.id}>
+                ↳ {label(child)}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
+      {orphanedChildren.map(category => (
+        <option key={category.id} value={category.id}>{label(category)}</option>
+      ))}
+    </>
+  );
+}
+
 export default function QuickAddInline({
   date,
   onDateChange,
@@ -242,11 +284,7 @@ export default function QuickAddInline({
               onChange={e => setForm({ ...form, category_id: e.target.value })}
             >
               <option value="">— не выбрана —</option>
-              {filteredCategories.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.icon ? `${c.icon} ` : ""}{c.name}
-                </option>
-              ))}
+              <CategoryOptions categories={filteredCategories} />
             </select>
           )}
           <input

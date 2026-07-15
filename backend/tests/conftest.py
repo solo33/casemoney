@@ -54,6 +54,9 @@ def _fresh_db(monkeypatch):
     Base.metadata.create_all(bind=test_engine)
     main_module.app.dependency_overrides[get_db] = _override_get_db
     monkeypatch.setattr("app.api.auth.send_activation_email", lambda *args: True)
+    monkeypatch.setattr(
+        "app.api.auth.send_registration_notification", lambda *args: True
+    )
     yield
     Base.metadata.drop_all(bind=test_engine)
     # сбрасываем кэш курсов между тестами

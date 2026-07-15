@@ -48,6 +48,26 @@ def test_registration_creates_unverified_user_with_seven_day_access(client):
     assert login.status_code == 200
 
 
+def test_registration_notifies_owner_in_background(client, monkeypatch):
+    notifications = []
+    monkeypatch.setattr(
+        "app.api.auth.send_registration_notification",
+        lambda *args: notifications.append(args) or True,
+    )
+
+    response = client.post("/api/auth/register", json={
+        "email": "owner-notification@test.com",
+        "username": "owner-notification",
+        "password": "secret1",
+    })
+
+    assert response.status_code == 200
+    assert len(notifications) == 1
+    assert notifications[0][0] == "owner-notification@test.com"
+    assert notifications[0][1] == "owner-notification"
+    assert notifications[0][2]
+
+
 def test_unverified_login_is_blocked_after_seven_days(client):
     client.post("/api/auth/register", json={
         "email": "expired@test.com",

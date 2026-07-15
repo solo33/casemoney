@@ -28,6 +28,8 @@ services:
         value: noreply@casemoney.ru
       - key: POSTBOX_FROM_NAME
         value: CaseMoney
+      - key: REGISTRATION_NOTIFY_EMAIL
+        value: andrey.zakhartsev@gmail.com
       - key: APP_URL
         value: https://casemoney.ru
       - key: CORS_ORIGINS

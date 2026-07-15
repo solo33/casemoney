@@ -1,10 +1,11 @@
 """Конверсия валют через ЦБ РФ (фиат) и CoinGecko (крипта).
 
 Все курсы хранятся в виде "1 unit of from_currency = rate * to_currency"
-и кэшируются в таблице exchange_rates с TTL = 1 час.
+и кэшируются в таблице exchange_rates с TTL = 24 часа.
 Все конверсии проходят через RUB как pivot.
 """
 import time
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.exchange_rate import ExchangeRate
 
-CACHE_TTL = timedelta(hours=1)
+CACHE_TTL = timedelta(days=1)
 
 # --- Memo-кэш пользовательских курсов ---
 # get_rate_for_user раньше делал 3-5 SQL-запросов (User, UserCurrency x2-4,
@@ -23,11 +24,19 @@ CACHE_TTL = timedelta(hours=1)
 _USER_RATE_TTL = 45  # секунд
 _user_rate_cache: dict[tuple[int, str, str], tuple[float, str, float]] = {}
 
+# Один недоступный провайдер не должен задерживать каждый новый тикер на весь
+# сетевой timeout. Первый запрос проверяет источник, остальные в течение
+# короткой паузы сразу используют stale-курс (или сообщают, что курса ещё нет).
+_PROVIDER_RETRY_TTL = 60  # секунд
+_provider_failed_at: dict[str, float] = {}
+_provider_locks = {"cbr": threading.Lock(), "coingecko": threading.Lock()}
+
 
 def invalidate_user_rates(user_id: Optional[int] = None) -> None:
     """Сбросить memo-кэш курсов. Вызывать при смене основной валюты или ручного курса."""
     if user_id is None:
         _user_rate_cache.clear()
+        _provider_failed_at.clear()
         return
     for key in [k for k in _user_rate_cache if k[0] == user_id]:
         _user_rate_cache.pop(key, None)
@@ -63,7 +72,7 @@ def fetch_cbr_to_rub() -> dict[str, float]:
     Использует ЦБ РФ. Например JPY (Nominal=100, Value=58) → 0.58 RUB за 1 JPY.
     """
     try:
-        r = httpx.get(CBR_URL, timeout=10.0)
+        r = httpx.get(CBR_URL, timeout=5.0)
         r.raise_for_status()
         data = r.json()
     except (httpx.HTTPError, ValueError) as e:
@@ -87,7 +96,7 @@ def fetch_coingecko_to_rub(tickers: list[str]) -> dict[str, float]:
         r = httpx.get(
             COINGECKO_URL,
             params={"ids": ",".join(ids), "vs_currencies": "rub"},
-            timeout=10.0,
+            timeout=5.0,
         )
         r.raise_for_status()
         data = r.json()
@@ -159,32 +168,46 @@ def get_rate_to_rub(db: Session, currency: str) -> float:
     if cached and _is_fresh(cached):
         return cached.rate
 
-    # Refresh: фиат через CBR, крипта через CoinGecko
-    try:
-        if currency in CRYPTO_IDS:
-            rates = fetch_coingecko_to_rub([currency])
-            source = "coingecko"
-        else:
-            rates = fetch_cbr_to_rub()
-            source = "cbr"
-    except ExchangeError:
-        # Внешний источник может быть временно недоступен. Для финансового
-        # интерфейса последний известный курс полезнее нулевого баланса или
-        # полностью упавшего отчёта, поэтому используем stale-запись из БД.
-        if cached:
+    source = "coingecko" if currency in CRYPTO_IDS else "cbr"
+    lock = _provider_locks[source]
+    with lock:
+        # Параллельный запрос мог уже обновить курс, пока мы ждали lock.
+        cached = _get_cached(db, currency, "RUB")
+        if cached and _is_fresh(cached):
             return cached.rate
-        raise
 
-    if currency not in rates:
-        # Если в источнике нет валюты — возвращаем stale, если есть, иначе ошибка
+        failed_at = _provider_failed_at.get(source)
+        if failed_at is not None and time.time() - failed_at < _PROVIDER_RETRY_TTL:
+            if cached:
+                return cached.rate
+            raise ExchangeError(f"{source} temporarily unavailable")
+
+        # Один ответ ЦБ содержит все фиатные курсы, а CoinGecko умеет вернуть
+        # все поддерживаемые криптовалюты одним запросом. Сохраняем весь набор,
+        # чтобы импорт с несколькими валютами не обращался к сети для каждой.
+        try:
+            rates = (
+                fetch_coingecko_to_rub(list(CRYPTO_IDS))
+                if source == "coingecko"
+                else fetch_cbr_to_rub()
+            )
+        except ExchangeError:
+            _provider_failed_at[source] = time.time()
+            if cached:
+                return cached.rate
+            raise
+
+        _provider_failed_at.pop(source, None)
+        for code, rate in rates.items():
+            if code != "RUB":
+                _save_rate(db, code, "RUB", rate, source)
+        db.commit()
+
+        if currency in rates:
+            return rates[currency]
         if cached:
             return cached.rate
         raise ExchangeError(f"Unknown currency: {currency}")
-
-    rate = rates[currency]
-    _save_rate(db, currency, "RUB", rate, source)
-    db.commit()
-    return rate
 
 
 def get_rate(db: Session, from_currency: str, to_currency: str) -> float:
@@ -272,6 +295,90 @@ def convert_for_user(
     """Конверсия с учётом ручных курсов пользователя."""
     rate, _ = get_rate_for_user(db, user_id, from_currency, to_currency)
     return round(amount * rate, 2)
+
+
+def prime_user_rates(
+    db: Session,
+    user_id: int,
+    currencies: set[str] | list[str],
+    to_currency: str,
+) -> None:
+    """Batch-load conversion inputs and seed the short-lived user-rate cache."""
+    from app.models.user_currency import UserCurrency
+    from app.models.user import User
+
+    to_cur = to_currency.upper()
+    from_currencies = {currency.upper() for currency in currencies}
+    missing = set()
+    for currency in from_currencies:
+        if currency == to_cur:
+            continue
+        cached = _user_rate_cache.get((user_id, currency, to_cur))
+        if cached is None or time.time() - cached[2] >= _USER_RATE_TTL:
+            missing.add(currency)
+    if not missing:
+        return
+
+    user = db.query(User).filter(User.id == user_id).first()
+    main = (user.main_currency if user and user.main_currency else "RUB").upper()
+    user_currencies = {
+        item.currency.upper(): item
+        for item in db.query(UserCurrency).filter(
+            UserCurrency.user_id == user_id,
+        ).all()
+    }
+
+    def manual_to_main(currency: str) -> Optional[float]:
+        if currency == main:
+            return 1.0
+        item = user_currencies.get(currency)
+        if item and not item.auto and item.manual_rate is not None:
+            return item.manual_rate
+        return None
+
+    required = missing | {to_cur}
+    manual_rates = {currency: manual_to_main(currency) for currency in required}
+    system_currencies = {
+        currency for currency in required if manual_rates[currency] is None
+    }
+    rub_rates = {}
+    for currency in system_currencies:
+        try:
+            rub_rates[currency] = get_rate_to_rub(db, currency)
+        except ExchangeError:
+            # The regular serializer preserves its existing zero-value fallback
+            # for rates that are unavailable even after stale-cache lookup.
+            continue
+    try:
+        main_to_rub = get_rate_to_rub(db, main)
+    except ExchangeError:
+        return
+
+    def to_main_rate(currency: str) -> Optional[float]:
+        manual = manual_rates[currency]
+        if manual is not None:
+            return manual
+        rub_rate = rub_rates.get(currency)
+        return rub_rate / main_to_rub if rub_rate is not None else None
+
+    target_rate = to_main_rate(to_cur)
+    if target_rate is None:
+        return
+    now = time.time()
+    for currency in missing:
+        source = (
+            "manual"
+            if manual_rates[currency] is not None or manual_rates[to_cur] is not None
+            else "auto"
+        )
+        currency_rate = to_main_rate(currency)
+        if currency_rate is None:
+            continue
+        _user_rate_cache[(user_id, currency, to_cur)] = (
+            currency_rate / target_rate,
+            source,
+            now,
+        )
 
 
 def refresh_all_rates(db: Session) -> dict[str, int]:

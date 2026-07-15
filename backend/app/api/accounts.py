@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 
 from app.database import get_db
@@ -64,12 +64,19 @@ def get_accounts(
 ):
     """Плоский список со всеми балансами и total_in_main."""
     main = accounts_svc.get_user_main_currency(db, user_id)
-    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    accounts = (
+        db.query(Account)
+        .options(selectinload(Account.balances))
+        .filter(Account.user_id == user_id)
+        .all()
+    )
+    accounts_svc.prime_account_rates(db, accounts, main)
     return [accounts_svc.serialize_account(db, a, main) for a in accounts]
 
 
 @router.get("/grouped", response_model=List[AccountGroupBucket])
 def get_accounts_grouped(
+    convert_balances: bool = True,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -83,10 +90,13 @@ def get_accounts_grouped(
     )
     accounts = (
         db.query(Account)
+        .options(selectinload(Account.balances))
         .filter(Account.user_id == user_id)
         .order_by(Account.sort_order, Account.id)
         .all()
     )
+    if convert_balances:
+        accounts_svc.prime_account_rates(db, accounts, main)
 
     by_group: dict[Optional[int], list[Account]] = {}
     for a in accounts:
@@ -95,7 +105,10 @@ def get_accounts_grouped(
     result: list[AccountGroupBucket] = []
     for g in groups:
         bucket_accounts = by_group.get(g.id, [])
-        serialized = [accounts_svc.serialize_account(db, a, main) for a in bucket_accounts]
+        serialized = [
+            accounts_svc.serialize_account(db, a, main, convert_balances=convert_balances)
+            for a in bucket_accounts
+        ]
         result.append(AccountGroupBucket(
             group=GroupSummary(id=g.id, name=g.name, sort_order=g.sort_order),
             accounts=serialized,
@@ -107,7 +120,10 @@ def get_accounts_grouped(
 
     ungrouped = by_group.get(None, [])
     if ungrouped:
-        serialized = [accounts_svc.serialize_account(db, a, main) for a in ungrouped]
+        serialized = [
+            accounts_svc.serialize_account(db, a, main, convert_balances=convert_balances)
+            for a in ungrouped
+        ]
         result.append(AccountGroupBucket(
             group=GroupSummary(id=None, name="Без группы", sort_order=10_000),
             accounts=serialized,

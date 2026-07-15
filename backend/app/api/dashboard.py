@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, extract
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -96,7 +96,13 @@ def get_dashboard(
     current_year = now.year
 
     # 1. Счета — каждый со своим total_in_main
-    accounts = db.query(Account).filter(Account.user_id == user_id).all()
+    accounts = (
+        db.query(Account)
+        .options(selectinload(Account.balances))
+        .filter(Account.user_id == user_id)
+        .all()
+    )
+    accounts_svc.prime_account_rates(db, accounts, main)
     accounts_serialized = [
         accounts_svc.serialize_account(db, a, main) for a in accounts
     ]
@@ -122,6 +128,12 @@ def get_dashboard(
             extract("year", Transaction.date) == current_year,
         )
         .all()
+    )
+    exchange_svc.prime_user_rates(
+        db,
+        user_id,
+        {transaction.currency for transaction in month_transactions},
+        main,
     )
 
     month_income = sum(

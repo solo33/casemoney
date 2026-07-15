@@ -24,6 +24,41 @@ def test_create_and_list_account(client, auth):
     assert any(a["id"] == acc["id"] for a in r.json())
 
 
+def test_grouped_accounts_can_skip_currency_conversion(client, auth, monkeypatch):
+    acc = make_account(client, auth, name="USD card", balance=100, currency="USD")
+
+    def must_not_convert(*args, **kwargs):
+        raise AssertionError("lightweight account options must not request exchange rates")
+
+    monkeypatch.setattr("app.services.accounts.exchange_svc.convert_for_user", must_not_convert)
+    r = client.get("/api/accounts/grouped?convert_balances=false", headers=auth)
+
+    assert r.status_code == 200, r.text
+    listed = [a for bucket in r.json() for a in bucket["accounts"]]
+    account = next(a for a in listed if a["id"] == acc["id"])
+    assert account["balances"][0]["balance"] == 100
+    assert account["balances"][0]["balance_in_main"] == 0
+
+
+def test_account_balances_list_rub_first(client, auth):
+    acc = make_account(client, auth, name="Multi", balance=100, currency="USD")
+    response = client.post(
+        f"/api/accounts/{acc['id']}/balances",
+        headers=auth,
+        json={"currency": "RUB", "balance": 500},
+    )
+    assert response.status_code == 201, response.text
+
+    response = client.get(
+        "/api/accounts/grouped?convert_balances=false",
+        headers=auth,
+    )
+    assert response.status_code == 200, response.text
+    listed = [a for bucket in response.json() for a in bucket["accounts"]]
+    account = next(a for a in listed if a["id"] == acc["id"])
+    assert [balance["currency"] for balance in account["balances"]] == ["RUB", "USD"]
+
+
 def test_account_isolation_between_users(client):
     auth_a = register_and_login(client)
     auth_b = register_and_login(client)

@@ -26,6 +26,10 @@ from botocore.config import Config
 
 log = logging.getLogger("casemoney.email")
 
+REGISTRATION_NOTIFY_EMAIL = os.getenv(
+    "REGISTRATION_NOTIFY_EMAIL", "andrey.zakhartsev@gmail.com"
+).strip()
+
 
 def _smtp_config() -> dict:
     return {
@@ -252,6 +256,43 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
 </body></html>
 """
     return send_email(to_email, subject, text, html)
+
+
+def send_registration_notification(
+    user_email: str,
+    username: str,
+    registered_at: str,
+) -> bool:
+    """Notify the service owner about a newly created account."""
+    if not REGISTRATION_NOTIFY_EMAIL:
+        return False
+
+    email_html = _html.escape(user_email)
+    username_html = _html.escape(username)
+    registered_at_html = _html.escape(registered_at)
+    subject = "CaseMoney — новая регистрация"
+    text = (
+        "В CaseMoney зарегистрирован новый пользователь.\n\n"
+        f"Email: {user_email}\n"
+        f"Имя пользователя: {username}\n"
+        f"Время регистрации: {registered_at}\n"
+    )
+    html = f"""\
+<!doctype html>
+<html><body style="font-family: system-ui, sans-serif; background: #f6f2e9; padding: 32px;">
+  <div style="max-width: 560px; margin: 0 auto; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 28px;">
+    <h1 style="font-family: Georgia, serif; color: #173a54; font-size: 24px; margin: 0 0 18px;">
+      Новая регистрация в CaseMoney
+    </h1>
+    <p style="color: #515c68; line-height: 1.7; margin: 0;">
+      <strong>Email:</strong> <a href="mailto:{email_html}" style="color: #9c7b3c;">{email_html}</a><br>
+      <strong>Имя пользователя:</strong> {username_html}<br>
+      <strong>Время регистрации:</strong> {registered_at_html}
+    </p>
+  </div>
+</body></html>
+"""
+    return send_email(REGISTRATION_NOTIFY_EMAIL, subject, text, html)
 
 
 def send_code_email(to_email: str, username: str, code: str) -> bool:

@@ -62,6 +62,7 @@ export default function Accounts() {
     try {
       const res = await api.get("/api/accounts/grouped");
       setGroups(res.data);
+      setError(null);
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка загрузки счетов");
     } finally {
@@ -70,12 +71,12 @@ export default function Accounts() {
   }, []);
 
   useEffect(() => {
-    fetchGroups();
     window.addEventListener(TX_ADDED_EVENT, fetchGroups);
     return () => window.removeEventListener(TX_ADDED_EVENT, fetchGroups);
   }, [fetchGroups]);
 
-  // Refetch when main currency changes (нужны новые total_in_main)
+  // Загружаем один раз при открытии и повторяем при смене основной валюты.
+  // Раньше соседний effect запускал второй одинаковый запрос при каждом mount.
   useEffect(() => { fetchGroups(); }, [mainCurrency, fetchGroups]);
 
   const toggleExpand = (id) => {
@@ -159,10 +160,23 @@ export default function Accounts() {
   };
 
   const handleToggleInclude = async (acc) => {
+    const includeInBalance = !acc.include_in_balance;
+    const updateLocalValue = (value) => {
+      setGroups(current => current.map(bucket => ({
+        ...bucket,
+        accounts: bucket.accounts.map(account => (
+          account.id === acc.id
+            ? { ...account, include_in_balance: value }
+            : account
+        )),
+      })));
+    };
+    updateLocalValue(includeInBalance);
     try {
-      await api.put(`/api/accounts/${acc.id}`, { include_in_balance: !acc.include_in_balance });
-      fetchGroups();
+      await api.put(`/api/accounts/${acc.id}`, { include_in_balance: includeInBalance });
+      setError(null);
     } catch (e) {
+      updateLocalValue(acc.include_in_balance);
       setError(e.response?.data?.detail || "Не удалось обновить");
     }
   };
