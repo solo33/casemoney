@@ -316,3 +316,34 @@ hr {
 .report-table td:first-child { position: sticky; left: 0; z-index: 2; background: inherit; }
 .report-table thead th:first-child { z-index: 4; }
 .table-wrap { max-width: 100%; }
+
+@keyframes cm-brand-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cm-brand-spinner {
+  animation: cm-brand-spin 1.25s linear infinite;
+  box-shadow: 0 5px 14px rgba(23, 58, 84, 0.18);
+}
+
+.cm-global-progress {
+  position: fixed;
+  top: 72px;
+  right: 18px;
+  z-index: 1800;
+  max-width: calc(100vw - 24px);
+  padding: 10px 14px;
+  background: rgba(255, 253, 247, 0.97);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(15, 30, 45, 0.2);
+}
+
+@media (max-width: 640px) {
+  .cm-global-progress { top: 68px; right: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-brand-spinner { animation: none; }
+}

@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import QuickAddInline from "../components/QuickAddInline";
+import { BrandProgress } from "../components/BrandProgress";
 import { useUser } from "../contexts/UserContext";
 import {
   currencySymbol,
@@ -298,7 +299,7 @@ export default function Home() {
           <h3 style={sectionTitle}>Баланс</h3>
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
             {balanceLoading || totalBalance == null ? (
-              <span style={{ fontSize: 14, color: "#a6afb8", fontWeight: 400 }}>Обновляем остатки…</span>
+              <BrandProgress label="Обновляем остатки…" size={38} style={{ minHeight: 40 }} />
             ) : (
               <>{formatMoney(totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span></>
             )}
@@ -321,7 +322,7 @@ export default function Home() {
           {trendLoading ? (
             <>
               <div style={{ borderTop: "1px solid #ece6d8", margin: "14px 0 10px" }} />
-              <p style={{ margin: 0, color: "#a6afb8", fontSize: 12 }}>Обновляем статистику по месяцам…</p>
+              <BrandProgress label="Обновляем статистику по месяцам…" size={30} />
             </>
           ) : trendDesc.length > 0 && (
             <>
@@ -340,9 +341,7 @@ export default function Home() {
             </Link>
           </div>
           {accountsLoading ? (
-            <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
-              Загружаем счета…
-            </p>
+            <AccountLoadingStructure />
           ) : grouped.length === 0 ? (
             <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
               Нет счетов. <Link to="/accounts">Добавить</Link>
@@ -455,7 +454,7 @@ export default function Home() {
             </div>
           </div>
           {breakdownCollapsed ? null : initialLoading ? (
-            <p style={{ color: "#a6afb8", fontSize: 14 }}>Загружаем категории…</p>
+            <BrandProgress label="Обновляем категории…" size={34} style={{ minHeight: 72 }} />
           ) : breakdownItems.length === 0 ? (
             <p style={{ color: "#a6afb8", fontSize: 14 }}>
               Нет {breakdownType === "income" ? "доходов" : "расходов"} за этот месяц
@@ -903,6 +902,37 @@ function MonthBar({ value, max, color }) {
         width: `${pct}%`, minWidth: pct > 0 ? 3 : 0,
         height: "100%", background: color, borderRadius: 999,
       }} />
+    </div>
+  );
+}
+
+function AccountLoadingStructure() {
+  return (
+    <div style={{ padding: "6px 12px 14px" }}>
+      <BrandProgress
+        label="Обновляем счета…"
+        size={34}
+        style={{ padding: "4px 4px 10px" }}
+      />
+      {["60%", "78%", "48%"].map((width, index) => (
+        <div
+          key={width}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "8px 6px",
+            borderTop: index === 0 ? "1px solid #ece6d8" : "none",
+          }}
+        >
+          <span style={{
+            width, height: 9, borderRadius: 999,
+            background: "linear-gradient(90deg, #ece6d8, #f6f2e9)",
+          }} />
+          <span style={{
+            width: 54, height: 9, borderRadius: 999, marginLeft: "auto",
+            background: "#ece6d8",
+          }} />
+        </div>
+      ))}
     </div>
   );
 }

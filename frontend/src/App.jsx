@@ -4,6 +4,7 @@ import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import CookieBanner from './components/CookieBanner'
+import { GlobalNetworkProgress } from './components/BrandProgress'
 import { UserProvider } from './contexts/UserContext'
 
 const Login = lazy(() => import('./pages/Login'))
@@ -228,6 +229,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <CookieBanner />
+      <GlobalNetworkProgress />
     </BrowserRouter>
   )
 }

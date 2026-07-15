@@ -11,8 +11,33 @@ const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,
 })
 
+let activeRequests = 0
+
+function publishRequestCount() {
+  window.__casemoneyActiveRequests = activeRequests
+  window.dispatchEvent(new CustomEvent('casemoney:network-progress', {
+    detail: { activeRequests },
+  }))
+}
+
+function startRequest(config) {
+  if (config?.skipGlobalProgress || config?.__casemoneyTracked) return config
+  config.__casemoneyTracked = true
+  activeRequests += 1
+  publishRequestCount()
+  return config
+}
+
+function finishRequest(config) {
+  if (!config?.__casemoneyTracked) return
+  config.__casemoneyTracked = false
+  activeRequests = Math.max(0, activeRequests - 1)
+  publishRequestCount()
+}
+
 // Перехватчик запросов — автоматически добавляет JWT токен в каждый запрос
 client.interceptors.request.use((config) => {
+  startRequest(config)
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -23,8 +48,12 @@ client.interceptors.request.use((config) => {
 // Перехватчик ответов — нормализует ошибки, чтобы во всех catch
 // `e.response?.data?.detail` всегда содержал понятный человеку текст.
 client.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    finishRequest(res.config)
+    return res
+  },
   (error) => {
+    finishRequest(error.config)
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('token')
       window.location.href = '/login'
