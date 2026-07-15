@@ -329,14 +329,47 @@ hr {
 .report-table thead th:first-child { z-index: 4; }
 .table-wrap { max-width: 100%; }
 
-@keyframes cm-brand-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes cm-brand-fill-up {
+  0%, 10% {
+    clip-path: inset(100% 0 0);
+    opacity: 1;
+  }
+  78%, 90% {
+    clip-path: inset(0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0);
+    opacity: 0;
+  }
 }
 
-.cm-brand-spinner {
-  animation: cm-brand-spin 1.25s linear infinite;
-  box-shadow: 0 5px 14px rgba(23, 58, 84, 0.18);
+.cm-brand-fill {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: calc(var(--cm-brand-size) * 0.72);
+  height: var(--cm-brand-size);
+  font-family: var(--font-display);
+  font-size: var(--cm-brand-size);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--line-strong);
+  -webkit-text-stroke: 1px rgba(23, 58, 84, 0.18);
+  filter: drop-shadow(0 3px 5px rgba(23, 58, 84, 0.12));
+}
+
+.cm-brand-fill::after {
+  content: "C";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--brass-bright);
+  -webkit-text-stroke: 1px var(--brass);
+  clip-path: inset(100% 0 0);
+  animation: cm-brand-fill-up 1.8s ease-in-out infinite;
 }
 
 .cm-global-progress {
@@ -357,5 +390,8 @@ hr {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cm-brand-spinner { animation: none; }
+  .cm-brand-fill::after {
+    animation: none;
+    clip-path: inset(0);
+  }
 }

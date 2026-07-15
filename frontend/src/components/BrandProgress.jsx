@@ -11,14 +11,13 @@ export function BrandProgress({ label = "Обновляем данные…", si
         ...style,
       }}
     >
-      <img
-        className="cm-brand-spinner"
-        src="/icon.svg"
-        alt=""
-        width={size}
-        height={size}
-        style={{ flex: "0 0 auto", borderRadius: Math.max(7, size * 0.2) }}
-      />
+      <span
+        className="cm-brand-fill"
+        aria-hidden="true"
+        style={{ "--cm-brand-size": `${size}px` }}
+      >
+        C
+      </span>
       <span>{label}</span>
     </div>
   );

@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 const isUncategorized = category => (
   category.name.trim().toLocaleLowerCase("ru-RU") === "без категории"
 );
@@ -15,8 +17,8 @@ const categoryLabel = category => (
 /**
  * Единый список категорий для нативного select.
  * Группы и их дочерние категории сортируются отдельно по алфавиту.
- * Первая строка optgroup дублирует группу как обычный option, потому что
- * сам HTML-элемент optgroup выбрать нельзя.
+ * Группа является обычным выбираемым option, дочерние строки идут следом
+ * с отступом. Так название не дублируется заголовком нативного optgroup.
  */
 export default function CategoryOptions({ categories }) {
   const byParent = new Map();
@@ -41,16 +43,8 @@ export default function CategoryOptions({ categories }) {
     <>
       {roots.map(parent => {
         const children = (byParent.get(parent.id) || []).sort(compareByName);
-        if (children.length === 0) {
-          return (
-            <option key={parent.id} value={parent.id} style={{ fontWeight: 700 }}>
-              {categoryLabel(parent)}
-            </option>
-          );
-        }
-
         return (
-          <optgroup key={parent.id} label={categoryLabel(parent)}>
+          <Fragment key={parent.id}>
             <option value={parent.id} style={{ fontWeight: 700 }}>
               {categoryLabel(parent)}
             </option>
@@ -59,7 +53,7 @@ export default function CategoryOptions({ categories }) {
                 ↳ {categoryLabel(child)}
               </option>
             ))}
-          </optgroup>
+          </Fragment>
         );
       })}
       {orphanedChildren.map(category => (
