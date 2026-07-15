@@ -217,7 +217,7 @@ export default function Home() {
       margin: "0 auto",
       padding: "16px",
       display: "grid",
-        gridTemplateColumns: "360px minmax(0, 760px)",
+      gridTemplateColumns: "320px minmax(0, 800px)",
       gap: 20,
       alignItems: "start",
     }}>
@@ -786,7 +786,7 @@ function MonthBars({ points, sym }) {
   const maxVal = Math.max(...points.flatMap(p => [Math.abs(p.income), Math.abs(p.expense)])) || 1;
 
   return (
-    <div>
+    <div aria-label="Движение денег по месяцам">
       {points.map((p, idx) => {
         const now = new Date();
         const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -796,16 +796,28 @@ function MonthBars({ points, sym }) {
           : RU_MONTHS_FULL[m - 1].charAt(0).toUpperCase() + RU_MONTHS_FULL[m - 1].slice(1);
         return (
           <div key={p.month} style={{
-            marginBottom: idx === points.length - 1 ? 0 : 12,
+            display: "grid",
+            gridTemplateColumns: "68px minmax(56px, 1fr) auto",
+            alignItems: "center",
+            gap: 8,
+            minHeight: 34,
+            padding: "4px 0",
+            borderBottom: idx === points.length - 1 ? "none" : "1px solid #f1ece2",
           }}>
-            <div style={{
-              fontSize: 12, color: "#7a8590", marginBottom: 4,
-              display: "flex", justifyContent: "space-between",
-            }}>
-              <span>{label}</span>
+            <span style={{ fontSize: 11, lineHeight: 1.2, color: "#7a8590" }}>
+              {label}
+            </span>
+            <div style={{ display: "grid", gap: 5 }} aria-hidden="true">
+              <MonthBar value={p.income} max={maxVal} color="#3d9a68" />
+              <MonthBar value={p.expense} max={maxVal} color="#d66a54" />
             </div>
-            <Bar value={p.income} max={maxVal} color="#167a4a" sym={sym} sign="+" />
-            <Bar value={p.expense} max={maxVal} color="#c0432b" sym={sym} sign="−" />
+            <div className="tabular" style={{
+              display: "grid", gap: 1, minWidth: 78,
+              fontSize: 11, lineHeight: 1.15, textAlign: "right", fontWeight: 600,
+            }}>
+              <span style={{ color: "#167a4a" }}>+{formatMoney(p.income)} {sym}</span>
+              <span style={{ color: "#c0432b" }}>−{formatMoney(p.expense)} {sym}</span>
+            </div>
           </div>
         );
       })}
@@ -813,23 +825,16 @@ function MonthBars({ points, sym }) {
   );
 }
 
-function Bar({ value, max, color, sym, sign }) {
+function MonthBar({ value, max, color }) {
   const pct = max > 0 ? Math.min(100, (Math.abs(value) / max) * 100) : 0;
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 8,
-      fontSize: 12, marginTop: 3,
+      height: 5, background: "#ece6d8", borderRadius: 999, overflow: "hidden",
     }}>
       <div style={{
-        flex: 1, height: 8, background: "#ece6d8", borderRadius: 4, overflow: "hidden",
-      }}>
-        <div style={{
-          width: `${pct}%`, height: "100%", background: color, borderRadius: 4,
-        }} />
-      </div>
-      <span style={{ color, fontWeight: 600, minWidth: 80, textAlign: "right" }}>
-        {sign}{formatMoney(value)} {sym}
-      </span>
+        width: `${pct}%`, minWidth: pct > 0 ? 3 : 0,
+        height: "100%", background: color, borderRadius: 999,
+      }} />
     </div>
   );
 }
