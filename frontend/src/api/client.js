@@ -11,7 +11,23 @@ const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,
 })
 
+const NETWORK_RETRY_DELAYS = [1000, 2000, 4000]
 let activeRequests = 0
+
+function wait(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
+}
+
+function shouldRetryNetworkRequest(error) {
+  const method = error.config?.method?.toLowerCase()
+  const retryCount = error.config?.__casemoneyRetryCount || 0
+  return (
+    !error.response
+    && error.code !== 'ERR_CANCELED'
+    && (method === 'get' || method === 'head' || method === 'options')
+    && retryCount < NETWORK_RETRY_DELAYS.length
+  )
+}
 
 function publishRequestCount() {
   window.__casemoneyActiveRequests = activeRequests
@@ -53,6 +69,14 @@ client.interceptors.response.use(
     return res
   },
   (error) => {
+    if (shouldRetryNetworkRequest(error)) {
+      const retryCount = error.config.__casemoneyRetryCount || 0
+      error.config.__casemoneyRetryCount = retryCount + 1
+      // Не завершаем глобальный progress: это всё ещё одна операция чтения.
+      return wait(NETWORK_RETRY_DELAYS[retryCount])
+        .then(() => client.request(error.config))
+    }
+
     finishRequest(error.config)
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('token')

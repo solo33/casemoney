@@ -13,6 +13,7 @@ class Category(Base):
     color = Column(String, default="#6366f1")   # hex цвет
     icon = Column(String, nullable=True)         # emoji или название иконки
     is_default = Column(Boolean, default=False)  # системные категории
+    sort_order = Column(Integer, nullable=False, default=0)
 
     # Иерархия (макс. 2 уровня). NULL = корневая категория.
     # Ограничение глубины проверяется на уровне API (FIN-48).
@@ -27,4 +28,5 @@ class Category(Base):
 
     __table_args__ = (
         Index("ix_categories_user_parent", "user_id", "parent_id"),
+        Index("ix_categories_user_parent_sort", "user_id", "parent_id", "sort_order"),
     )

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../api/client";
+import CategoryOptions from "./CategoryOptions";
 import {
   COMMON_CURRENCIES,
   formatMoneyWithCurrency,
@@ -307,11 +308,7 @@ export default function QuickAddFab() {
                     style={{ width: "100%", marginTop: 4 }}
                   >
                     <option value="">— Без категории —</option>
-                    {categories.filter(c => c.type === form.type).map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.icon ? `${c.icon} ` : ""}{c.name}
-                      </option>
-                    ))}
+                    <CategoryOptions categories={categories.filter(c => c.type === form.type)} />
                   </select>
                 </label>
               )}

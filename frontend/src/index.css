@@ -184,6 +184,18 @@ input:focus, select:focus, textarea:focus {
 
 input::placeholder { color: var(--text-muted); }
 
+/* Суммы вводятся вручную: системные stepper-стрелки занимают полезное место. */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
 button {
   cursor: pointer;
   background: var(--navy);

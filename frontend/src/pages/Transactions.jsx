@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import CategoryOptions from "../components/CategoryOptions";
 import {
   COMMON_CURRENCIES,
   currencySymbol,
@@ -81,11 +82,13 @@ export default function Transactions() {
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = { limit: PAGE_SIZE, offset: page * PAGE_SIZE };
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       const res = await api.get("/api/transactions/", { params });
       setData(res.data);
+      setError(null);
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка загрузки");
     } finally {
@@ -264,9 +267,7 @@ export default function Transactions() {
           ) : (
             <select value={newTx.category_id} onChange={e => setNewTx({ ...newTx, category_id: e.target.value })}>
               <option value="">— Категория —</option>
-              {filteredCategoriesForCreate.map(c => (
-                <option key={c.id} value={c.id}>{categoryNameFor(c.id)}</option>
-              ))}
+              <CategoryOptions categories={filteredCategoriesForCreate} />
             </select>
           )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
@@ -304,14 +305,7 @@ export default function Transactions() {
         </select>
         <select value={filters.category_id} onChange={e => setFilter("category_id", e.target.value)}>
           <option value="">Все категории</option>
-          {categories.filter(c => !c.parent_id).map(c => (
-            <optgroup key={c.id} label={c.name}>
-              <option value={c.id}>{c.name} (все)</option>
-              {categories.filter(ch => ch.parent_id === c.id).map(ch => (
-                <option key={ch.id} value={ch.id}>{c.name} → {ch.name}</option>
-              ))}
-            </optgroup>
-          ))}
+          <CategoryOptions categories={categories} />
         </select>
         <input
           type="date"
@@ -544,14 +538,7 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
           ) : (
             <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
               <option value="">— Без категории —</option>
-              {cats.map(c => {
-                const p = c.parent_id ? categories.find(x => x.id === c.parent_id) : null;
-                return (
-                  <option key={c.id} value={c.id}>
-                    {p ? `${p.name} → ${c.name}` : c.name}
-                  </option>
-                );
-              })}
+              <CategoryOptions categories={cats} />
             </select>
           )}
           <input

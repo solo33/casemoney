@@ -154,6 +154,27 @@ export default function Categories() {
     }
   };
 
+  const handleReorder = async (siblings, categoryId, direction, parentId) => {
+    const currentIndex = siblings.findIndex(category => category.id === categoryId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= siblings.length) return;
+
+    const categoryIds = siblings.map(category => category.id);
+    [categoryIds[currentIndex], categoryIds[targetIndex]] = [
+      categoryIds[targetIndex], categoryIds[currentIndex],
+    ];
+    setError(null);
+    try {
+      await api.post("/api/categories/reorder", {
+        category_ids: categoryIds,
+        parent_id: parentId,
+      });
+      await fetchTree();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось изменить порядок");
+    }
+  };
+
   const grouped = useMemo(() => {
     return {
       expense: tree.filter(r => r.type === "expense"),
@@ -210,6 +231,7 @@ export default function Categories() {
           title="Расходы"
           color="#c0432b"
           roots={grouped.expense}
+          handleReorder={handleReorder}
           {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }}
         />
         <div style={{ height: 24 }} />
@@ -217,6 +239,7 @@ export default function Categories() {
           title="Доходы"
           color="#167a4a"
           roots={grouped.income}
+          handleReorder={handleReorder}
           {...{ expanded, toggleExpand, addingTo, setAddingTo, subForm, setSubForm, handleCreateSubcategory, handleDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }}
         />
 
@@ -245,6 +268,7 @@ function Section({
   expanded, toggleExpand,
   addingTo, setAddingTo, subForm, setSubForm,
   handleCreateSubcategory, handleDelete,
+  handleReorder,
   activeDrag,
   editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit,
 }) {
@@ -263,7 +287,7 @@ function Section({
         <p style={{ color: "#a6afb8", fontSize: 14 }}>Нет категорий</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {roots.map(root => (
+          {roots.map((root, rootIndex) => (
             <RootNode
               key={root.id}
               root={root}
@@ -282,6 +306,13 @@ function Section({
               startEdit={startEdit}
               cancelEdit={cancelEdit}
               saveEdit={saveEdit}
+              canMoveUp={rootIndex > 0}
+              canMoveDown={rootIndex < roots.length - 1}
+              onMoveUp={() => handleReorder(roots, root.id, -1, null)}
+              onMoveDown={() => handleReorder(roots, root.id, 1, null)}
+              onMoveChild={(childId, direction) => (
+                handleReorder(root.children || [], childId, direction, root.id)
+              )}
             />
           ))}
         </div>
@@ -290,7 +321,7 @@ function Section({
   );
 }
 
-function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, setSubForm, onSubmitSub, onDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }) {
+function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, setSubForm, onSubmitSub, onDelete, activeDrag, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit, canMoveUp, canMoveDown, onMoveUp, onMoveDown, onMoveChild }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `root-${root.id}`,
     data: { id: root.id, type: root.type },
@@ -356,6 +387,12 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
             {root.children.length} {isExpanded ? "▾" : "▸"}
           </span>
         )}
+        <OrderButtons
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+        />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); startEdit(root); }}
@@ -433,7 +470,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
           display: "flex", flexDirection: "column", gap: 2,
           padding: "0 12px 12px 40px",
         }}>
-          {root.children.map(child => (
+          {root.children.map((child, childIndex) => (
             <ChildNode
               key={child.id}
               child={child}
@@ -444,6 +481,10 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
               startEdit={startEdit}
               cancelEdit={cancelEdit}
               saveEdit={saveEdit}
+              canMoveUp={childIndex > 0}
+              canMoveDown={childIndex < root.children.length - 1}
+              onMoveUp={() => onMoveChild(child.id, -1)}
+              onMoveDown={() => onMoveChild(child.id, 1)}
             />
           ))}
         </div>
@@ -452,7 +493,7 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
   );
 }
 
-function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit }) {
+function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdit, cancelEdit, saveEdit, canMoveUp, canMoveDown, onMoveUp, onMoveDown }) {
   const isEditing = editingId === child.id;
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `child-${child.id}`,
@@ -520,6 +561,13 @@ function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdi
       }} />
       {child.icon && <span style={{ fontSize: 14 }}>{child.icon}</span>}
       <span style={{ flex: 1 }}>{child.name}</span>
+      <OrderButtons
+        canMoveUp={canMoveUp}
+        canMoveDown={canMoveDown}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+        compact
+      />
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); startEdit(child); }}
@@ -540,5 +588,44 @@ function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdi
         ×
       </button>
     </div>
+  );
+}
+
+function OrderButtons({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, compact = false }) {
+  const buttonStyle = {
+    padding: compact ? "2px 6px" : "4px 7px",
+    fontSize: 12,
+    lineHeight: 1,
+    opacity: 1,
+  };
+  const stopDrag = event => event.stopPropagation();
+
+  return (
+    <span style={{ display: "inline-flex", gap: 2 }} onClick={stopDrag}>
+      <button
+        type="button"
+        className="btn-ghost"
+        style={{ ...buttonStyle, opacity: canMoveUp ? 1 : 0.3 }}
+        disabled={!canMoveUp}
+        onClick={onMoveUp}
+        onPointerDown={stopDrag}
+        title="Переместить выше"
+        aria-label="Переместить выше"
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        className="btn-ghost"
+        style={{ ...buttonStyle, opacity: canMoveDown ? 1 : 0.3 }}
+        disabled={!canMoveDown}
+        onClick={onMoveDown}
+        onPointerDown={stopDrag}
+        title="Переместить ниже"
+        aria-label="Переместить ниже"
+      >
+        ↓
+      </button>
+    </span>
   );
 }

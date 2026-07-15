@@ -29,6 +29,7 @@ class CategoryResponse(BaseModel):
     icon: Optional[str]
     is_default: bool
     parent_id: Optional[int]
+    sort_order: int
 
     class Config:
         from_attributes = True
@@ -42,6 +43,7 @@ class CategoryTreeNode(BaseModel):
     icon: Optional[str]
     is_default: bool
     parent_id: Optional[int]
+    sort_order: int
     children: List["CategoryTreeNode"] = []
 
     class Config:
@@ -49,3 +51,8 @@ class CategoryTreeNode(BaseModel):
 
 
 CategoryTreeNode.model_rebuild()
+
+
+class CategoryReorder(BaseModel):
+    category_ids: List[int]
+    parent_id: Optional[int] = None
