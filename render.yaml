@@ -29,9 +29,9 @@ services:
       - key: POSTBOX_FROM_NAME
         value: CaseMoney
       - key: APP_URL
-        value: https://casemoney-web-solo33.onrender.com
+        value: https://casemoney.ru
       - key: CORS_ORIGINS
-        value: https://casemoney-web-solo33.onrender.com
+        value: https://casemoney.ru,https://www.casemoney.ru,https://casemoney-web-solo33.onrender.com
       - key: PORT
         value: "8000"
       - key: WEB_CONCURRENCY
