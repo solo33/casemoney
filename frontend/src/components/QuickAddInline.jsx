@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "./QuickAddFab";
-import { COMMON_CURRENCIES } from "../utils/money";
+import { COMMON_CURRENCIES, sortCurrenciesRubFirst } from "../utils/money";
 
 const TABS = [
   { value: "expense",  label: "↘ Расход",  color: "#c0432b" },
@@ -95,7 +95,9 @@ export default function QuickAddInline({
       return {
         ...f,
         account_id: String(first.id),
-        currency: first.balances?.[0]?.currency || "",
+        currency: sortCurrenciesRubFirst(
+          (first.balances || []).map(balance => balance.currency)
+        )[0] || "",
       };
     });
   }, []);
@@ -124,7 +126,7 @@ export default function QuickAddInline({
     if (!form.account_id || !accounts.length) return;
     const acc = accounts.find(a => String(a.id) === String(form.account_id));
     if (!acc?.balances?.length) return;
-    const codes = acc.balances.map(b => b.currency);
+    const codes = sortCurrenciesRubFirst(acc.balances.map(b => b.currency));
     if (!codes.includes(form.currency)) {
       setForm(f => ({ ...f, currency: codes[0] }));
     }
@@ -134,7 +136,9 @@ export default function QuickAddInline({
     () => accounts.find(a => String(a.id) === String(form.account_id)),
     [accounts, form.account_id]
   );
-  const accountCurrencies = (selectedAccount?.balances || []).map(b => b.currency);
+  const accountCurrencies = sortCurrenciesRubFirst(
+    (selectedAccount?.balances || []).map(b => b.currency)
+  );
 
   const filteredCategories = type === "transfer"
     ? categories

@@ -4,7 +4,12 @@ import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import QuickAddInline from "../components/QuickAddInline";
 import { useUser } from "../contexts/UserContext";
-import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
+import {
+  currencySymbol,
+  formatMoney,
+  formatMoneyWithCurrency,
+  sortCurrenciesRubFirst,
+} from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -716,7 +721,9 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
   const [err, setErr] = useState(null);
 
   const acc = accounts.find(a => String(a.id) === form.account_id);
-  const accCurrencies = (acc?.balances || []).map(b => b.currency);
+  const accCurrencies = sortCurrenciesRubFirst(
+    (acc?.balances || []).map(b => b.currency)
+  );
   const cats = form.type === "transfer"
     ? [] : categories.filter(c => c.type === form.type);
 

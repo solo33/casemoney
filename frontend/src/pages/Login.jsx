@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import PwaInstallLink from "../components/PwaInstallLink";
 import { login, getPublicConfig } from "../api/auth";
 
 const DEMO_EMAIL = "test@test.com";
@@ -244,6 +245,7 @@ export default function Login() {
       }}>
         <span>© CaseMoney · Личные финансы</span>
         <span style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <PwaInstallLink style={{ padding: 0, color: "#9c7b3c", fontSize: 12 }} />
           <Link to="/privacy" style={{ color: "#9c7b3c", textDecoration: "none" }}>Конфиденциальность</Link>
           <Link to="/terms" style={{ color: "#9c7b3c", textDecoration: "none" }}>Соглашение</Link>
           <Link to="/cookies" style={{ color: "#9c7b3c", textDecoration: "none" }}>Cookie</Link>

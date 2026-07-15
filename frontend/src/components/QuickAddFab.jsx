@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../api/client";
-import { COMMON_CURRENCIES, formatMoneyWithCurrency } from "../utils/money";
+import {
+  COMMON_CURRENCIES,
+  formatMoneyWithCurrency,
+  sortCurrenciesRubFirst,
+} from "../utils/money";
 
 // Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
@@ -41,7 +45,9 @@ export default function QuickAddFab() {
             const next = { ...f };
             if (!next.account_id) {
               next.account_id = String(acc.data[0].id);
-              next.currency = acc.data[0].balances?.[0]?.currency || "";
+              next.currency = sortCurrenciesRubFirst(
+                (acc.data[0].balances || []).map(balance => balance.currency)
+              )[0] || "";
             }
             return next;
           });
@@ -56,7 +62,7 @@ export default function QuickAddFab() {
     const acc = accounts.find(a => String(a.id) === String(form.account_id));
     if (!acc) return;
     if (!acc.balances?.length) return;
-    const currencies = acc.balances.map(b => b.currency);
+    const currencies = sortCurrenciesRubFirst(acc.balances.map(b => b.currency));
     if (!currencies.includes(form.currency)) {
       setForm(f => ({ ...f, currency: currencies[0] }));
     }
@@ -93,7 +99,9 @@ export default function QuickAddFab() {
   );
 
   const accountBalances = selectedAccount?.balances || [];
-  const accountCurrencies = accountBalances.map(b => b.currency);
+  const accountCurrencies = sortCurrenciesRubFirst(
+    accountBalances.map(b => b.currency)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();

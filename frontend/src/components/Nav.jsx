@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
+import PwaInstallLink from "./PwaInstallLink";
 
 const BASE_LINKS = [
   { to: "/home", label: "Главная" },
@@ -161,6 +162,11 @@ export default function Nav() {
                       {l.label}
                     </NavLink>
                   ))}
+                  <PwaInstallLink style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    padding: "8px 12px", borderTop: "1px solid #ece6d8",
+                    marginTop: 4, color: "#9c7b3c", fontSize: 14,
+                  }} />
                 </div>
               </>
             )}
@@ -297,6 +303,10 @@ export default function Nav() {
               {l.label}
             </NavLink>
           ))}
+          <PwaInstallLink style={{
+            ...mobileLinkStyle({ isActive: false }),
+            width: "100%", textAlign: "left", cursor: "pointer",
+          }} />
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
             <span style={{ fontSize: 12, color: "rgba(244,241,232,0.6)" }}>Валюта:</span>
             <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>

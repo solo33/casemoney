@@ -2,7 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
-import { COMMON_CURRENCIES, currencySymbol, formatMoney } from "../utils/money";
+import {
+  COMMON_CURRENCIES,
+  currencySymbol,
+  formatMoney,
+  sortCurrenciesRubFirst,
+} from "../utils/money";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -67,7 +72,9 @@ export default function Transactions() {
       setNewTx(t => ({
         ...t,
         account_id: String(first.id),
-        currency: first.balances?.[0]?.currency || "RUB",
+        currency: sortCurrenciesRubFirst(
+          (first.balances || []).map(balance => balance.currency)
+        )[0] || "RUB",
       }));
     }
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -101,7 +108,7 @@ export default function Transactions() {
     if (!newTx.account_id || !accounts.length) return;
     const acc = accounts.find(a => String(a.id) === String(newTx.account_id));
     if (!acc?.balances?.length) return;
-    const codes = acc.balances.map(b => b.currency);
+    const codes = sortCurrenciesRubFirst(acc.balances.map(b => b.currency));
     if (!codes.includes(newTx.currency)) {
       setNewTx(t => ({ ...t, currency: codes[0] }));
     }
@@ -111,7 +118,9 @@ export default function Transactions() {
     () => accounts.find(a => String(a.id) === String(newTx.account_id)),
     [accounts, newTx.account_id]
   );
-  const newTxCurrencies = (selectedAccount?.balances || []).map(b => b.currency);
+  const newTxCurrencies = sortCurrenciesRubFirst(
+    (selectedAccount?.balances || []).map(b => b.currency)
+  );
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -467,7 +476,9 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
   const [err, setErr] = useState(null);
 
   const acc = accounts.find(a => String(a.id) === form.account_id);
-  const accCurrencies = (acc?.balances || []).map(b => b.currency);
+  const accCurrencies = sortCurrenciesRubFirst(
+    (acc?.balances || []).map(b => b.currency)
+  );
   const cats = form.type === "transfer" ? [] : categories.filter(c => c.type === form.type);
 
   const save = async () => {

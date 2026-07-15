@@ -20,6 +20,16 @@ export const COMMON_CURRENCIES = [
   "BTC", "ETH", "USDT", "USDC", "SOL", "BNB", "TON",
 ];
 
+export function sortCurrenciesRubFirst(currencies) {
+  return [...new Set(currencies)].sort((left, right) => {
+    const leftCode = String(left).toUpperCase();
+    const rightCode = String(right).toUpperCase();
+    if (leftCode === "RUB" && rightCode !== "RUB") return -1;
+    if (rightCode === "RUB" && leftCode !== "RUB") return 1;
+    return 0;
+  });
+}
+
 export function currencySymbol(code) {
   return CURRENCY_SYMBOLS[code?.toUpperCase()] || code;
 }
