@@ -1,92 +1,163 @@
+from datetime import datetime, timedelta, timezone
+
 from tests.conftest import register_and_login, TestingSessionLocal
 
+from app.models.user import User
+from app.services.auth import create_activation_token
 
-def test_register_reports_email_delivery_failure(client, monkeypatch):
-    monkeypatch.setattr("app.api.auth.send_code_email", lambda *args, **kwargs: False)
 
-    r = client.post("/api/auth/register", json={
+def _get_user(email: str) -> User | None:
+    db = TestingSessionLocal()
+    try:
+        return db.query(User).filter(User.email == email).first()
+    finally:
+        db.close()
+
+
+def test_registration_succeeds_when_email_delivery_fails(client, monkeypatch):
+    monkeypatch.setattr("app.api.auth.send_activation_email", lambda *args: False)
+
+    response = client.post("/api/auth/register", json={
         "email": "delivery-failure@test.com",
         "username": "delivery-failure",
         "password": "secret1",
     })
 
-    assert r.status_code == 503
-    assert "Не удалось отправить код" in r.json()["detail"]
-    assert _get_code("delivery-failure@test.com") is None
+    assert response.status_code == 200
+    assert response.json()["access_token"]
+    assert response.json()["email_sent"] is False
+    assert _get_user("delivery-failure@test.com").email_verified is False
 
 
-def _get_code(email):
-    from app.models.pending_registration import PendingRegistration
+def test_registration_creates_unverified_user_with_seven_day_access(client):
+    response = client.post("/api/auth/register", json={
+        "email": "grace@test.com",
+        "username": "grace",
+        "password": "secret1",
+    })
+
+    assert response.status_code == 200
+    assert response.json()["requires_code"] is False
+    assert response.json()["verification_grace_days"] == 7
+    assert response.json()["access_token"]
+
+    login = client.post("/api/auth/login", json={
+        "email": "grace@test.com",
+        "password": "secret1",
+    })
+    assert login.status_code == 200
+
+
+def test_unverified_login_is_blocked_after_seven_days(client):
+    client.post("/api/auth/register", json={
+        "email": "expired@test.com",
+        "username": "expired",
+        "password": "secret1",
+    })
     db = TestingSessionLocal()
     try:
-        p = db.query(PendingRegistration).filter(PendingRegistration.email == email).first()
-        return p.code if p else None
+        user = db.query(User).filter(User.email == "expired@test.com").one()
+        user.created_at = datetime.now(timezone.utc) - timedelta(days=8)
+        db.commit()
     finally:
         db.close()
 
-
-def test_register_requires_code_then_creates_user(client):
-    r = client.post("/api/auth/register", json={
-        "email": "a@test.com", "username": "a", "password": "secret1",
+    response = client.post("/api/auth/login", json={
+        "email": "expired@test.com",
+        "password": "secret1",
     })
-    assert r.status_code == 200, r.text
-    assert r.json()["requires_code"] is True
-
-    # пользователь ещё не создан — логин невозможен
-    r = client.post("/api/auth/login", json={"email": "a@test.com", "password": "secret1"})
-    assert r.status_code == 401
-
-    # подтверждаем кодом → автологин
-    code = _get_code("a@test.com")
-    r = client.post("/api/auth/verify-code", json={"email": "a@test.com", "code": code})
-    assert r.status_code == 200
-    assert "access_token" in r.json()
-
-    # теперь логин работает
-    r = client.post("/api/auth/login", json={"email": "a@test.com", "password": "secret1"})
-    assert r.status_code == 200
+    assert response.status_code == 403
 
 
-def test_wrong_code_rejected(client):
-    client.post("/api/auth/register", json={"email": "b@test.com", "username": "b", "password": "secret1"})
-    r = client.post("/api/auth/verify-code", json={"email": "b@test.com", "code": "000000"})
-    assert r.status_code == 400
+def test_activation_link_verifies_account(client):
+    client.post("/api/auth/register", json={
+        "email": "activate@test.com",
+        "username": "activate",
+        "password": "secret1",
+    })
+    user = _get_user("activate@test.com")
+    response = client.get(
+        "/api/auth/activate",
+        params={"token": create_activation_token(user.id)},
+    )
+    assert response.status_code == 200
+    assert _get_user("activate@test.com").email_verified is True
+
+
+def test_resend_has_persistent_cooldown_and_attempt_cap(client):
+    client.post("/api/auth/register", json={
+        "email": "resend@test.com",
+        "username": "resend",
+        "password": "secret1",
+    })
+
+    # Immediate resend is silently skipped to avoid account enumeration.
+    response = client.post(
+        "/api/auth/resend-activation", json={"email": "resend@test.com"}
+    )
+    assert response.status_code == 200
+    assert _get_user("resend@test.com").verification_email_attempts == 1
+
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "resend@test.com").one()
+        user.verification_email_sent_at = datetime.now(timezone.utc) - timedelta(minutes=16)
+        db.commit()
+    finally:
+        db.close()
+
+    client.post("/api/auth/resend-activation", json={"email": "resend@test.com"})
+    assert _get_user("resend@test.com").verification_email_attempts == 2
+
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "resend@test.com").one()
+        user.verification_email_attempts = 5
+        user.verification_email_sent_at = datetime.now(timezone.utc) - timedelta(days=1)
+        db.commit()
+    finally:
+        db.close()
+
+    client.post("/api/auth/resend-activation", json={"email": "resend@test.com"})
+    assert _get_user("resend@test.com").verification_email_attempts == 5
 
 
 def test_duplicate_email_rejected(client):
-    register_and_login(client, email="c@test.com")  # полноценно создаёт юзера
-    r = client.post("/api/auth/register", json={"email": "c@test.com", "username": "c2", "password": "secret1"})
-    assert r.status_code == 400
+    register_and_login(client, email="duplicate@test.com")
+    response = client.post("/api/auth/register", json={
+        "email": "duplicate@test.com",
+        "username": "duplicate2",
+        "password": "secret1",
+    })
+    assert response.status_code == 400
 
 
 def test_login_wrong_password(client):
-    register_and_login(client, email="d@test.com", password="rightpass")
-    r = client.post("/api/auth/login", json={"email": "d@test.com", "password": "wrong"})
-    assert r.status_code == 401
-
-
-def test_resend_cooldown(client):
-    client.post("/api/auth/register", json={"email": "e@test.com", "username": "e", "password": "secret1"})
-    # повторный запрос сразу → кулдаун 429
-    r = client.post("/api/auth/register", json={"email": "e@test.com", "username": "e", "password": "secret1"})
-    assert r.status_code == 429
+    register_and_login(client, email="wrong-password@test.com", password="rightpass")
+    response = client.post("/api/auth/login", json={
+        "email": "wrong-password@test.com",
+        "password": "wrong",
+    })
+    assert response.status_code == 401
 
 
 def test_protected_requires_token(client):
-    r = client.get("/api/accounts/")
-    assert r.status_code in (401, 403)
+    response = client.get("/api/accounts/")
+    assert response.status_code in (401, 403)
 
 
 def test_forgot_password_always_ok(client):
-    r = client.post("/api/auth/forgot-password", json={"email": "nobody@test.com"})
-    assert r.status_code == 200
-    assert r.json()["ok"] is True
+    response = client.post(
+        "/api/auth/forgot-password", json={"email": "nobody@test.com"}
+    )
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
 
 
 def test_public_config_has_registration_flag(client):
-    r = client.get("/api/auth/config")
-    assert r.status_code == 200
-    assert r.json()["registration_enabled"] is True
+    response = client.get("/api/auth/config")
+    assert response.status_code == 200
+    assert response.json()["registration_enabled"] is True
 
 
 def test_health(client):

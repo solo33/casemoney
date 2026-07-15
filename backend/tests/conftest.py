@@ -49,10 +49,11 @@ def _override_get_db():
 
 
 @pytest.fixture(autouse=True)
-def _fresh_db():
+def _fresh_db(monkeypatch):
     """Чистая схема на каждый тест."""
     Base.metadata.create_all(bind=test_engine)
     main_module.app.dependency_overrides[get_db] = _override_get_db
+    monkeypatch.setattr("app.api.auth.send_activation_email", lambda *args: True)
     yield
     Base.metadata.drop_all(bind=test_engine)
     # сбрасываем кэш курсов между тестами
@@ -83,7 +84,9 @@ def register_and_login(client, email=None, password="secret123"):
     })
     assert r.status_code == 200, r.text
 
-    if r.json().get("requires_code"):
+    if r.json().get("access_token"):
+        token = r.json()["access_token"]
+    elif r.json().get("requires_code"):
         # Достаём код из тестовой БД и подтверждаем (автологин возвращает токен)
         from app.models.pending_registration import PendingRegistration
         db = TestingSessionLocal()

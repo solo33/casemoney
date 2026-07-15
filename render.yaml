@@ -20,6 +20,14 @@ services:
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      - key: POSTBOX_ACCESS_KEY_ID
+        sync: false
+      - key: POSTBOX_SECRET_ACCESS_KEY
+        sync: false
+      - key: POSTBOX_FROM_EMAIL
+        value: noreply@casemoney.ru
+      - key: POSTBOX_FROM_NAME
+        value: CaseMoney
       - key: APP_URL
         value: https://casemoney-web-solo33.onrender.com
       - key: CORS_ORIGINS

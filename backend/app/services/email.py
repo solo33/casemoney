@@ -21,6 +21,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 import httpx
+import boto3
+from botocore.config import Config
 
 log = logging.getLogger("casemoney.email")
 
@@ -45,9 +47,11 @@ def is_smtp_configured() -> bool:
     """Return whether any real email transport is configured.
 
     The legacy name is kept because it is part of the public auth/admin
-    responses.  Brevo's HTTPS API is preferred when its key is present; SMTP
-    remains available for local and paid deployments.
+    responses. Yandex Cloud Postbox and Brevo use HTTPS APIs and therefore
+    work on Render Free; SMTP remains available for local and paid deployments.
     """
+    if _postbox_configured():
+        return True
     if _brevo_configured():
         return True
     cfg = _smtp_config()
@@ -56,6 +60,54 @@ def is_smtp_configured() -> bool:
 
 def _brevo_configured() -> bool:
     return bool(os.getenv("BREVO_API_KEY") and _sender()[1])
+
+
+def _postbox_configured() -> bool:
+    return bool(
+        os.getenv("POSTBOX_ACCESS_KEY_ID")
+        and os.getenv("POSTBOX_SECRET_ACCESS_KEY")
+        and os.getenv("POSTBOX_FROM_EMAIL")
+    )
+
+
+def _send_via_postbox(to: str, subject: str, text: str, html: str | None) -> bool:
+    sender_email = os.environ["POSTBOX_FROM_EMAIL"]
+    sender_name = os.getenv("POSTBOX_FROM_NAME", "CaseMoney")
+    from_address = f"{sender_name} <{sender_email}>" if sender_name else sender_email
+    body = {"Text": {"Data": text, "Charset": "UTF-8"}}
+    if html:
+        body["Html"] = {"Data": html, "Charset": "UTF-8"}
+
+    try:
+        client = boto3.client(
+            "sesv2",
+            aws_access_key_id=os.environ["POSTBOX_ACCESS_KEY_ID"],
+            aws_secret_access_key=os.environ["POSTBOX_SECRET_ACCESS_KEY"],
+            endpoint_url=os.getenv(
+                "POSTBOX_ENDPOINT_URL", "https://postbox.cloud.yandex.net"
+            ),
+            config=Config(region_name="ru-central1"),
+        )
+        response = client.send_email(
+            FromEmailAddress=from_address,
+            Destination={"ToAddresses": [to]},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": body,
+                }
+            },
+        )
+        log.info(
+            "Sent email to %s via Yandex Cloud Postbox: %s (message_id=%s)",
+            to,
+            subject,
+            response.get("MessageId"),
+        )
+        return True
+    except Exception as exc:
+        log.error("Failed to send email to %s via Yandex Cloud Postbox: %s", to, exc)
+        return False
 
 
 def _sender() -> tuple[str, str]:
@@ -103,6 +155,9 @@ def send_email(to: str, subject: str, text: str, html: str | None = None) -> boo
     cfg = _smtp_config()
 
     # Render Free blocks outbound SMTP ports, but HTTPS APIs remain available.
+    if _postbox_configured():
+        return _send_via_postbox(to, subject, text, html)
+
     if _brevo_configured():
         return _send_via_brevo(to, subject, text, html)
 
@@ -159,7 +214,7 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
         f"Вы зарегистрировались в CaseMoney. "
         f"Перейдите по ссылке ниже, чтобы подтвердить email и активировать аккаунт:\n\n"
         f"{activation_url}\n\n"
-        f"Ссылка действительна 24 часа.\n\n"
+        f"Ссылка действительна 7 дней.\n\n"
         f"Если вы не регистрировались — просто проигнорируйте это письмо.\n\n"
         f"— CaseMoney"
     )
@@ -191,7 +246,7 @@ def send_activation_email(to_email: str, username: str, activation_url: str) -> 
       <a href="{url_html}" style="color: #9f1239; word-break: break-all;">{url_html}</a>
     </p>
     <p style="color: #a8a29e; font-size: 12px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0;">
-      Ссылка действительна 24 часа. Если вы не регистрировались — проигнорируйте это письмо.
+      Ссылка действительна 7 дней. Если вы не регистрировались — проигнорируйте это письмо.
     </p>
   </div>
 </body></html>

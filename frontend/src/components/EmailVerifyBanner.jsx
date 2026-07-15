@@ -32,6 +32,10 @@ export default function EmailVerifyBanner() {
       <span>
         📬 Подтвердите email <strong>{user.email}</strong> — мы отправили ссылку при регистрации.
       </span>
+      <span>
+        Подтвердите адрес в течение 7 дней. После этого доступ будет
+        приостановлен до подтверждения.
+      </span>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {msg && <span style={{ fontSize: 12, color: "#78350f" }}>{msg}</span>}
         <button

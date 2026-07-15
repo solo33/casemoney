@@ -1,4 +1,3 @@
-import secrets
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -11,27 +10,26 @@ from app.database import get_db
 from app.models.user import User
 from app.models.user_currency import UserCurrency
 from app.models.pending_registration import PendingRegistration
-from app.schemas.user import UserRegister, UserLogin, UserResponse, Token
+from app.schemas.user import UserRegister, UserLogin, Token
 from app.services.auth import (
     hash_password, verify_password, create_access_token,
     create_activation_token, verify_activation_token,
     create_reset_token, verify_reset_token,
 )
 from app.services.email import (
-    send_activation_email, send_reset_email, send_code_email, app_url, is_smtp_configured,
+    send_activation_email, send_reset_email, app_url, is_smtp_configured,
 )
-from app.services.app_config import is_email_verification_required, get_config
+from app.services.app_config import get_config
 from app.seeds import seed_default_categories, seed_default_accounts
 from datetime import datetime, timedelta, timezone
 
 # Параметры кода подтверждения
-CODE_TTL_MIN = 15          # срок жизни кода
-RESEND_COOLDOWN_SEC = 60   # минимум между отправками кода на один email
 MAX_CODE_ATTEMPTS = 5      # попыток ввода кода
 
 
-def _gen_code() -> str:
-    return f"{secrets.randbelow(900000) + 100000}"  # 6 цифр, 100000..999999
+VERIFICATION_GRACE_DAYS = 7
+VERIFICATION_RESEND_COOLDOWN_MIN = 15
+MAX_VERIFICATION_EMAIL_ATTEMPTS = 5
 
 
 def _now() -> datetime:
@@ -56,6 +54,10 @@ def _send_activation(user: User):
 class RegisterResponse(BaseModel):
     requires_code: bool        # нужно ли вводить код подтверждения
     smtp_configured: bool
+    access_token: str | None = None
+    token_type: str = "bearer"
+    email_sent: bool = False
+    verification_grace_days: int = VERIFICATION_GRACE_DAYS
 
 
 class VerifyCodeRequest(BaseModel):
@@ -74,13 +76,20 @@ def public_config(db: Session = Depends(get_db)):
     return PublicConfig(registration_enabled=cfg.registration_enabled)
 
 
-def _create_user(db: Session, email: str, username: str, hashed_password: str) -> User:
+def _create_user(
+    db: Session,
+    email: str,
+    username: str,
+    hashed_password: str,
+    *,
+    email_verified: bool = True,
+) -> User:
     """Создаёт пользователя + дефолтные валюту/категории/счета."""
     user = User(
         email=email,
         username=username,
         hashed_password=hashed_password,
-        email_verified=True,
+        email_verified=email_verified,
     )
     db.add(user)
     db.commit()
@@ -94,8 +103,42 @@ def _create_user(db: Session, email: str, username: str, hashed_password: str) -
     return user
 
 
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _verification_time_left(user: User) -> timedelta:
+    created_at = _as_utc(user.created_at or _now())
+    return created_at + timedelta(days=VERIFICATION_GRACE_DAYS) - _now()
+
+
+def _create_user_access_token(user: User) -> str:
+    expires_delta = None
+    if not user.email_verified:
+        expires_delta = min(
+            _verification_time_left(user),
+            timedelta(days=VERIFICATION_GRACE_DAYS),
+        )
+    return create_access_token({"sub": str(user.id)}, expires_delta=expires_delta)
+
+
+def _record_verification_email_attempt(db: Session, user: User) -> None:
+    user.verification_email_attempts = (user.verification_email_attempts or 0) + 1
+    user.verification_email_sent_at = _now()
+    db.commit()
+
+
+def _can_resend_verification(user: User) -> bool:
+    if (user.verification_email_attempts or 0) >= MAX_VERIFICATION_EMAIL_ATTEMPTS:
+        return False
+    if not user.verification_email_sent_at:
+        return True
+    elapsed = _now() - _as_utc(user.verification_email_sent_at)
+    return elapsed >= timedelta(minutes=VERIFICATION_RESEND_COOLDOWN_MIN)
+
+
 @router.post("/register", response_model=RegisterResponse)
-@limiter.limit("10/hour")
+@limiter.limit("5/hour;10/day")
 def register(
     request: Request,
     data: UserRegister,
@@ -108,51 +151,36 @@ def register(
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
+    if db.query(User).filter(User.username == data.username).first():
+        raise HTTPException(status_code=400, detail="Имя пользователя уже занято")
+
     hashed = hash_password(data.password)
 
-    # Если админ отключил подтверждение email — создаём сразу, без кода.
-    if not cfg.require_email_verification:
-        _create_user(db, data.email, data.username, hashed)
-        return RegisterResponse(requires_code=False, smtp_configured=is_smtp_configured())
-
-    # Иначе — заявка на регистрацию + код на email.
-    pending = db.query(PendingRegistration).filter(
-        PendingRegistration.email == data.email
-    ).first()
-
-    now = _now()
-    if pending and pending.last_sent_at:
-        last = pending.last_sent_at
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        if (now - last).total_seconds() < RESEND_COOLDOWN_SEC:
-            wait = int(RESEND_COOLDOWN_SEC - (now - last).total_seconds())
-            raise HTTPException(status_code=429, detail=f"Код уже отправлен. Повторите через {wait} с.")
-
-    code = _gen_code()
-    if pending is None:
-        pending = PendingRegistration(email=data.email)
-        db.add(pending)
-    pending.username = data.username
-    pending.hashed_password = hashed
-    pending.code = code
-    pending.expires_at = now + timedelta(minutes=CODE_TTL_MIN)
-    pending.attempts = 0
-    pending.last_sent_at = now
-    db.flush()
-
-    # Confirmation codes must report delivery failures to the UI.  Previously
-    # this ran as a background task, so the page claimed success even when the
-    # email provider rejected the message.
-    if not send_code_email(data.email, data.username, code):
-        db.rollback()
-        raise HTTPException(
-            status_code=503,
-            detail="Не удалось отправить код. Попробуйте ещё раз через несколько минут.",
+    # Create the account immediately. When verification is required, access is
+    # granted only for the seven-day grace period and the email can be verified
+    # at any point using the activation link.
+    user = _create_user(
+        db,
+        data.email,
+        data.username,
+        hashed,
+        email_verified=not cfg.require_email_verification,
+    )
+    email_sent = False
+    if cfg.require_email_verification:
+        _record_verification_email_attempt(db, user)
+        email_sent = send_activation_email(
+            user.email,
+            user.username,
+            _build_activation_url(user.id),
         )
-    db.commit()
-
-    return RegisterResponse(requires_code=True, smtp_configured=is_smtp_configured())
+    token = _create_user_access_token(user)
+    return RegisterResponse(
+        requires_code=False,
+        smtp_configured=is_smtp_configured(),
+        access_token=token,
+        email_sent=email_sent,
+    )
 
 
 @router.post("/verify-code", response_model=Token)
@@ -189,7 +217,7 @@ def verify_code(request: Request, data: VerifyCodeRequest, db: Session = Depends
     db.delete(pending)
     db.commit()
 
-    token = create_access_token({"sub": str(user.id)})
+    token = _create_user_access_token(user)
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -259,7 +287,18 @@ def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
 
-    token = create_access_token({"sub": str(user.id)})
+    cfg = get_config(db)
+    if cfg.require_email_verification and not user.email_verified:
+        if _verification_time_left(user) <= timedelta(0):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Email не подтверждён. Семидневный период истёк — "
+                    "запросите новое письмо и подтвердите адрес."
+                ),
+            )
+
+    token = _create_user_access_token(user)
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -298,7 +337,7 @@ class ResendResponse(BaseModel):
 
 
 @router.post("/resend-activation", response_model=ResendResponse)
-@limiter.limit("5/hour")
+@limiter.limit("3/hour;10/day")
 def resend_activation(
     request: Request,
     data: ResendRequest,
@@ -307,7 +346,8 @@ def resend_activation(
 ):
     """Повторно отправить письмо активации. Не раскрываем существует ли email."""
     user = db.query(User).filter(User.email == data.email).first()
-    if user and not user.email_verified:
+    if user and not user.email_verified and _can_resend_verification(user):
+        _record_verification_email_attempt(db, user)
         background.add_task(_send_activation, user)
     return ResendResponse(
         ok=True,

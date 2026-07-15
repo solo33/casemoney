@@ -43,10 +43,12 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Создаёт JWT токен"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -69,7 +71,7 @@ def decode_token(token: str) -> dict:
 
 # === Активация email ===
 
-ACTIVATION_TOKEN_TTL_HOURS = 24
+ACTIVATION_TOKEN_TTL_HOURS = 24 * 7
 
 
 def create_activation_token(user_id: int) -> str:

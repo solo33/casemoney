@@ -30,6 +30,11 @@ export default function Register() {
     try {
       const res = await register(form);
       setSmtpOk(res.data.smtp_configured);
+      if (res.data.access_token) {
+        localStorage.setItem("token", res.data.access_token);
+        navigate("/home");
+        return;
+      }
       if (res.data.requires_code) {
         setStep("code");
         setInfo("");

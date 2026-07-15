@@ -14,3 +14,5 @@ class User(Base):
     main_currency = Column(String(10), nullable=False, default="RUB")
     is_admin = Column(Boolean, nullable=False, default=False)
     email_verified = Column(Boolean, nullable=False, default=False)
+    verification_email_sent_at = Column(DateTime(timezone=True), nullable=True)
+    verification_email_attempts = Column(Integer, nullable=False, default=0)
