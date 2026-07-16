@@ -378,7 +378,6 @@ export default function Home() {
                   key={bucket.group.id ?? "ungrouped"}
                   bucket={bucket}
                   sym={sym}
-                  mainCurrency={mainCurrency}
                   onAccountClick={goToAccount}
                   onAdjustBalance={(account, balance) => setAdjustingBalance({ account, balance })}
                 />
@@ -961,7 +960,7 @@ function AccountLoadingStructure() {
   );
 }
 
-function GroupBlock({ bucket, sym, mainCurrency, onAccountClick, onAdjustBalance }) {
+function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance }) {
   // На телефоне группы свёрнуты по умолчанию — важен итог, детали по тапу
   const [collapsed, setCollapsed] = useState(IS_MOBILE);
   return (
@@ -999,7 +998,6 @@ function GroupBlock({ bucket, sym, mainCurrency, onAccountClick, onAdjustBalance
             <AccountBlock
               key={acc.id}
               acc={acc}
-              mainCurrency={mainCurrency}
               onClick={() => onAccountClick(acc.id)}
               onAdjustBalance={balance => onAdjustBalance(acc, balance)}
             />
@@ -1010,7 +1008,7 @@ function GroupBlock({ bucket, sym, mainCurrency, onAccountClick, onAdjustBalance
   );
 }
 
-function AccountBlock({ acc, mainCurrency, onClick, onAdjustBalance }) {
+function AccountBlock({ acc, onClick, onAdjustBalance }) {
   const balances = acc.balances || [];
   return (
     <div
@@ -1038,7 +1036,6 @@ function AccountBlock({ acc, mainCurrency, onClick, onAdjustBalance }) {
           <BalanceActionRow
             key={balance.currency}
             balance={balance}
-            mainCurrency={mainCurrency}
             onAdjust={() => onAdjustBalance(balance)}
             onHistory={onClick}
           />

@@ -152,6 +152,24 @@ def test_duplicate_email_rejected(client):
     assert response.status_code == 400
 
 
+def test_duplicate_username_is_allowed(client):
+    first = client.post("/api/auth/register", json={
+        "email": "same-name-one@test.com",
+        "username": "Алексей",
+        "password": "secret1",
+    })
+    second = client.post("/api/auth/register", json={
+        "email": "same-name-two@test.com",
+        "username": "Алексей",
+        "password": "secret1",
+    })
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert _get_user("same-name-one@test.com").username == "Алексей"
+    assert _get_user("same-name-two@test.com").username == "Алексей"
+
+
 def test_login_wrong_password(client):
     register_and_login(client, email="wrong-password@test.com", password="rightpass")
     response = client.post("/api/auth/login", json={

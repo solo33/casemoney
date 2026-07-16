@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import CategoryPicker from "./CategoryPicker";
-import { currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
+import { formatMoney, formatMoneyWithCurrency } from "../utils/money";
 
-export function BalanceActionRow({ balance, mainCurrency, onAdjust, onHistory }) {
+export function BalanceActionRow({ balance, onAdjust, onHistory }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const longPressTimer = useRef(null);
   const longPressed = useRef(false);
@@ -52,11 +52,6 @@ export function BalanceActionRow({ balance, mainCurrency, onAdjust, onHistory })
       <span className="account-balance-amount">
         {formatMoneyWithCurrency(balance.balance, balance.currency)}
       </span>
-      {balance.currency !== mainCurrency && (
-        <span className="account-balance-equivalent">
-          ≈ {formatMoney(balance.balance_in_main)} {currencySymbol(mainCurrency)}
-        </span>
-      )}
       <button
         type="button"
         className="balance-action-trigger btn-ghost"

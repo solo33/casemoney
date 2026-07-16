@@ -59,13 +59,6 @@ def update_me(
         ).first()
         if other:
             raise HTTPException(status_code=400, detail="Email уже занят")
-    if "username" in update_fields and update_fields["username"]:
-        other = db.query(User).filter(
-            User.username == update_fields["username"], User.id != user_id,
-        ).first()
-        if other:
-            raise HTTPException(status_code=400, detail="Имя пользователя занято")
-
     for k, v in update_fields.items():
         setattr(user, k, v)
     db.commit()

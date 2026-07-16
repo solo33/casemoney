@@ -162,9 +162,6 @@ def register(
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    if db.query(User).filter(User.username == data.username).first():
-        raise HTTPException(status_code=400, detail="Имя пользователя уже занято")
-
     hashed = hash_password(data.password)
 
     # Create the account immediately. When verification is required, access is
