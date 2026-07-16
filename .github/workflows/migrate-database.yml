@@ -33,6 +33,13 @@ jobs:
       RESET_TARGET: ${{ inputs.reset_target }}
 
     steps:
+      - name: Install Amvera-compatible PostgreSQL client
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          apt-get update
+          apt-get install --yes --no-install-recommends postgresql-client-16
+
       - name: Validate confirmation and secrets
         shell: bash
         run: |
@@ -54,12 +61,15 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          DUMP_FILE="${RUNNER_TEMP}/casemoney.dump"
+          SOURCE_PSQL="/usr/lib/postgresql/18/bin/psql"
+          SOURCE_PG_DUMP="/usr/lib/postgresql/18/bin/pg_dump"
+          TARGET_PSQL="/usr/lib/postgresql/16/bin/psql"
+          DUMP_FILE="${RUNNER_TEMP}/casemoney.sql"
           trap 'rm -f "$DUMP_FILE"' EXIT
 
           echo "Checking PostgreSQL connections and versions..."
-          source_version="$(psql "$SOURCE_DATABASE_URL" -XAtc 'SHOW server_version_num;')"
-          target_version="$(psql "$TARGET_DATABASE_URL" -XAtc 'SHOW server_version_num;')"
+          source_version="$("$SOURCE_PSQL" "$SOURCE_DATABASE_URL" -XAtc 'SHOW server_version_num;')"
+          target_version="$("$TARGET_PSQL" "$TARGET_DATABASE_URL" -XAtc 'SHOW server_version_num;')"
           source_major=$((source_version / 10000))
           target_major=$((target_version / 10000))
           echo "Source PostgreSQL: ${source_major}; target PostgreSQL: ${target_major}."
@@ -69,7 +79,7 @@ jobs:
             exit 1
           fi
 
-          target_tables="$(psql "$TARGET_DATABASE_URL" -XAtc \
+          target_tables="$("$TARGET_PSQL" "$TARGET_DATABASE_URL" -XAtc \
             "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema');")"
           if (( target_tables > 0 )) && [[ "$RESET_TARGET" != "true" ]]; then
             echo "Target contains ${target_tables} tables. Enable reset_target only for the new Amvera database."
@@ -77,37 +87,41 @@ jobs:
           fi
 
           echo "Creating a private temporary dump on the GitHub runner..."
-          pg_dump --format=custom --no-owner --no-acl \
+          "$SOURCE_PG_DUMP" --format=plain --no-owner --no-acl \
             --dbname "$SOURCE_DATABASE_URL" --file "$DUMP_FILE"
-          pg_restore --list "$DUMP_FILE" >/dev/null
+          test -s "$DUMP_FILE"
+
+          # pg_dump 17+ wraps plain dumps in psql security meta-commands that
+          # psql 16 does not know. They do not affect the SQL transaction.
+          sed -i -e '/^\\restrict /d' -e '/^\\unrestrict /d' "$DUMP_FILE"
 
           if (( target_tables > 0 )); then
             echo "Resetting the target public schema..."
-            psql "$TARGET_DATABASE_URL" -Xv ON_ERROR_STOP=1 \
+            "$TARGET_PSQL" "$TARGET_DATABASE_URL" -Xv ON_ERROR_STOP=1 \
               -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           fi
 
           echo "Restoring into Amvera in one transaction..."
-          pg_restore --exit-on-error --single-transaction --no-owner --no-acl \
-            --dbname "$TARGET_DATABASE_URL" "$DUMP_FILE"
+          "$TARGET_PSQL" "$TARGET_DATABASE_URL" -Xv ON_ERROR_STOP=1 \
+            --single-transaction --file "$DUMP_FILE"
 
           echo "Comparing table lists..."
           table_query="SELECT schemaname || '|' || tablename FROM pg_catalog.pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1;"
           source_tables_file="${RUNNER_TEMP}/source-tables.txt"
           target_tables_file="${RUNNER_TEMP}/target-tables.txt"
-          psql "$SOURCE_DATABASE_URL" -XAtc "$table_query" >"$source_tables_file"
-          psql "$TARGET_DATABASE_URL" -XAtc "$table_query" >"$target_tables_file"
+          "$SOURCE_PSQL" "$SOURCE_DATABASE_URL" -XAtc "$table_query" >"$source_tables_file"
+          "$TARGET_PSQL" "$TARGET_DATABASE_URL" -XAtc "$table_query" >"$target_tables_file"
           diff -u "$source_tables_file" "$target_tables_file"
 
           echo "Comparing exact row counts..."
           checked=0
           while IFS='|' read -r schema table; do
             [[ -z "$schema" || -z "$table" ]] && continue
-            qualified="$(psql "$SOURCE_DATABASE_URL" -XAt \
+            qualified="$("$SOURCE_PSQL" "$SOURCE_DATABASE_URL" -XAt \
               -v schema="$schema" -v table="$table" \
               -c "SELECT format('%I.%I', :'schema', :'table');")"
-            source_count="$(psql "$SOURCE_DATABASE_URL" -XAtc "SELECT count(*) FROM ${qualified};")"
-            target_count="$(psql "$TARGET_DATABASE_URL" -XAtc "SELECT count(*) FROM ${qualified};")"
+            source_count="$("$SOURCE_PSQL" "$SOURCE_DATABASE_URL" -XAtc "SELECT count(*) FROM ${qualified};")"
+            target_count="$("$TARGET_PSQL" "$TARGET_DATABASE_URL" -XAtc "SELECT count(*) FROM ${qualified};")"
             if [[ "$source_count" != "$target_count" ]]; then
               echo "Row count mismatch in ${qualified}: source=${source_count}, target=${target_count}."
               exit 1
