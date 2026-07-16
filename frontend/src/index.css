@@ -61,6 +61,13 @@
   --warn:          #b7791f;
   --warn-soft:     rgba(183, 121, 31, 0.12);
 
+  /* Reports use a slightly darker semantic palette on light paper. */
+  --report-income: #0f6a40;
+  --report-expense:#a93421;
+  --report-column: #dbe8ef;
+  --report-row:    #edf3f6;
+  --report-cross:  #c8dce7;
+
   /* ---------- Radii ---------- */
   --r-xs: 4px;
   --r-sm: 6px;
@@ -301,23 +308,55 @@ hr {
    !important нужен, чтобы перекрыть инлайновый фон закреплённой
    первой колонки и фоновых строк групп/итогов.
    ============================================================ */
-/* Первый столбец (названия) и шапку не подсвечиваем — hc-1 отсутствует,
-   в правилах колонок нет th, в правиле строки исключён :first-child. */
-.report-table tbody tr:hover td:not(:first-child) { background: #efe2c9 !important; }
+/* Hover is a complete cross: row label + selected column + its heading. */
+.report-table thead tr { background: #315a75 !important; }
+.report-table thead th { background: #315a75 !important; color: #fff !important; }
+.report-table tbody tr:hover td:not([colspan]) { background: var(--report-row) !important; }
 
-.report-table.hc-2  td:nth-child(2)  { background: #efe2c9 !important; }
-.report-table.hc-3  td:nth-child(3)  { background: #efe2c9 !important; }
-.report-table.hc-4  td:nth-child(4)  { background: #efe2c9 !important; }
-.report-table.hc-5  td:nth-child(5)  { background: #efe2c9 !important; }
-.report-table.hc-6  td:nth-child(6)  { background: #efe2c9 !important; }
-.report-table.hc-7  td:nth-child(7)  { background: #efe2c9 !important; }
-.report-table.hc-8  td:nth-child(8)  { background: #efe2c9 !important; }
-.report-table.hc-9  td:nth-child(9)  { background: #efe2c9 !important; }
-.report-table.hc-10 td:nth-child(10) { background: #efe2c9 !important; }
-.report-table.hc-11 td:nth-child(11) { background: #efe2c9 !important; }
-.report-table.hc-12 td:nth-child(12) { background: #efe2c9 !important; }
-.report-table.hc-13 td:nth-child(13) { background: #efe2c9 !important; }
-.report-table.hc-14 td:nth-child(14) { background: #efe2c9 !important; }
+.report-table.hc-1  td:nth-child(1),
+.report-table.hc-2  td:nth-child(2),
+.report-table.hc-3  td:nth-child(3),
+.report-table.hc-4  td:nth-child(4),
+.report-table.hc-5  td:nth-child(5),
+.report-table.hc-6  td:nth-child(6),
+.report-table.hc-7  td:nth-child(7),
+.report-table.hc-8  td:nth-child(8),
+.report-table.hc-9  td:nth-child(9),
+.report-table.hc-10 td:nth-child(10),
+.report-table.hc-11 td:nth-child(11),
+.report-table.hc-12 td:nth-child(12),
+.report-table.hc-13 td:nth-child(13),
+.report-table.hc-14 td:nth-child(14) { background: var(--report-column) !important; }
+
+.report-table.hc-1  th:nth-child(1),
+.report-table.hc-2  th:nth-child(2),
+.report-table.hc-3  th:nth-child(3),
+.report-table.hc-4  th:nth-child(4),
+.report-table.hc-5  th:nth-child(5),
+.report-table.hc-6  th:nth-child(6),
+.report-table.hc-7  th:nth-child(7),
+.report-table.hc-8  th:nth-child(8),
+.report-table.hc-9  th:nth-child(9),
+.report-table.hc-10 th:nth-child(10),
+.report-table.hc-11 th:nth-child(11),
+.report-table.hc-12 th:nth-child(12),
+.report-table.hc-13 th:nth-child(13),
+.report-table.hc-14 th:nth-child(14) { background: var(--navy-deep) !important; color: #fff !important; }
+
+.report-table.hc-1  tbody tr:hover td:nth-child(1),
+.report-table.hc-2  tbody tr:hover td:nth-child(2),
+.report-table.hc-3  tbody tr:hover td:nth-child(3),
+.report-table.hc-4  tbody tr:hover td:nth-child(4),
+.report-table.hc-5  tbody tr:hover td:nth-child(5),
+.report-table.hc-6  tbody tr:hover td:nth-child(6),
+.report-table.hc-7  tbody tr:hover td:nth-child(7),
+.report-table.hc-8  tbody tr:hover td:nth-child(8),
+.report-table.hc-9  tbody tr:hover td:nth-child(9),
+.report-table.hc-10 tbody tr:hover td:nth-child(10),
+.report-table.hc-11 tbody tr:hover td:nth-child(11),
+.report-table.hc-12 tbody tr:hover td:nth-child(12),
+.report-table.hc-13 tbody tr:hover td:nth-child(13),
+.report-table.hc-14 tbody tr:hover td:nth-child(14) { background: var(--report-cross) !important; }
 
 /* Отчётные таблицы: шапка и первый столбец закреплены при прокрутке
    (на мобильном таблица прокручивается внутри .table-wrap).
@@ -394,4 +433,142 @@ hr {
     animation: none;
     clip-path: inset(0);
   }
+}
+
+/* ============================================================
+   Mobile application shell and content layouts
+   ============================================================ */
+.transactions-filter-trigger,
+.transactions-filter-done,
+.transactions-mobile-list,
+.annual-mobile-view,
+.yoy-filter-trigger,
+.yoy-filter-done,
+.yoy-mobile-results,
+.mobile-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+  .page { padding: 16px 12px 94px; }
+  .page > h1:first-child { font-size: 25px !important; margin-bottom: 10px !important; }
+
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  .page button:not(.btn-link), .page select, .page input { min-height: 44px; }
+  .register-secondary-links a:nth-child(1), .register-secondary-links a:nth-child(3) { display: none; }
+
+  .analysis-nav {
+    flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -12px 14px !important; padding: 0 12px 10px !important;
+  }
+  .analysis-nav::-webkit-scrollbar { display: none; }
+  .analysis-nav-link { flex: 0 0 auto; min-height: 42px; display: inline-flex; align-items: center; }
+
+  /* Shared mobile bottom sheets */
+  .mobile-sheet-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 299;
+    width: 100%; border: 0; border-radius: 0; background: rgba(10,29,44,.48);
+  }
+
+  /* Transactions: filter sheet + card list */
+  .transactions-head { align-items: center !important; margin-bottom: 10px !important; }
+  .transactions-head > div { width: 100%; }
+  .transactions-head a { flex: 1; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; }
+  .transactions-desktop-add { display: none; }
+  .transactions-filter-trigger { display: block; width: 100%; margin-bottom: 10px; text-align: left; }
+  .transactions-filters {
+    display: none !important; position: fixed; z-index: 300; left: 0; right: 0; bottom: 0;
+    max-height: 82svh; overflow-y: auto; border-radius: 20px 20px 0 0 !important;
+    padding: 18px 16px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+    box-shadow: 0 -12px 30px rgba(15,30,45,.2);
+  }
+  .transactions-filters.is-open { display: flex !important; flex-direction: column; align-items: stretch !important; }
+  .transactions-filters input, .transactions-filters select { width: 100%; }
+  .transactions-filter-done { display: block; width: 100%; margin-top: 8px; }
+  .transactions-desktop-table { display: none; }
+  .transactions-mobile-list { display: flex; flex-direction: column; gap: 8px; }
+  .mobile-transaction-card {
+    position: relative; display: flex; align-items: stretch;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 11px; overflow: hidden;
+  }
+  .mobile-transaction-main {
+    flex: 1; min-width: 0; min-height: 70px; border: 0; border-radius: 0; padding: 10px 42px 10px 10px;
+    display: grid; grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; align-items: center;
+    background: transparent; color: var(--text); text-align: left;
+  }
+  .mobile-transaction-main:hover { background: var(--surface-2); }
+  .mobile-transaction-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); font-size: 18px; }
+  .mobile-transaction-copy { min-width: 0; display: flex; flex-direction: column; }
+  .mobile-transaction-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .mobile-transaction-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 11.5px; }
+  .mobile-transaction-amount { font-weight: 700; white-space: nowrap; font-size: 13.5px; }
+  .mobile-transaction-delete { position: absolute; right: 0; top: 50%; translate: 0 -50%; width: 44px; height: 44px; border: 0 !important; color: var(--expense) !important; }
+  .transactions-mobile-edit { min-width: 0; margin-top: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .transactions-mobile-edit td { display: block; }
+  .transactions-mobile-edit td > div { flex-direction: column; align-items: stretch !important; }
+  .transactions-mobile-edit input, .transactions-mobile-edit select, .transactions-mobile-edit button { width: 100% !important; }
+
+  /* Accounts: one clear action hierarchy */
+  .accounts-toolbar { align-items: stretch !important; margin-bottom: 14px !important; }
+  .accounts-toolbar > div:first-child { min-width: 0 !important; width: 100%; }
+  .accounts-new-group { width: 100%; }
+  .accounts-new-group input { flex: 1; width: auto !important; }
+  .accounts-toolbar > button { flex: 1; }
+  .account-group-card { margin-bottom: 10px !important; }
+  .account-main-row { gap: 7px !important; padding: 11px 10px !important; }
+  .account-drag-handle { display: none; }
+  .account-row-actions { display: none !important; width: 100%; padding-top: 4px; gap: 6px !important; }
+  .account-main-row.is-expanded .account-row-actions { display: grid !important; grid-template-columns: 1fr 1fr 44px; }
+  .account-row-actions button { min-height: 40px !important; }
+  .account-group-delete { width: 40px; height: 40px; padding: 0 !important; }
+
+  /* Report summary */
+  .report-period-controls { gap: 8px !important; position: sticky; top: 58px; z-index: 20; margin: 0 -12px 12px !important; padding: 8px 12px; background: rgba(246,242,233,.97); border-bottom: 1px solid var(--line); }
+  .report-period-controls > div { width: 100%; }
+  .report-period-controls > div:first-child { display: grid !important; grid-template-columns: repeat(3, 1fr); }
+  .report-period-controls > div:last-child { display: grid !important; grid-template-columns: 44px 1fr 44px; }
+  .report-period-controls > div:last-child button:last-child { display: none; }
+  .report-period-controls input { width: 100% !important; }
+  .report-stat-grid { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; margin-bottom: 14px !important; }
+  .report-stat-card { min-width: 0 !important; padding: 12px !important; }
+  .report-stat-card:last-child { grid-column: 1 / -1; }
+  .report-stat-card > div:last-child { font-size: 18px !important; }
+  .report-chart-grid { display: block !important; margin-bottom: 12px !important; }
+  .report-card { min-width: 0 !important; padding: 14px 10px !important; margin-bottom: 10px; }
+  .report-card-trend .recharts-yAxis { display: none; }
+  .report-card-pie { display: none; }
+  .report-card-categories table { min-width: 0; }
+  .report-card-categories th:first-child, .report-card-categories td:first-child,
+  .report-card-categories th:last-child, .report-card-categories td:last-child { display: none; }
+  .report-card-categories th, .report-card-categories td { padding: 9px 6px !important; }
+
+  /* Annual and year-over-year reports use a one-period vertical layout. */
+  .annual-desktop-table { display: none; }
+  .annual-mobile-view { display: block; }
+  .annual-report-controls { gap: 8px !important; }
+  .annual-report-controls > div { width: 100%; justify-content: space-between; }
+  .mobile-period-select { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-weight: 600; }
+  .mobile-period-select select { min-width: 150px; }
+  .mobile-report-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .mobile-report-totals > div, .mobile-balance-total { padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; }
+  .mobile-report-totals > div:last-child { grid-column: 1 / -1; }
+  .mobile-report-totals small, .mobile-balance-total small { color: var(--text-3); }
+  .mobile-report-totals strong { margin-top: 3px; font-size: 16px; }
+  .mobile-balance-total { margin-bottom: 12px; }
+  .mobile-balance-total strong { margin-top: 4px; font-size: 22px; color: var(--navy); }
+  .mobile-report-section { margin-bottom: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .mobile-report-section h3 { margin: 0; min-height: 46px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; background: var(--surface-2); }
+  .mobile-report-row { width: 100%; min-height: 48px; padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; align-items: center; background: transparent; color: var(--text); border: 0; border-top: 1px solid var(--line-soft); border-radius: 0; text-align: left; }
+  .mobile-report-row.static { cursor: default; }
+
+  .yoy-filter-trigger { display: block; width: 100%; margin-bottom: 12px; text-align: left; }
+  .yoy-filters { display: none !important; position: fixed; z-index: 300; left: 0; right: 0; bottom: 0; max-height: 82svh; overflow-y: auto; border-radius: 20px 20px 0 0 !important; padding: 18px 16px calc(82px + env(safe-area-inset-bottom,0px)) !important; }
+  .yoy-filters.is-open { display: flex !important; }
+  .yoy-filter-done { display: block; width: 100%; margin-top: 8px; }
+  .yoy-filters button { min-height: 40px; }
+  .yoy-mobile-results { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .yoy-mobile-month { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .yoy-mobile-month h3 { margin: 0; padding: 9px 12px; background: var(--surface-2); }
+  .yoy-mobile-month div { min-height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line-soft); }
 }

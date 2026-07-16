@@ -27,6 +27,7 @@ export default function AnnualReport() {
   const [error, setError] = useState(null);
   const [hideEmpty, setHideEmpty] = useState(true);
   const [hoverCol, setHoverCol] = useState(null);
+  const [mobileMonth, setMobileMonth] = useState(new Date().getMonth());
 
   const onCellOver = (e) => {
     const cell = e.target.closest("td, th");
@@ -88,7 +89,7 @@ export default function AnnualReport() {
       </p>
 
       {/* Контролы */}
-      <div style={{
+      <div className="annual-report-controls" style={{
         display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
         marginBottom: 16,
       }}>
@@ -130,7 +131,18 @@ export default function AnnualReport() {
       {error && <p style={{ color: "#c0432b" }}>{error}</p>}
 
       {data && !loading && (
-        <div className="table-wrap" style={{
+        <>
+        <MobileAnnualFlow
+          data={data}
+          month={mobileMonth}
+          onMonthChange={setMobileMonth}
+          incomeRows={incomeRows}
+          expenseRows={expenseRows}
+          sym={sym}
+          year={year}
+          navigate={navigate}
+        />
+        <div className="table-wrap annual-desktop-table" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
           paddingTop: 4, paddingBottom: 4,
         }}>
@@ -161,7 +173,7 @@ export default function AnnualReport() {
               {incomeRows.map(row => (
                 <RowLine
                   key={`i-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#167a4a" months={visibleMonths}
+                  row={row} sym={sym} accent="#0f6a40" months={visibleMonths}
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "income" });
@@ -175,7 +187,7 @@ export default function AnnualReport() {
                 monthly={data.income_totals}
                 total={data.income_total}
                 sym={sym}
-                color="#167a4a"
+                color="#0f6a40"
                 months={visibleMonths}
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
@@ -191,7 +203,7 @@ export default function AnnualReport() {
               {expenseRows.map(row => (
                 <RowLine
                   key={`e-${row.category_id}-${row.parent_id}`}
-                  row={row} sym={sym} accent="#c0432b" months={visibleMonths}
+                  row={row} sym={sym} accent="#a93421" months={visibleMonths}
                   onCellClick={(monthIdx) => {
                     const p = periodForCell(year, monthIdx);
                     const params = new URLSearchParams({ date_from: p.from, date_to: p.to, type: "expense" });
@@ -205,7 +217,7 @@ export default function AnnualReport() {
                 monthly={data.expense_totals}
                 total={data.expense_total}
                 sym={sym}
-                color="#c0432b"
+                color="#a93421"
                 months={visibleMonths}
                 onCellClick={(monthIdx) => {
                   const p = periodForCell(year, monthIdx);
@@ -228,7 +240,42 @@ export default function AnnualReport() {
             </tbody>
           </table>
         </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function MobileAnnualFlow({ data, month, onMonthChange, incomeRows, expenseRows, sym, year, navigate }) {
+  const go = (type, categoryId) => {
+    const p = periodForCell(year, month);
+    const params = new URLSearchParams({ type, date_from: p.from, date_to: p.to });
+    if (categoryId != null) params.set("category_id", String(categoryId));
+    navigate(`/transactions?${params}`);
+  };
+  const renderRows = (rows, type, color) => rows
+    .filter(row => Math.abs(row.monthly[month] || 0) > .005)
+    .sort((a, b) => Math.abs(b.monthly[month]) - Math.abs(a.monthly[month]))
+    .map(row => (
+      <button key={`${type}-${row.category_id}-${row.parent_id}`} type="button" className="mobile-report-row" onClick={() => go(type, row.category_id)}>
+        <span style={{ paddingLeft: row.parent_id ? 14 : 0 }}>{row.parent_id ? "↳ " : ""}{row.category_name}</span>
+        <strong style={{ color }}>{formatMoney(row.monthly[month], { maxFraction: 0 })} {sym}</strong>
+      </button>
+    ));
+  return (
+    <div className="annual-mobile-view">
+      <label className="mobile-period-select">Месяц
+        <select value={month} onChange={e => onMonthChange(Number(e.target.value))}>
+          {MONTHS.map((label, index) => <option key={label} value={index}>{label}</option>)}
+        </select>
+      </label>
+      <div className="mobile-report-totals">
+        <div><small>Доходы</small><strong style={{ color: "#0f6a40" }}>{formatMoney(data.income_totals[month] || 0, { maxFraction: 0 })} {sym}</strong></div>
+        <div><small>Расходы</small><strong style={{ color: "#a93421" }}>{formatMoney(data.expense_totals[month] || 0, { maxFraction: 0 })} {sym}</strong></div>
+        <div><small>Сальдо</small><strong>{formatMoney(data.net_monthly[month] || 0, { maxFraction: 0 })} {sym}</strong></div>
+      </div>
+      <section className="mobile-report-section"><h3>Доходы</h3>{renderRows(incomeRows, "income", "#0f6a40")}</section>
+      <section className="mobile-report-section"><h3>Расходы</h3>{renderRows(expenseRows, "expense", "#a93421")}</section>
     </div>
   );
 }
@@ -392,7 +439,7 @@ function SubtotalRow({ label, monthly, total, sym, color, onCellClick, months })
 
 function NetRow({ label, monthly, total, sym, onCellClick, months }) {
   const cols = months || monthly.map((_, i) => i);
-  const overallColor = total >= 0 ? "#4ade80" : "#f87171";
+  const overallColor = total >= 0 ? "#78e0a5" : "#ff9b8a";
   return (
     <tr style={{ background: "#173a54" }}>
       <td
@@ -406,7 +453,7 @@ function NetRow({ label, monthly, total, sym, onCellClick, months }) {
       </td>
       {cols.map((i) => {
         const v = monthly[i];
-        const color = Math.abs(v) < 0.005 ? "#7a8590" : (v >= 0 ? "#4ade80" : "#f87171");
+        const color = Math.abs(v) < 0.005 ? "#b7c5cf" : (v >= 0 ? "#78e0a5" : "#ff9b8a");
         const active = Math.abs(v) > 0.005;
         return (
           <td

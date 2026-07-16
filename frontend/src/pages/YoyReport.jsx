@@ -17,6 +17,7 @@ export default function YoyReport() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hoverCol, setHoverCol] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const onCellOver = (e) => {
     const cell = e.target.closest("td, th");
@@ -55,7 +56,7 @@ export default function YoyReport() {
     setter(next);
   };
 
-  const accentColor = type === "income" ? "#167a4a" : "#c0432b";
+  const accentColor = type === "income" ? "#0f6a40" : "#a93421";
 
   return (
     <div className="page" style={{ maxWidth: 1400 }}>
@@ -69,8 +70,12 @@ export default function YoyReport() {
         и категориями — например, сравнить только расходы на еду.
       </p>
 
+      <button type="button" className="yoy-filter-trigger btn-ghost" onClick={() => setFiltersOpen(true)}>
+        Фильтры · {selAccounts.size ? `${selAccounts.size} сч.` : "все счета"} · {selCategories.size ? `${selCategories.size} кат.` : "все категории"}
+      </button>
+      {filtersOpen && <button type="button" className="mobile-sheet-backdrop" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} />}
       {/* Контролы */}
-      <div style={{
+      <div className={`yoy-filters${filtersOpen ? " is-open" : ""}`} style={{
         background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
         padding: 14, marginBottom: 16,
         display: "flex", flexDirection: "column", gap: 10,
@@ -94,6 +99,7 @@ export default function YoyReport() {
           onToggle={(id) => toggle(selCategories, setSelCategories, id)}
           onClear={() => setSelCategories(new Set())}
         />
+        <button type="button" className="yoy-filter-done" onClick={() => setFiltersOpen(false)}>Показать сравнение</button>
       </div>
 
       {loading && <p>Загрузка...</p>}
@@ -103,7 +109,18 @@ export default function YoyReport() {
         data.years.length === 0 ? (
           <p style={{ color: "#a6afb8" }}>Нет данных под выбранные фильтры.</p>
         ) : (
-          <div className="table-wrap" style={{
+          <>
+          <div className="yoy-mobile-results">
+            {data.rows.map(row => (
+              <section key={row.month} className="yoy-mobile-month">
+                <h3>{row.label}</h3>
+                {data.years.map(year => (
+                  <div key={year}><span>{year}</span><strong style={{ color: accentColor }}>{formatMoney(row.values[year] ?? 0, { maxFraction: 0 })} {sym}</strong></div>
+                ))}
+              </section>
+            ))}
+          </div>
+          <div className="table-wrap annual-desktop-table" style={{
             background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
             paddingTop: 4, paddingBottom: 4,
           }}>
@@ -160,6 +177,7 @@ export default function YoyReport() {
               </tbody>
             </table>
           </div>
+          </>
         )
       )}
     </div>

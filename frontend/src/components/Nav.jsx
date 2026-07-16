@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
-import { COMMON_CURRENCIES, currencySymbol } from "../utils/money";
+import { currencySymbol } from "../utils/money";
 import PwaInstallLink from "./PwaInstallLink";
 
 const BASE_LINKS = [
@@ -10,6 +10,13 @@ const BASE_LINKS = [
   { to: "/transactions", label: "Записи" },
   { to: "/reports", label: "Анализ" },
   { to: "/goals", label: "Цели" },
+];
+
+const MOBILE_PRIMARY_LINKS = [
+  { to: "/home", label: "Главная", icon: "⌂" },
+  { to: "/transactions", label: "Записи", icon: "≡" },
+  { to: "/reports", label: "Анализ", icon: "⌁" },
+  { to: "/accounts", label: "Счета", icon: "▣" },
 ];
 
 const RECORD_LINKS = [
@@ -35,7 +42,7 @@ export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { user, mainCurrency, updateMainCurrency } = useUser();
+  const { user, mainCurrency } = useUser();
   const links = BASE_LINKS;
   const settingsLinks = user?.is_admin
     ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
@@ -44,15 +51,6 @@ export default function Nav() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     navigate("/login");
-  };
-
-  const handleChangeMainCurrency = async (e) => {
-    const cur = e.target.value;
-    try {
-      await updateMainCurrency(cur);
-    } catch (err) {
-      alert("Не удалось обновить валюту: " + (err.response?.data?.detail || err.message));
-    }
   };
 
   // Ссылки на navy-фоне: приглушённо-светлые, активная — белая на полупрозрачной заливке
@@ -230,33 +228,30 @@ export default function Nav() {
             background: "transparent", border: "1px solid rgba(255,255,255,0.18)",
             color: "var(--text-on-dark)",
           }}
-          aria-label="Меню"
+          aria-label={open ? "Закрыть меню" : "Открыть меню"}
+          aria-expanded={open}
+          aria-controls="mobile-more-menu"
         >
           {open ? "✕" : "☰"}
         </button>
       </div>
 
       {open && (
-        <div className="nav-mobile-menu" style={{
-          background: "#0f293d",
-          borderTop: "1px solid rgba(255,255,255,0.10)",
-          padding: "8px 16px 12px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-        }}>
-          {links.map(l => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              style={mobileLinkStyle}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </NavLink>
-          ))}
+        <>
+          <button
+            type="button"
+            className="nav-mobile-backdrop"
+            aria-label="Закрыть меню"
+            onClick={() => setOpen(false)}
+          />
+          <div id="mobile-more-menu" className="nav-mobile-menu" role="dialog" aria-modal="true" aria-label="Дополнительное меню">
+          <div className="nav-mobile-sheet-head">
+            <strong>Ещё</strong>
+            <button type="button" onClick={() => setOpen(false)} className="btn-ghost" aria-label="Закрыть меню">×</button>
+          </div>
+          <NavLink to="/goals" style={mobileLinkStyle} onClick={() => setOpen(false)}>Цели</NavLink>
           <div style={{
-            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
             letterSpacing: 0.5, padding: "10px 11px 4px",
           }}>
             Записи
@@ -272,7 +267,7 @@ export default function Nav() {
             </NavLink>
           ))}
           <div style={{
-            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
             letterSpacing: 0.5, padding: "10px 11px 4px",
           }}>
             Настройки
@@ -288,7 +283,7 @@ export default function Nav() {
             </NavLink>
           ))}
           <div style={{
-            fontSize: 11, color: "rgba(244,241,232,0.45)", textTransform: "uppercase",
+            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
             letterSpacing: 0.5, padding: "10px 11px 4px",
           }}>
             Полезное
@@ -307,35 +302,77 @@ export default function Nav() {
             ...mobileLinkStyle({ isActive: false }),
             width: "100%", textAlign: "left", cursor: "pointer",
           }} />
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span style={{ fontSize: 12, color: "rgba(244,241,232,0.6)" }}>Валюта:</span>
-            <select value={mainCurrency} onChange={handleChangeMainCurrency} style={{ flex: 1 }}>
-              {COMMON_CURRENCIES.map(c => (
-                <option key={c} value={c}>{currencySymbol(c)} {c}</option>
-              ))}
-            </select>
-          </div>
+          <NavLink to="/settings/currencies" style={mobileLinkStyle} onClick={() => setOpen(false)}>
+            Основная валюта <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{currencySymbol(mainCurrency)} {mainCurrency}</span>
+          </NavLink>
           <button
             onClick={handleLogout}
             style={{
-              marginTop: 8, textAlign: "left",
-              background: "transparent", border: "1px solid rgba(255,255,255,0.18)",
-              color: "var(--text-on-dark)",
+              marginTop: 8, textAlign: "left", minHeight: 44,
+              background: "transparent", border: "1px solid #e4ddcd",
+              color: "#c0432b",
             }}
           >
             Выйти
           </button>
-        </div>
+          </div>
+        </>
       )}
+
+      <div className="mobile-bottom-nav" aria-label="Основная навигация">
+        {MOBILE_PRIMARY_LINKS.map(link => (
+          <NavLink key={link.to} to={link.to} end={link.to === "/home"}>
+            <span aria-hidden="true">{link.icon}</span>
+            <small>{link.label}</small>
+          </NavLink>
+        ))}
+        <button type="button" onClick={() => setOpen(true)} aria-label="Открыть дополнительные разделы">
+          <span aria-hidden="true">•••</span>
+          <small>Ещё</small>
+        </button>
+      </div>
 
       <style>{`
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
         .nav-burger { display: none !important; }
-        @media (max-width: 720px) {
+        .mobile-bottom-nav { display: none; }
+        @media (max-width: 767px) {
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
           .nav-burger { display: block !important; }
+          nav > div:first-child { padding: 0 12px 0 16px !important; }
+          .nav-burger { margin-left: auto; width: 44px; height: 44px; padding: 0 !important; }
+          .nav-mobile-backdrop { position: fixed; inset: 0; z-index: 119; border: 0; border-radius: 0; background: rgba(10,29,44,.48); }
+          .nav-mobile-menu {
+            position: fixed; z-index: 120; left: 0; right: 0; bottom: 0;
+            max-height: min(78svh, 680px); overflow-y: auto;
+            padding: 10px 16px calc(84px + env(safe-area-inset-bottom, 0px));
+            background: #fffdf7; border-radius: 20px 20px 0 0;
+            box-shadow: 0 -12px 30px rgba(15,30,45,.2);
+            display: flex; flex-direction: column; gap: 2px;
+          }
+          .nav-mobile-menu a { color: #1b2531 !important; background: transparent !important; min-height: 44px; display: flex !important; align-items: center; }
+          .nav-mobile-menu a[aria-current="page"] { color: #173a54 !important; background: #f6f2e9 !important; }
+          .nav-mobile-sheet-head { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 4px 4px 11px; }
+          .nav-mobile-sheet-head strong { font-size: 18px; }
+          .nav-mobile-sheet-head button { width: 44px; height: 44px; padding: 0; font-size: 20px; }
+          .mobile-bottom-nav {
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 110;
+            min-height: calc(62px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            background: rgba(255,253,247,.98); border-top: 1px solid #e4ddcd;
+            box-shadow: 0 -5px 18px rgba(15,30,45,.08);
+          }
+          .mobile-bottom-nav a, .mobile-bottom-nav button {
+            min-width: 0; min-height: 62px; padding: 7px 2px 5px; border: 0; border-radius: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+            background: transparent; color: #7a8590; text-decoration: none;
+          }
+          .mobile-bottom-nav a[aria-current="page"] { color: #173a54; }
+          .mobile-bottom-nav span { font-size: 21px; line-height: 1; }
+          .mobile-bottom-nav small { font-size: 10.5px; font-weight: 600; }
         }
       `}</style>
     </nav>

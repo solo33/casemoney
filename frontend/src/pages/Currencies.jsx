@@ -148,7 +148,7 @@ export default function Currencies() {
         {/* Шапка таблицы */}
         <div className="cur-head" style={{
           display: "grid",
-          gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
+          gridTemplateColumns: "1.7fr 70px 100px 1.4fr 52px",
           gap: 12, alignItems: "center",
           fontSize: 12, color: "#a6afb8", textTransform: "uppercase",
           letterSpacing: 0.5, marginBottom: 8, padding: "0 4px",
@@ -164,6 +164,7 @@ export default function Currencies() {
             .cur-head { display: none !important; }
             .cur-row-grid { grid-template-columns: 1fr !important; gap: 4px !important; padding: 10px 4px !important; }
             .cur-field-label { display: block !important; }
+            .cur-row-grid > button { justify-self: end; }
           }
         `}</style>
 
@@ -259,7 +260,7 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
   return (
     <div className="cur-row-grid" style={{
       display: "grid",
-      gridTemplateColumns: "1.7fr 70px 100px 1.4fr 60px",
+      gridTemplateColumns: "1.7fr 70px 100px 1.4fr 52px",
       gap: 12, alignItems: "center",
       padding: "8px 4px",
       borderBottom: "1px solid #f6f2e9",
@@ -332,13 +333,25 @@ function CurrencyRow({ uc, mainCurrency, onSave, onDelete, saving }) {
           type="button"
           onClick={onDelete}
           className="btn-ghost"
-          style={{ padding: "2px 8px", fontSize: 14, color: "#c0432b" }}
+          style={{ width: 44, height: 44, padding: 0, color: "#c0432b", display: "grid", placeItems: "center" }}
           title="Удалить"
+          aria-label={`Удалить валюту ${uc.currency}`}
         >
-          × Удалить
+          <TrashIcon />
         </button>
       )}
     </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16" />
+      <path d="M9 7V4h6v3" />
+      <path d="M6.5 7l1 13h9l1-13" />
+      <path d="M10 11v5M14 11v5" />
+    </svg>
   );
 }
 

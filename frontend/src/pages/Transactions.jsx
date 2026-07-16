@@ -27,6 +27,7 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
   const [filters, setFilters] = useState(() => ({
@@ -205,12 +206,12 @@ export default function Transactions() {
 
   return (
     <div className="page" style={{ maxWidth: 1200 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+      <div className="transactions-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <h1 style={{ margin: 0 }}>Записи</h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <Link to="/import" className="btn-ghost" style={{ textDecoration: "none", padding: "7px 12px" }}>Импорт</Link>
           <Link to="/history" className="btn-ghost" style={{ textDecoration: "none", padding: "7px 12px" }}>История</Link>
-          <button
+          <button className="transactions-desktop-add"
             type="button"
             onClick={() => setEditing(editing === "new" ? null : "new")}
           >
@@ -282,7 +283,11 @@ export default function Transactions() {
       )}
 
       {/* Фильтры */}
-      <div style={{
+      <button type="button" className="transactions-filter-trigger btn-ghost" onClick={() => setFiltersOpen(true)}>
+        Фильтры{hasFilters ? ` · ${Object.values(filters).filter(Boolean).length}` : ""}
+      </button>
+      {filtersOpen && <button type="button" className="mobile-sheet-backdrop" aria-label="Закрыть фильтры" onClick={() => setFiltersOpen(false)} />}
+      <div className={`transactions-filters${filtersOpen ? " is-open" : ""}`} style={{
         background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
         padding: 12, marginBottom: 12,
         display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
@@ -337,6 +342,7 @@ export default function Transactions() {
         {hasFilters && (
           <button className="btn-ghost" onClick={resetFilters}>Сбросить</button>
         )}
+        <button type="button" className="transactions-filter-done" onClick={() => setFiltersOpen(false)}>Показать записи</button>
       </div>
 
       {/* Pagination header */}
@@ -357,7 +363,7 @@ export default function Transactions() {
 
       {/* Таблица */}
       {data.items.length > 0 && (
-        <div className="table-wrap" style={{
+        <div className="table-wrap transactions-desktop-table" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
         }}>
           <table>
@@ -391,6 +397,30 @@ export default function Transactions() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {data.items.length > 0 && (
+        <div className="transactions-mobile-list">
+          {data.items.map(tx => (
+            <div key={tx.id}>
+              <MobileTransactionCard
+                tx={tx}
+                accountName={accountName}
+                categoryName={categoryNameFor}
+                formatDate={formatDate}
+                onEdit={() => setEditing(editing === tx.id ? null : tx.id)}
+                onDelete={() => handleDelete(tx.id)}
+              />
+              {editing === tx.id && (
+                <table className="transactions-mobile-edit"><tbody><EditRow
+                  tx={tx} accounts={accounts} categories={categories}
+                  onCancel={() => setEditing(null)}
+                  onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
+                /></tbody></table>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -452,6 +482,28 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
         </button>
       </td>
     </tr>
+  );
+}
+
+function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
+  const category = tx.type === "transfer"
+    ? `→ ${accountName(tx.to_account_id)}`
+    : (tx.category_id ? categoryName(tx.category_id) : "Без категории");
+  const title = tx.description || category || TYPE_LABEL[tx.type];
+  return (
+    <article className="mobile-transaction-card">
+      <button type="button" className="mobile-transaction-main" onClick={onEdit} aria-label={`Изменить запись ${title}`}>
+        <span className="mobile-transaction-icon" style={{ color: TYPE_COLOR[tx.type] }}>{TYPE_ICON[tx.type]}</span>
+        <span className="mobile-transaction-copy">
+          <strong>{title}</strong>
+          <small>{formatDate(tx.date)} · {accountName(tx.account_id)} · {category}</small>
+        </span>
+        <span className="mobile-transaction-amount" style={{ color: TYPE_COLOR[tx.type] }}>
+          {tx.type === "expense" ? "−" : tx.type === "income" ? "+" : ""}{formatMoney(tx.amount)} {currencySymbol(tx.currency)}
+        </span>
+      </button>
+      <button type="button" className="mobile-transaction-delete btn-ghost" onClick={onDelete} aria-label={`Удалить запись ${title}`}>×</button>
+    </article>
   );
 }
 

@@ -10,7 +10,7 @@ const TABS = [
 
 export default function AnalysisNav() {
   return (
-    <div style={{
+    <div className="analysis-nav" style={{
       display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16,
       borderBottom: "1px solid #e4ddcd", paddingBottom: 10,
     }}>
@@ -19,6 +19,7 @@ export default function AnalysisNav() {
           key={t.to}
           to={t.to}
           end={t.end}
+          className="analysis-nav-link"
           style={({ isActive }) => ({
             padding: "6px 14px",
             borderRadius: 999,

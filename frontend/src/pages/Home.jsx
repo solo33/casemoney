@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
-import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import { QUICK_ADD_OPEN_EVENT, TX_ADDED_EVENT } from "../components/QuickAddFab";
 import QuickAddInline from "../components/QuickAddInline";
 import { BrandProgress } from "../components/BrandProgress";
 import { useUser } from "../contexts/UserContext";
@@ -267,8 +267,16 @@ export default function Home() {
       <style>{`
         @media (max-width: 900px) {
           .home-layout { grid-template-columns: 1fr !important; }
-          /* На телефоне форма ввода — первым экраном, баланс и счета ниже */
-          .home-main { order: -1; }
+          .home-aside { order: -1; }
+        }
+        @media (max-width: 767px) {
+          .home-layout { padding: 12px 12px 86px !important; gap: 12px !important; }
+          .home-inline-add { display: none !important; }
+          .home-aside, .home-main { display: contents !important; }
+          .home-balance-card { order: 1; }
+          .home-records-card { order: 2; }
+          .home-breakdown-card { order: 3; }
+          .home-accounts-card { order: 4; }
         }
       `}</style>
 
@@ -295,7 +303,7 @@ export default function Home() {
       {/* ============== LEFT SIDEBAR ============== */}
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
-        <Card>
+        <Card className="home-balance-card">
           <h3 style={sectionTitle}>Баланс</h3>
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
             {balanceLoading || totalBalance == null ? (
@@ -333,7 +341,7 @@ export default function Home() {
         </Card>
 
         {/* Accounts grouped — только учитываемые в балансе */}
-        <Card noPadding>
+        <Card noPadding className="home-accounts-card">
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Счета</h3>
             <Link to="/accounts" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none" }}>
@@ -371,15 +379,17 @@ export default function Home() {
       {/* ============== RIGHT MAIN ============== */}
       <main className="home-main" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Inline quick-add form — дата синхронизирована с лентой за день */}
-        <QuickAddInline
-          date={selectedDate}
-          onDateChange={setSelectedDate}
-          accountGroups={accountOptions}
-          categories={categories}
-        />
+        <div className="home-inline-add">
+          <QuickAddInline
+            date={selectedDate}
+            onDateChange={setSelectedDate}
+            accountGroups={accountOptions}
+            categories={categories}
+          />
+        </div>
 
         {/* Записи: табы Сегодня / Последние изменённые */}
-        <Card noPadding>
+        <Card noPadding className="home-records-card">
           <div style={{
             display: "flex", alignItems: "stretch", flexWrap: "wrap",
             borderBottom: "1px solid #ece6d8",
@@ -434,7 +444,7 @@ export default function Home() {
 
         {/* Разбивка по категориям с переключателем Расходы/Доходы.
             На телефоне свёрнута по умолчанию — разворачивается по тапу. */}
-        <Card>
+        <Card className="home-breakdown-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: breakdownCollapsed ? 0 : 12, gap: 8, flexWrap: "wrap" }}>
             <h3
               onClick={() => setBreakdownCollapsed(c => !c)}
@@ -504,14 +514,21 @@ export default function Home() {
 // =============== components ===============
 
 function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
+  const [step, setStep] = useState(0);
   const steps = [
-    { done: hasAccounts, title: "1. Создайте счета", desc: "Карта, наличные, вклад или криптокошелек.", cta: "К счетам", to: "/accounts" },
-    { done: false, title: "2. Импортируйте историю", desc: "CSV, XLSX или XLS с предварительной проверкой.", cta: "Импорт", to: "/import" },
-    { done: hasTx, title: "3. Добавьте первую запись", desc: "Расход, доход или перевод через форму на главной.", cta: null, to: null },
-    { done: false, title: "4. Посмотрите анализ", desc: "Категории, динамика и годовые отчеты.", cta: "Анализ", to: "/reports" },
+    { title: "Выберите основную валюту", desc: "Она будет использоваться для общего баланса и отчётов." },
+    { title: "Проверьте начальные счета", desc: hasAccounts ? "Начальные счета уже созданы. Переименуйте или удалите ненужные." : "Создайте карту, наличные или другой первый счёт." },
+    { title: "Добавьте данные", desc: "Начните вручную с одной записи или импортируйте историю из файла." },
+    { title: "Готово к работе", desc: hasTx ? "Данные уже появились — можно смотреть баланс и анализ." : "После первой записи на главной появятся баланс и статистика." },
   ];
+  const current = steps[step];
+  const finish = () => onDismiss();
+  const openQuickAdd = () => {
+    onDismiss();
+    window.dispatchEvent(new CustomEvent(QUICK_ADD_OPEN_EVENT));
+  };
   return (
-    <div style={{
+    <div className="onboarding-wizard" style={{
       background: "linear-gradient(100deg, #173a54, #0f293d)",
       color: "var(--text-on-dark)", borderRadius: 12, padding: 20,
       position: "relative",
@@ -524,44 +541,28 @@ function Onboarding({ hasAccounts, hasTx, onDismiss, navigate }) {
         }}
         title="Скрыть"
       >×</button>
+      <div style={{ color: "rgba(244,241,232,.65)", fontSize: 12, marginBottom: 8 }}>Шаг {step + 1} из {steps.length}</div>
+      <div style={{ display: "flex", gap: 5, margin: "0 42px 16px 0" }}>
+        {steps.map((_, index) => <span key={index} style={{ height: 4, flex: 1, borderRadius: 4, background: index <= step ? "#c2a05a" : "rgba(255,255,255,.18)" }} />)}
+      </div>
       <h2 style={{ fontFamily: "var(--font-display)", color: "#fff", margin: "0 0 4px", fontSize: 22 }}>
         Добро пожаловать в CaseMoney
       </h2>
-      <p style={{ color: "rgba(244,241,232,0.8)", margin: "0 0 16px", fontSize: 14 }}>
-        Пошаговый режим для новичка: настройте счета, загрузите историю или добавьте записи вручную.
+      <h3 style={{ color: "#fff", margin: "14px 0 6px" }}>{current.title}</h3>
+      <p style={{ color: "rgba(244,241,232,0.8)", margin: "0 0 18px", fontSize: 14 }}>
+        {current.desc}
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
-        {steps.map((s, i) => (
-          <div key={i} style={{
-            background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: 14,
-            border: "1px solid rgba(255,255,255,0.12)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{
-                width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
-                background: s.done ? "#167a4a" : "rgba(255,255,255,0.15)",
-                color: "#fff", fontWeight: 700,
-              }}>{s.done ? "✓" : i + 1}</span>
-              <span style={{ fontWeight: 600, fontSize: 14, color: "#fff" }}>{s.title}</span>
-            </div>
-            <div style={{ fontSize: 12.5, color: "rgba(244,241,232,0.7)", marginBottom: s.cta ? 10 : 0 }}>
-              {s.desc}
-            </div>
-            {s.cta && (
-              <button
-                type="button"
-                onClick={() => navigate(s.to)}
-                style={{
-                  background: "#c2a05a", border: "none", color: "#0a1d2c",
-                  fontWeight: 600, fontSize: 13, padding: "6px 14px", borderRadius: 6, cursor: "pointer",
-                }}
-              >
-                {s.cta}
-              </button>
-            )}
-          </div>
-        ))}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {step === 0 && <button type="button" onClick={() => navigate("/settings/currencies")} className="btn-ghost" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }}>Настроить валюту</button>}
+        {step === 1 && <button type="button" onClick={() => navigate("/accounts")} className="btn-ghost" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }}>Открыть счета</button>}
+        {step === 2 && <>
+          <button type="button" onClick={openQuickAdd} style={{ background: "#c2a05a", color: "#0a1d2c", borderColor: "#c2a05a" }}>Добавить вручную</button>
+          <button type="button" onClick={() => navigate("/import")} className="btn-ghost" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }}>Импортировать</button>
+        </>}
+        {step > 0 && <button type="button" onClick={() => setStep(s => s - 1)} className="btn-link" style={{ color: "rgba(255,255,255,.75)" }}>Назад</button>}
+        {step < steps.length - 1
+          ? <button type="button" onClick={() => setStep(s => s + 1)} style={{ marginLeft: "auto", background: "#fff", color: "#173a54", borderColor: "#fff" }}>Продолжить</button>
+          : <button type="button" onClick={finish} style={{ marginLeft: "auto", background: "#c2a05a", color: "#0a1d2c", borderColor: "#c2a05a" }}>Начать</button>}
       </div>
     </div>
   );
@@ -604,9 +605,9 @@ const sectionTitle = {
   letterSpacing: 0.5,
 };
 
-function Card({ children, style, noPadding }) {
+function Card({ children, style, noPadding, className = "" }) {
   return (
-    <div style={{
+    <div className={className} style={{
       background: "#fffdf7",
       border: "1px solid #e4ddcd",
       borderRadius: 10,

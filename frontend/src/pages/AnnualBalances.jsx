@@ -14,7 +14,7 @@ function Cell({ value, bold }) {
       padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap",
       fontVariantNumeric: "tabular-nums",
       fontWeight: bold ? 600 : 400,
-      color: zero ? "#c7cdd3" : (value < 0 ? "#c0432b" : "#1b2531"),
+      color: zero ? "#9aa5af" : (value < 0 ? "#a93421" : "#1b2531"),
       fontSize: 12.5,
     }}>
       {zero ? "—" : formatMoney(value, { maxFraction: 0 })}
@@ -29,6 +29,7 @@ export default function AnnualBalances() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hoverCol, setHoverCol] = useState(null);
+  const [mobileMonth, setMobileMonth] = useState(new Date().getMonth());
 
   // Делегирование: подсветка колонки по nth-child наведённой ячейки
   const onCellOver = (e) => {
@@ -92,7 +93,9 @@ export default function AnnualBalances() {
         data.groups.length === 0 ? (
           <p style={{ color: "#a6afb8" }}>Нет счетов.</p>
         ) : (
-          <div className="table-wrap" style={{
+          <>
+          <MobileBalances data={data} month={mobileMonth} onMonthChange={setMobileMonth} sym={sym} />
+          <div className="table-wrap annual-desktop-table" style={{
             background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           }}>
             <table
@@ -129,8 +132,36 @@ export default function AnnualBalances() {
               </tbody>
             </table>
           </div>
+          </>
         )
       )}
+    </div>
+  );
+}
+
+function MobileBalances({ data, month, onMonthChange, sym }) {
+  return (
+    <div className="annual-mobile-view">
+      <label className="mobile-period-select">Месяц
+        <select value={month} onChange={e => onMonthChange(Number(e.target.value))}>
+          {MONTHS.map((label, index) => <option key={label} value={index}>{label}</option>)}
+        </select>
+      </label>
+      <div className="mobile-balance-total">
+        <small>Общий баланс на конец месяца</small>
+        <strong>{formatMoney(data.total_monthly[month] || 0, { maxFraction: 0 })} {sym}</strong>
+      </div>
+      {data.groups.map(group => (
+        <section key={group.group_id ?? "ungrouped"} className="mobile-report-section">
+          <h3><span>{group.group_name}</span><strong>{formatMoney(group.monthly[month] || 0, { maxFraction: 0 })} {sym}</strong></h3>
+          {group.accounts.map(account => (
+            <div key={account.account_id} className="mobile-report-row static">
+              <span>{account.icon ? `${account.icon} ` : ""}{account.name}</span>
+              <strong>{formatMoney(account.monthly[month] || 0, { maxFraction: 0 })} {sym}</strong>
+            </div>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

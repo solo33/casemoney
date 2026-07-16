@@ -62,7 +62,7 @@ function stepAnchor(gran, anchor, dir) {
 // (дефолт при импорте), поэтому для наглядности раскрашиваем сектора по
 // порядку из фиксированной палитры в духе Modern Ledger.
 const PIE_PALETTE = [
-  "#173a54", "#9c7b3c", "#2f6296", "#167a4a", "#c0432b", "#7a8590",
+  "#173a54", "#8a682d", "#245783", "#0f6a40", "#a93421", "#66727e",
   "#0f766e", "#b45309", "#6d28d9", "#be123c", "#0e7490", "#4d7c0f",
   "#9333ea", "#a16207", "#1d4ed8", "#15803d",
 ];
@@ -185,7 +185,7 @@ export default function Reports() {
       <AnalysisNav />
 
       {/* Период: гранулярность + один пикер + стрелки */}
-      <div style={{
+      <div className="report-period-controls" style={{
         display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12, alignItems: "center",
       }}>
         <div style={{ display: "flex", gap: 6 }}>
@@ -242,22 +242,22 @@ export default function Reports() {
       {summary && !loading && (
         <>
           {/* Карточки итогов */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-            <StatCard label="Доходы" value={summary.total_income} color="#167a4a" sign="+" sym={sym} />
-            <StatCard label="Расходы" value={summary.total_expense} color="#c0432b" sign="−" sym={sym} />
+          <div className="report-stat-grid" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+            <StatCard label="Доходы" value={summary.total_income} color="#0f6a40" sign="+" sym={sym} />
+            <StatCard label="Расходы" value={summary.total_expense} color="#a93421" sign="−" sym={sym} />
             <StatCard
               label="Сальдо"
               value={summary.net}
-              color={summary.net >= 0 ? "#167a4a" : "#c0432b"}
+              color={summary.net >= 0 ? "#0f6a40" : "#a93421"}
               sign={summary.net >= 0 ? "+" : ""}
               sym={sym}
             />
           </div>
 
           {/* Графики */}
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+          <div className="report-chart-grid" style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
             {/* Bar — 6 месяцев */}
-            <Card title="Доходы и расходы (6 месяцев)" style={{ flex: 2, minWidth: 320 }}>
+            <Card title="Доходы и расходы (6 месяцев)" kind="trend" style={{ flex: 2, minWidth: 320 }}>
               {barData.length === 0 ? (
                 <p style={{ color: "#a6afb8" }}>Нет данных</p>
               ) : (
@@ -268,8 +268,8 @@ export default function Reports() {
                     <YAxis tick={{ fontSize: 12 }} />
                     <Tooltip formatter={(v) => formatMoney(v) + " " + sym} />
                     <Legend />
-                    <Bar dataKey="Доходы" fill="#167a4a" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Расходы" fill="#c0432b" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Доходы" fill="#0f6a40" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Расходы" fill="#a93421" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -277,6 +277,7 @@ export default function Reports() {
 
             {/* Pie — расходы по категориям с drill-down */}
             <Card
+              kind="pie"
               title={
                 drillRoot
                   ? `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} — подкатегории`
@@ -349,7 +350,7 @@ export default function Reports() {
 
           {/* Таблица топ категорий с раскрывающимися подкатегориями */}
           {summary.category_breakdown.length > 0 && (
-            <Card title="Топ категорий по расходам">
+            <Card title="Расходы по категориям" kind="categories">
               <div className="table-wrap">
                 <table className="report-table">
                   <thead>
@@ -468,7 +469,7 @@ export default function Reports() {
 
 function StatCard({ label, value, color, sign = "", sym = "₽" }) {
   return (
-    <div style={{
+    <div className="report-stat-card" style={{
       flex: 1, minWidth: 140, background: "#fffdf7", border: "1px solid #e4ddcd",
       borderRadius: 12, padding: "14px 18px",
     }}>
@@ -480,9 +481,9 @@ function StatCard({ label, value, color, sign = "", sym = "₽" }) {
   );
 }
 
-function Card({ title, children, style, right }) {
+function Card({ title, children, style, right, kind }) {
   return (
-    <div style={{
+    <div className={`report-card${kind ? ` report-card-${kind}` : ""}`} style={{
       background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 12, padding: 18,
       ...style,
     }}>

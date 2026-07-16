@@ -243,7 +243,7 @@ export default function Register() {
               Уже есть аккаунт?{" "}
               <Link to="/login" style={{ color: "#173a54", fontWeight: 500 }}>Войти</Link>
             </p>
-            <div style={{ marginTop: 12, display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
+            <div className="register-secondary-links" style={{ marginTop: 12, display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
               <Link to="/articles" style={{ color: "#9c7b3c" }}>Статьи</Link>
               <Link to="/help" style={{ color: "#9c7b3c" }}>Помощь</Link>
               <Link to="/roadmap" style={{ color: "#9c7b3c" }}>Роадмап</Link>

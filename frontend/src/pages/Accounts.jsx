@@ -294,7 +294,7 @@ export default function Accounts() {
   return (
     <div className="page">
       {/* Header: общий баланс + действия */}
-      <div style={{
+      <div className="accounts-toolbar" style={{
         display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center",
         marginBottom: 20,
       }}>
@@ -305,7 +305,7 @@ export default function Accounts() {
           </div>
         </div>
 
-        <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: 6 }}>
+        <form className="accounts-new-group" onSubmit={handleCreateGroup} style={{ display: "flex", gap: 6 }}>
           <input
             placeholder="Новая группа"
             value={newGroupName}
@@ -469,7 +469,7 @@ function GroupBucket({
   const collapsed = collapsedGroups.has(groupKey);
 
   return (
-    <div ref={setNodeRef} style={{
+    <div ref={setNodeRef} className="account-group-card" style={{
       marginBottom: 16,
       border: `1px solid ${dropHighlight ? "#173a54" : "#e4ddcd"}`,
       background: "#fffdf7",
@@ -500,7 +500,7 @@ function GroupBucket({
           {formatMoney(bucket.total_in_main)} {currencySymbol(mainCurrency)}
         </span>
         {groupId !== null && (
-          <button
+          <button className="account-group-delete"
             type="button"
             onClick={() => onDeleteGroup(bucket.group)}
             className="btn-ghost"
@@ -577,14 +577,14 @@ function AccountRow({
   return (
     <div ref={setNodeRef} style={{ ...style }}>
       {/* Main row */}
-      <div style={{
+      <div className={`account-main-row${isExpanded ? " is-expanded" : ""}`} style={{
         display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10,
         padding: "10px 14px",
         borderTop: "1px solid #ece6d8",
         background: excluded ? "#f6f2e9" : "#fff",
         opacity: excluded ? 0.75 : 1,
       }}>
-        <span
+        <span className="account-drag-handle"
           style={{ cursor: "grab", color: "#c7cdd3", fontSize: 16, userSelect: "none" }}
           {...listeners}
           {...attributes}
@@ -627,7 +627,7 @@ function AccountRow({
         </span>
         {/* Кнопки — единый блок: при нехватке места переносится целиком,
             а не по одной кнопке (× не должен оказываться на своей строке) */}
-        <div style={{ display: "flex", gap: 10, flexShrink: 0, alignItems: "center" }}>
+        <div className="account-row-actions" style={{ display: "flex", gap: 10, flexShrink: 0, alignItems: "center" }}>
           <button
             type="button"
             onClick={() => onToggleInclude(acc)}

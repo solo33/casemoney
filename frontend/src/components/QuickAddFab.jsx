@@ -9,6 +9,7 @@ import {
 
 // Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
+export const QUICK_ADD_OPEN_EVENT = "casemoney:quick-add-open";
 
 const TYPE_OPTIONS = [
   { value: "expense", label: "↘ Расход", color: "#c0432b" },
@@ -18,6 +19,7 @@ const TYPE_OPTIONS = [
 
 export default function QuickAddFab() {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
@@ -28,6 +30,7 @@ export default function QuickAddFab() {
     category_id: "",
     to_account_id: "",  // счёт-получатель для перевода
     description: "",
+    date: new Date().toISOString().slice(0, 10),
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -70,6 +73,12 @@ export default function QuickAddFab() {
   }, [form.account_id, accounts]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const openQuickAdd = () => setOpen(true);
+    window.addEventListener(QUICK_ADD_OPEN_EVENT, openQuickAdd);
+    return () => window.removeEventListener(QUICK_ADD_OPEN_EVENT, openQuickAdd);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -91,7 +100,17 @@ export default function QuickAddFab() {
 
   const close = () => {
     setOpen(false);
+    setStep(1);
     setError(null);
+  };
+
+  const continueToDetails = () => {
+    setError(null);
+    if (!form.amount || parseFloat(form.amount) <= 0) {
+      setError("Введите сумму");
+      return;
+    }
+    setStep(2);
   };
 
   const selectedAccount = useMemo(
@@ -106,6 +125,10 @@ export default function QuickAddFab() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (step === 1) {
+      continueToDetails();
+      return;
+    }
     setError(null);
     if (!form.account_id) { setError("Выберите счёт"); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { setError("Введите сумму"); return; }
@@ -127,6 +150,7 @@ export default function QuickAddFab() {
         account_id: parseInt(form.account_id),
         category_id: form.type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : undefined,
+        date: form.date ? new Date(`${form.date}T12:00:00`).toISOString() : undefined,
       });
       window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
       setForm(f => ({ ...f, amount: "", description: "", category_id: "" }));
@@ -146,8 +170,8 @@ export default function QuickAddFab() {
         className="fab-add-btn"
         style={{
           position: "fixed",
-          right: 20,
-          bottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
+          right: 16,
+          bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
           width: 56, height: 56, borderRadius: "50%",
           background: "#173a54", color: "#fff", border: "none",
           fontSize: 28, lineHeight: 1, cursor: "pointer",
@@ -161,13 +185,14 @@ export default function QuickAddFab() {
       {/* На десктопе используется встроенная форма на Главной, плавающую кнопку прячем */}
       <style>{`
         .fab-add-btn { display: flex; }
-        @media (min-width: 721px) { .fab-add-btn { display: none !important; } }
+        @media (min-width: 768px) { .fab-add-btn { display: none !important; } }
       `}</style>
 
       {open && (
         <>
           <div
             onClick={close}
+            className="quick-add-sheet"
             style={{
               position: "fixed", inset: 0,
               background: "rgba(15,23,42,0.5)", zIndex: 200,
@@ -183,7 +208,7 @@ export default function QuickAddFab() {
               background: "#fffdf7",
               borderRadius: "20px 20px 0 0",
               padding: "12px 20px calc(24px + env(safe-area-inset-bottom, 0px))",
-              zIndex: 201, maxHeight: "90vh", overflowY: "auto",
+              zIndex: 201, maxHeight: "94svh", overflowY: "auto",
               boxShadow: "0 -8px 24px rgba(0,0,0,0.15)",
               animation: "fab-slide 0.2s ease-out",
             }}
@@ -194,11 +219,14 @@ export default function QuickAddFab() {
             }} />
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 17 }}>Быстрое добавление</h3>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17 }}>Новая запись</h3>
+                <div style={{ color: "#7a8590", fontSize: 12, marginTop: 2 }}>Шаг {step} из 2</div>
+              </div>
               <button
                 type="button" onClick={close}
                 className="btn-ghost"
-                style={{ padding: "4px 10px", fontSize: 18, lineHeight: 1 }}
+                style={{ width: 44, height: 44, padding: 0, fontSize: 18, lineHeight: 1 }}
                 aria-label="Закрыть"
               >
                 ✕
@@ -261,6 +289,17 @@ export default function QuickAddFab() {
                 </label>
               </div>
 
+              {step === 1 && (
+                <>
+                  {error && <p style={{ color: "#c0432b", fontSize: 13, marginBottom: 12 }}>{error}</p>}
+                  <button type="button" onClick={continueToDetails} style={{ width: "100%", minHeight: 48, fontSize: 15, fontWeight: 600 }}>
+                    Продолжить
+                  </button>
+                </>
+              )}
+
+              <div style={{ display: step === 2 ? "block" : "none" }}>
+
               {/* Счёт */}
               <label style={{ display: "block", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Счёт</span>
@@ -313,6 +352,17 @@ export default function QuickAddFab() {
                 </label>
               )}
 
+              <label style={{ display: "block", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: "#7a8590" }}>Дата</span>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm({ ...form, date: e.target.value })}
+                  required
+                  style={{ width: "100%", marginTop: 4 }}
+                />
+              </label>
+
               <label style={{ display: "block", marginBottom: 16 }}>
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Описание (необязательно)</span>
                 <input
@@ -332,19 +382,27 @@ export default function QuickAddFab() {
                 type="submit"
                 disabled={submitting}
                 style={{
-                  width: "100%", padding: "12px", fontSize: 15, fontWeight: 600,
+                  width: "100%", minHeight: 48, padding: "12px", fontSize: 15, fontWeight: 600,
                   opacity: submitting ? 0.6 : 1,
                   cursor: submitting ? "not-allowed" : "pointer",
                 }}
               >
                 {submitting ? "Сохраняем..." : "Добавить"}
               </button>
+              <button type="button" onClick={() => setStep(1)} className="btn-link" style={{ width: "100%", minHeight: 44, marginTop: 4 }}>
+                ← Изменить сумму
+              </button>
+              </div>
             </form>
           </div>
 
           <style>{`
             @keyframes fab-fade { from { opacity: 0 } to { opacity: 1 } }
             @keyframes fab-slide { from { transform: translateY(100%) } to { transform: translateY(0) } }
+            @media (max-width: 767px) {
+              .quick-add-sheet { top: 58px; max-height: none !important; border-radius: 18px 18px 0 0 !important; padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }
+              .quick-add-sheet input, .quick-add-sheet select { min-height: 46px; }
+            }
           `}</style>
         </>
       )}
