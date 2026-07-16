@@ -72,6 +72,7 @@ export function PublicPage({ title, children }) {
             <Link to="/articles" style={navLink}>Статьи</Link>
             <Link to="/help" style={navLink}>Помощь</Link>
             <Link to="/roadmap" style={navLink}>Роадмап</Link>
+            <Link to="/about" style={navLink}>О программе</Link>
             <Link to="/login" style={{ ...navLink, color: "#173a54" }}>Войти</Link>
           </nav>
         </header>

@@ -44,7 +44,7 @@ services:
     name: casemoney-web-solo33
     runtime: static
     rootDir: frontend
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci && npm run build:verify
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL

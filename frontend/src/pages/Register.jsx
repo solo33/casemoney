@@ -247,6 +247,7 @@ export default function Register() {
               <Link to="/articles" style={{ color: "#9c7b3c" }}>Статьи</Link>
               <Link to="/help" style={{ color: "#9c7b3c" }}>Помощь</Link>
               <Link to="/roadmap" style={{ color: "#9c7b3c" }}>Роадмап</Link>
+              <Link to="/about" style={{ color: "#9c7b3c" }}>О программе</Link>
               <Link to="/cookies" style={{ color: "#9c7b3c" }}>Cookie</Link>
             </div>
           </>

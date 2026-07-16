@@ -252,6 +252,7 @@ export default function Login() {
           <Link to="/articles" style={{ color: "#9c7b3c", textDecoration: "none" }}>Статьи</Link>
           <Link to="/help" style={{ color: "#9c7b3c", textDecoration: "none" }}>Помощь</Link>
           <Link to="/roadmap" style={{ color: "#9c7b3c", textDecoration: "none" }}>Роадмап</Link>
+          <Link to="/about" style={{ color: "#9c7b3c", textDecoration: "none" }}>О программе</Link>
           <span>Курсы: ЦБ РФ · CoinGecko</span>
         </span>
       </footer>

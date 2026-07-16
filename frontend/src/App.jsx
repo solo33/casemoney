@@ -33,6 +33,7 @@ const History = lazy(() => import('./pages/History'))
 const Articles = lazy(() => import('./pages/Articles'))
 const Help = lazy(() => import('./pages/Help'))
 const Roadmap = lazy(() => import('./pages/Roadmap'))
+const About = lazy(() => import('./pages/About'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/articles" element={<PublicContentRoute><Articles /></PublicContentRoute>} />
           <Route path="/help" element={<PublicContentRoute><Help /></PublicContentRoute>} />
           <Route path="/roadmap" element={<PublicContentRoute><Roadmap /></PublicContentRoute>} />
+          <Route path="/about" element={<PublicContentRoute><About /></PublicContentRoute>} />
 
         <Route
           path="/home"

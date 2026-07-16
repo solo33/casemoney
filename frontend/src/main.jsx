@@ -15,11 +15,15 @@ if ('serviceWorker' in navigator) {
   })
 }
 
-registerSW({
+const updateSW = registerSW({
   immediate: true,
+  onNeedRefresh() {
+    updateSW(true)
+  },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return
-    window.setInterval(() => registration.update(), 60 * 60 * 1000)
+    registration.update()
+    window.setInterval(() => registration.update(), 10 * 60 * 1000)
   },
 })
 

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/bump-build.mjs && vite build",
+    "build:verify": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "icons": "node scripts/generate-icons.mjs",
