@@ -37,7 +37,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           docker pull postgres:18
-          docker pull postgres:16
+          docker pull postgres:16.3
 
       - name: Validate confirmation and secrets
         shell: bash
@@ -73,11 +73,13 @@ jobs:
           target_psql() {
             docker run --rm \
               -e DATABASE_URL="$TARGET_DATABASE_URL" \
-              postgres:16 \
+              postgres:16.3 \
               sh -c 'exec psql "$DATABASE_URL" "$@"' sh "$@"
           }
 
           echo "Checking PostgreSQL connections and versions..."
+          docker run --rm postgres:18 psql --version
+          docker run --rm postgres:16.3 psql --version
           source_version="$(source_psql -XAtc 'SHOW server_version_num;')"
           target_version="$(target_psql -XAtc 'SHOW server_version_num;')"
           source_major=$((source_version / 10000))
@@ -118,7 +120,7 @@ jobs:
           docker run --rm \
             -e DATABASE_URL="$TARGET_DATABASE_URL" \
             -v "${RUNNER_TEMP}:/migration:ro" \
-            postgres:16 \
+            postgres:16.3 \
             sh -c 'exec psql "$DATABASE_URL" -Xv ON_ERROR_STOP=1 --single-transaction --file /migration/casemoney.sql'
 
           echo "Comparing table lists..."
