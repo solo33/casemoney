@@ -457,6 +457,13 @@ hr {
 .account-balance-currency { min-width: 50px; font-weight: 700; }
 .account-balance-amount { flex: 1; }
 .account-balance-equivalent { color: #a6afb8; font-size: 12px; }
+.home-accounts-card .account-balance-currency { flex: 1; }
+.home-accounts-card .account-balance-amount {
+  flex: 0 0 auto;
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
 .balance-action-trigger,
 .balance-delete-currency {
   min-width: 28px;
