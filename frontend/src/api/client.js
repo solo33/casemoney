@@ -5,7 +5,11 @@ import axios from 'axios'
 // (localhost, 127.0.0.1 или IP в локальной сети), и порт 8000. Так при смене
 // IP машины роутером (DHCP) не нужно править .env — просто открой фронт по
 // новому адресу, бэкенд найдётся сам.
-const DEFAULT_API_URL = `${window.location.protocol}//${window.location.hostname}:8000`
+// В production frontend и API обслуживаются одним доменом. Отдельный порт 8000
+// нужен только Vite dev-серверу при локальной разработке.
+const DEFAULT_API_URL = import.meta.env.DEV
+  ? `${window.location.protocol}//${window.location.hostname}:8000`
+  : window.location.origin
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,

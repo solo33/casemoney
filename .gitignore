@@ -17,6 +17,8 @@ __pycache__/
 
 # PostgreSQL
 *.sql
+*.dump
+migration-artifacts/
 
 # Node
 node_modules/

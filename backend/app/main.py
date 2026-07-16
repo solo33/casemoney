@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -124,12 +126,53 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-@app.get("/")
-def root():
-    return {"message": "CaseMoney API работает"}
-
-
 @app.get("/health")
 def health():
     """Healthcheck для хостинга/мониторинга."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def readiness():
+    """Проверяет, что приложение может выполнить запрос к PostgreSQL."""
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "ready"}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "not_ready"})
+    finally:
+        db.close()
+
+
+_STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).resolve().parents[1] / "static"))
+_STATIC_ROOT = _STATIC_DIR.resolve()
+
+
+def _frontend_file(path: Path, *, immutable: bool = False):
+    cache_control = "public, max-age=31536000, immutable" if immutable else "no-cache, max-age=0"
+    return FileResponse(path, headers={"Cache-Control": cache_control})
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    index = _STATIC_DIR / "index.html"
+    if index.is_file():
+        return _frontend_file(index)
+    return {"message": "CaseMoney API работает"}
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def frontend_spa(full_path: str):
+    """Отдаёт production frontend и index.html для маршрутов React Router."""
+    if full_path == "api" or full_path.startswith("api/"):
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    requested = (_STATIC_DIR / full_path).resolve()
+    if requested.is_relative_to(_STATIC_ROOT) and requested.is_file():
+        return _frontend_file(requested, immutable=full_path.startswith("assets/"))
+
+    index = _STATIC_DIR / "index.html"
+    if index.is_file():
+        return _frontend_file(index)
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
