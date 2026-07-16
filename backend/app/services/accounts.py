@@ -84,6 +84,7 @@ def serialize_account(
         icon=account.icon,
         group_id=account.group_id,
         include_in_balance=account.include_in_balance,
+        show_for_entries=account.show_for_entries,
         balances=balances_out,
         total_in_main=round(total_in_main, 2),
     )

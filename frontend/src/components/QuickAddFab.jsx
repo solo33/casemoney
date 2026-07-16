@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../api/client";
-import CategoryOptions from "./CategoryOptions";
+import AccountOptions, { entryAccountGroups } from "./AccountOptions";
+import CategoryPicker from "./CategoryPicker";
 import {
   COMMON_CURRENCIES,
-  formatMoneyWithCurrency,
   sortCurrenciesRubFirst,
 } from "../utils/money";
 
@@ -21,6 +21,7 @@ export default function QuickAddFab() {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [accounts, setAccounts] = useState([]);
+  const [accountGroups, setAccountGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
     type: "expense",
@@ -38,19 +39,22 @@ export default function QuickAddFab() {
   useEffect(() => {
     if (!open) return;
     Promise.all([
-      api.get("/api/accounts/"),
+      api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
       api.get("/api/categories/"),
     ])
       .then(([acc, cat]) => {
-        setAccounts(acc.data);
+        const groups = entryAccountGroups(acc.data || []);
+        const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
+        setAccountGroups(groups);
+        setAccounts(flatAccounts);
         setCategories(cat.data);
-        if (acc.data.length > 0) {
+        if (flatAccounts.length > 0) {
           setForm(f => {
             const next = { ...f };
             if (!next.account_id) {
-              next.account_id = String(acc.data[0].id);
+              next.account_id = String(flatAccounts[0].id);
               next.currency = sortCurrenciesRubFirst(
-                (acc.data[0].balances || []).map(balance => balance.currency)
+                (flatAccounts[0].balances || []).map(balance => balance.currency)
               )[0] || "";
             }
             return next;
@@ -310,15 +314,7 @@ export default function QuickAddFab() {
                   style={{ width: "100%", marginTop: 4 }}
                 >
                   <option value="">— Выбрать —</option>
-                  {accounts.map(a => {
-                    const summary = (a.balances || [])
-                      .map(b => formatMoneyWithCurrency(b.balance, b.currency)).join(", ");
-                    return (
-                      <option key={a.id} value={a.id}>
-                        {a.icon ? `${a.icon} ` : ""}{a.name}{summary ? ` — ${summary}` : ""}
-                      </option>
-                    );
-                  })}
+                  <AccountOptions groups={accountGroups} />
                 </select>
               </label>
 
@@ -333,22 +329,19 @@ export default function QuickAddFab() {
                     style={{ width: "100%", marginTop: 4 }}
                   >
                     <option value="">— получатель —</option>
-                    {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
-                      <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
-                    ))}
+                    <AccountOptions groups={accountGroups} excludeId={form.account_id} />
                   </select>
                 </label>
               ) : (
                 <label style={{ display: "block", marginBottom: 12 }}>
                   <span style={{ fontSize: 12, color: "#7a8590" }}>Категория</span>
-                  <select
+                  <CategoryPicker
+                    categories={categories.filter(c => c.type === form.type)}
                     value={form.category_id}
-                    onChange={e => setForm({ ...form, category_id: e.target.value })}
+                    onChange={category_id => setForm({ ...form, category_id })}
                     style={{ width: "100%", marginTop: 4 }}
-                  >
-                    <option value="">— Без категории —</option>
-                    <CategoryOptions categories={categories.filter(c => c.type === form.type)} />
-                  </select>
+                    placeholder="— Без категории —"
+                  />
                 </label>
               )}
 

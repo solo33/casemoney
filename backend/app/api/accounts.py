@@ -1,18 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, selectinload
+from datetime import datetime, timezone
+from math import isfinite
 from typing import List, Optional
 
 from app.database import get_db
 from app.models.account import Account
 from app.models.account_balance import AccountBalance
 from app.models.account_group import AccountGroup
+from app.models.category import Category
+from app.models.transaction import Transaction, TransactionType
+from app.models.transaction_history import TransactionHistory
 from app.schemas.account import (
     AccountCreate,
     AccountUpdate,
     AccountResponse,
     AccountBalanceCreate,
     AccountBalanceUpdate,
+    AccountBalanceAdjustmentCreate,
+    AccountBalanceAdjustmentResponse,
     AccountBalanceResponse,
     AccountGroupBucket,
     GroupSummary,
@@ -141,6 +148,11 @@ def create_account(
 ):
     limits_svc.enforce_limit(db, user_id, "accounts")
     _validate_group(db, user_id, data.group_id)
+    show_for_entries = (
+        data.show_for_entries
+        if "show_for_entries" in data.model_fields_set
+        else data.include_in_balance
+    )
     account = Account(
         name=data.name,
         type=data.type,
@@ -148,6 +160,7 @@ def create_account(
         icon=data.icon,
         group_id=data.group_id,
         include_in_balance=data.include_in_balance,
+        show_for_entries=show_for_entries,
         user_id=user_id,
     )
     db.add(account)
@@ -305,6 +318,103 @@ def update_balance(
         if b.currency == currency:
             return b
     return AccountBalanceResponse(currency=currency, balance=bal.balance, balance_in_main=0.0)
+
+
+@router.post(
+    "/{account_id}/balances/{currency}/adjust",
+    response_model=AccountBalanceAdjustmentResponse,
+    status_code=201,
+)
+def adjust_balance(
+    account_id: int,
+    currency: str,
+    data: AccountBalanceAdjustmentCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Создаёт доход/расход на разницу между фактическим и указанным остатком."""
+    if not isfinite(data.balance):
+        raise HTTPException(status_code=400, detail="Некорректный остаток")
+
+    account = db.query(Account).filter(
+        Account.id == account_id,
+        Account.user_id == user_id,
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    normalized_currency = currency.upper()
+    balance = db.query(AccountBalance).filter(
+        AccountBalance.account_id == account_id,
+        AccountBalance.currency == normalized_currency,
+    ).with_for_update().first()
+    if not balance:
+        raise HTTPException(status_code=404, detail="Balance not found")
+
+    old_balance = round(float(balance.balance), 2)
+    new_balance = round(float(data.balance), 2)
+    difference = round(new_balance - old_balance, 2)
+    if abs(difference) < 0.005:
+        raise HTTPException(status_code=400, detail="Остаток не изменился")
+
+    tx_type = TransactionType.income if difference > 0 else TransactionType.expense
+    category = None
+    if data.category_id is not None:
+        category = db.query(Category).filter(
+            Category.id == data.category_id,
+            Category.user_id == user_id,
+        ).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        if category.type != tx_type.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Категория не соответствует типу корректировки",
+            )
+
+    transaction = Transaction(
+        amount=abs(difference),
+        currency=normalized_currency,
+        type=tx_type,
+        description="Корректировка остатка",
+        date=datetime.now(timezone.utc),
+        account_id=account_id,
+        category_id=category.id if category else None,
+        user_id=user_id,
+    )
+    db.add(transaction)
+    db.flush()
+    balance.balance = new_balance
+
+    category_name = None
+    if category:
+        if category.parent_id:
+            parent = db.query(Category).filter(Category.id == category.parent_id).first()
+            category_name = f"{parent.name}\\{category.name}" if parent else category.name
+        else:
+            category_name = category.name
+    db.add(TransactionHistory(
+        user_id=user_id,
+        transaction_id=transaction.id,
+        action="created",
+        op_date=transaction.date,
+        type=tx_type.value,
+        amount=transaction.amount,
+        currency=normalized_currency,
+        account_name=account.name,
+        category_name=category_name,
+        description=transaction.description,
+    ))
+    db.commit()
+
+    return AccountBalanceAdjustmentResponse(
+        transaction_id=transaction.id,
+        currency=normalized_currency,
+        old_balance=old_balance,
+        new_balance=new_balance,
+        difference=difference,
+        type=tx_type.value,
+    )
 
 
 @router.delete("/{account_id}/balances/{currency}", status_code=204)

@@ -25,6 +25,10 @@ class Account(Base):
     # Если FALSE — счёт виден, но не суммируется в total_balance дашборда/группы.
     include_in_balance = Column(Boolean, nullable=False, default=True)
 
+    # Показывать ли счёт в формах создания записей. Настройка независима от
+    # общего баланса, но для новых счетов по умолчанию повторяет его значение.
+    show_for_entries = Column(Boolean, nullable=False, default=True)
+
     transactions = relationship(
         "Transaction",
         foreign_keys="Transaction.account_id",

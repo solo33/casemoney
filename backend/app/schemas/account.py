@@ -22,6 +22,20 @@ class AccountBalanceUpdate(BaseModel):
     balance: float
 
 
+class AccountBalanceAdjustmentCreate(BaseModel):
+    balance: float
+    category_id: Optional[int] = None
+
+
+class AccountBalanceAdjustmentResponse(BaseModel):
+    transaction_id: int
+    currency: str
+    old_balance: float
+    new_balance: float
+    difference: float
+    type: str
+
+
 # --- Account ---
 
 class AccountBase(BaseModel):
@@ -31,6 +45,7 @@ class AccountBase(BaseModel):
     icon: Optional[str] = None
     group_id: Optional[int] = None
     include_in_balance: bool = True
+    show_for_entries: bool = True
 
 
 class AccountCreate(AccountBase):
@@ -46,6 +61,7 @@ class AccountUpdate(BaseModel):
     icon: Optional[str] = None
     group_id: Optional[int] = None  # передать null чтобы вынести из группы
     include_in_balance: Optional[bool] = None
+    show_for_entries: Optional[bool] = None
 
 
 class AccountResponse(AccountBase):

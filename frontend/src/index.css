@@ -425,7 +425,134 @@ hr {
 }
 
 @media (max-width: 640px) {
-  .cm-global-progress { top: 68px; right: 12px; }
+  .cm-global-progress {
+    top: 62px;
+    right: 8px;
+    max-width: calc(100vw - 16px);
+    padding: 5px 8px;
+    border-radius: 9px;
+    box-shadow: 0 6px 16px rgba(15, 30, 45, 0.16);
+  }
+  .cm-global-progress .cm-brand-fill { --cm-brand-size: 28px !important; }
+  .cm-global-progress [role="status"] { gap: 6px !important; font-size: 11px !important; }
+}
+
+.category-picker { width: 100%; }
+.category-picker-native { width: 100%; }
+.category-picker-trigger,
+.category-picker-backdrop { display: none; }
+
+.account-balance-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+  color: #515c68;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.account-balance-row:hover { background: #f6f2e9; }
+.account-balance-currency { min-width: 50px; font-weight: 700; }
+.account-balance-amount { flex: 1; }
+.account-balance-equivalent { color: #a6afb8; font-size: 12px; }
+.balance-action-trigger,
+.balance-delete-currency {
+  min-width: 28px;
+  min-height: 28px;
+  padding: 1px 6px !important;
+  font-size: 12px !important;
+}
+.balance-delete-currency { color: #c0432b !important; }
+.balance-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1499;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.balance-context-menu {
+  position: absolute;
+  top: calc(100% + 3px);
+  right: 4px;
+  z-index: 1500;
+  width: 190px;
+  padding: 5px;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 28px rgba(15, 30, 45, 0.2);
+}
+.balance-context-menu button {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-size: 13px;
+}
+.balance-context-menu button:hover { background: #f6f2e9; }
+
+.balance-adjustment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(15, 30, 45, 0.5);
+}
+.balance-adjustment-modal {
+  width: min(680px, 100%);
+  padding: 0 22px 22px;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 22px 52px rgba(15, 30, 45, 0.28);
+}
+.balance-adjustment-head {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.balance-adjustment-head h3 { margin: 0; font-family: var(--font-display); }
+.balance-adjustment-head button { width: 40px; height: 40px; padding: 0; }
+.balance-adjustment-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 22px;
+}
+.balance-adjustment-grid label,
+.balance-adjustment-difference { display: grid; gap: 5px; }
+.balance-adjustment-grid label > span,
+.balance-adjustment-difference > span { color: #515c68; font-size: 13px; font-weight: 600; }
+.balance-adjustment-grid small { color: #7a8590; font-size: 12px; }
+.balance-adjustment-difference strong { align-self: center; font-size: 18px; }
+.balance-adjustment-difference .is-income { color: #167a4a; }
+.balance-adjustment-difference .is-expense { color: #c0432b; }
+.balance-adjustment-error {
+  margin-top: 14px;
+  padding: 8px 10px;
+  color: #c0432b;
+  background: #fef2f0;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.balance-adjustment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -519,7 +646,7 @@ hr {
   .account-main-row { gap: 7px !important; padding: 11px 10px !important; }
   .account-drag-handle { display: none; }
   .account-row-actions { display: none !important; width: 100%; padding-top: 4px; gap: 6px !important; }
-  .account-main-row.is-expanded .account-row-actions { display: grid !important; grid-template-columns: 1fr 1fr 44px; }
+  .account-main-row.is-expanded .account-row-actions { display: grid !important; grid-template-columns: 1fr 1fr; }
   .account-row-actions button { min-height: 40px !important; }
   .account-group-delete { width: 40px; height: 40px; padding: 0 !important; }
 
@@ -571,4 +698,136 @@ hr {
   .yoy-mobile-month { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .yoy-mobile-month h3 { margin: 0; padding: 9px 12px; background: var(--surface-2); }
   .yoy-mobile-month div { min-height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line-soft); }
+}
+
+@media (max-width: 767px) {
+  .account-balances-list { padding-left: 14px !important; padding-right: 8px !important; }
+  .account-balance-row {
+    min-height: 48px;
+    padding: 8px 6px;
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .account-balance-equivalent { display: none; }
+  .balance-action-trigger { display: none; }
+  .balance-delete-currency { min-width: 40px; min-height: 40px; }
+  .balance-menu-backdrop { background: rgba(15, 30, 45, 0.45); }
+  .balance-context-menu {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    padding: 10px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+  }
+  .balance-context-menu::before {
+    content: "";
+    display: block;
+    width: 38px;
+    height: 4px;
+    margin: 0 auto 8px;
+    border-radius: 999px;
+    background: #c7cdd3;
+  }
+  .balance-context-menu button { min-height: 48px; font-size: 15px; }
+  .balance-adjustment-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .balance-adjustment-modal {
+    max-height: 92svh;
+    overflow-y: auto;
+    padding: 0 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+  }
+  .balance-adjustment-grid { grid-template-columns: 1fr; gap: 13px; }
+  .balance-adjustment-actions { position: sticky; bottom: 0; padding-top: 10px; background: #fffdf7; }
+  .balance-adjustment-actions button { flex: 1; min-height: 46px; }
+
+  .category-picker-native { display: none; }
+  .category-picker-trigger {
+    display: flex;
+    width: 100%;
+    min-height: 46px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    color: var(--ink);
+    background: #fffdf7;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    text-align: left;
+    font-weight: 500;
+  }
+  .category-picker-backdrop {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    align-items: flex-end;
+    background: rgba(15, 30, 45, 0.48);
+  }
+  .category-picker-sheet {
+    width: 100%;
+    max-height: min(78svh, 680px);
+    padding: 8px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+    overflow: hidden;
+    background: #fffdf7;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 28px rgba(15, 30, 45, 0.2);
+  }
+  .category-picker-handle {
+    width: 38px;
+    height: 4px;
+    margin: 0 auto 8px;
+    border-radius: 999px;
+    background: #c7cdd3;
+  }
+  .category-picker-heading {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .category-picker-heading strong { font-size: 17px; }
+  .category-picker-list {
+    max-height: calc(min(78svh, 680px) - 70px);
+    padding: 6px 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .category-picker-list button {
+    display: block;
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 10px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    text-align: left;
+  }
+  .category-picker-parent {
+    font-size: 15px;
+    font-weight: 750;
+  }
+  .category-picker-child {
+    min-height: 34px !important;
+    padding: 6px 10px 6px 30px !important;
+    color: #566371 !important;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .category-picker-empty {
+    color: #7a8590 !important;
+    font-size: 13px;
+  }
+  .category-picker-group + .category-picker-group {
+    border-top: 1px solid rgba(228, 221, 205, 0.65);
+  }
 }

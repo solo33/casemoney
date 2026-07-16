@@ -4,6 +4,8 @@ import api from "../api/client";
 import { QUICK_ADD_OPEN_EVENT, TX_ADDED_EVENT } from "../components/QuickAddFab";
 import QuickAddInline from "../components/QuickAddInline";
 import { BrandProgress } from "../components/BrandProgress";
+import AccountOptions from "../components/AccountOptions";
+import CategoryPicker from "../components/CategoryPicker";
 import { useUser } from "../contexts/UserContext";
 import {
   currencySymbol,
@@ -502,6 +504,7 @@ export default function Home() {
         <TxEditModal
           tx={editingTx}
           accounts={flatAccounts}
+          accountGroups={accountOptions}
           categories={categories}
           onClose={() => setEditingTx(null)}
           onSaved={() => { setEditingTx(null); fetchAll(); }}
@@ -706,7 +709,7 @@ const TYPE_TABS = [
   { value: "income", label: "↗ Доход", color: "#167a4a" },
 ];
 
-function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
+function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
@@ -726,11 +729,6 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
   );
   const cats = form.type === "transfer"
     ? [] : categories.filter(c => c.type === form.type);
-
-  const catLabel = (c) => {
-    const p = c.parent_id ? categories.find(x => x.id === c.parent_id) : null;
-    return p ? `${p.name} → ${c.name}` : c.name;
-  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -812,21 +810,25 @@ function TxEditModal({ tx, accounts, categories, onClose, onSaved }) {
 
         <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })} required>
           <option value="">{form.type === "transfer" ? "— Со счёта —" : "— Счёт —"}</option>
-          {accounts.map(a => <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>)}
+          <AccountOptions groups={accountGroups} includeIds={[form.account_id]} />
         </select>
 
         {form.type === "transfer" ? (
           <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
             <option value="">— На счёт (получатель) —</option>
-            {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
-              <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
-            ))}
+            <AccountOptions
+              groups={accountGroups}
+              excludeId={form.account_id}
+              includeIds={[form.to_account_id]}
+            />
           </select>
         ) : (
-          <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
-            <option value="">— Без категории —</option>
-            {cats.map(c => <option key={c.id} value={c.id}>{catLabel(c)}</option>)}
-          </select>
+          <CategoryPicker
+            categories={cats}
+            value={form.category_id}
+            onChange={category_id => setForm({ ...form, category_id })}
+            placeholder="— Без категории —"
+          />
         )}
 
         <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />

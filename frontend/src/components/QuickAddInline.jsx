@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "./QuickAddFab";
-import CategoryOptions from "./CategoryOptions";
+import AccountOptions, { entryAccountGroups } from "./AccountOptions";
+import CategoryPicker from "./CategoryPicker";
 import { COMMON_CURRENCIES, sortCurrenciesRubFirst } from "../utils/money";
 
 const TABS = [
@@ -43,8 +44,9 @@ export default function QuickAddInline({
   const [success, setSuccess] = useState(false);
 
   const applyOptions = useCallback((buckets, cats) => {
-    const flat = buckets.flatMap(b => b.accounts || []);
-    setAccountGroups(buckets);
+    const visibleBuckets = entryAccountGroups(buckets);
+    const flat = visibleBuckets.flatMap(b => b.accounts || []);
+    setAccountGroups(visibleBuckets);
     setAccounts(flat);
     setCategories(cats);
     setForm(f => {
@@ -69,7 +71,7 @@ export default function QuickAddInline({
 
     try {
       const [grp, cat] = await Promise.all([
-        api.get("/api/accounts/grouped"),
+        api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
         api.get("/api/categories/"),
       ]);
       applyOptions(grp.data || [], cat.data || []);
@@ -193,15 +195,7 @@ export default function QuickAddInline({
             required
           >
             <option value="">— выбрать —</option>
-            {accountGroups.map(b => (
-              <optgroup key={b.group.id ?? "ungrouped"} label={b.group.name}>
-                {b.accounts.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.icon ? `${a.icon} ` : ""}{a.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
+            <AccountOptions groups={accountGroups} />
           </select>
           <input
             type="number"
@@ -233,22 +227,14 @@ export default function QuickAddInline({
               required
             >
               <option value="">— получатель —</option>
-              {accountGroups.map(b => (
-                <optgroup key={b.group.id ?? "ungrouped"} label={b.group.name}>
-                  {b.accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
-                    <option key={a.id} value={a.id}>{a.icon ? `${a.icon} ` : ""}{a.name}</option>
-                  ))}
-                </optgroup>
-              ))}
+              <AccountOptions groups={accountGroups} excludeId={form.account_id} />
             </select>
           ) : (
-            <select
+            <CategoryPicker
+              categories={filteredCategories}
               value={form.category_id}
-              onChange={e => setForm({ ...form, category_id: e.target.value })}
-            >
-              <option value="">— не выбрана —</option>
-              <CategoryOptions categories={filteredCategories} />
-            </select>
+              onChange={category_id => setForm({ ...form, category_id })}
+            />
           )}
           <input
             type="date"

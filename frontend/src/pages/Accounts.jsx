@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import CategoryPicker from "../components/CategoryPicker";
 import { COMMON_CURRENCIES, currencySymbol, formatMoney, formatMoneyWithCurrency } from "../utils/money";
 
 const ACCOUNT_TYPES = [
@@ -47,11 +48,13 @@ export default function Accounts() {
     initial_currency: "RUB", initial_balance: 0,
     group_id: "",
     include_in_balance: true,
+    show_for_entries: true,
   });
   const [expanded, setExpanded] = useState(new Set());        // account ids with expanded balances
   const [addingCurrencyTo, setAddingCurrencyTo] = useState(null);  // account.id
   const [currencyForm, setCurrencyForm] = useState({ currency: "USD", balance: 0 });
   const [activeDrag, setActiveDrag] = useState(null);
+  const [adjustingBalance, setAdjustingBalance] = useState(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -142,6 +145,7 @@ export default function Accounts() {
         name: "", type: "cash", color: "", icon: "",
         initial_currency: "RUB", initial_balance: 0, group_id: "",
         include_in_balance: true,
+        show_for_entries: true,
       });
       fetchGroups();
     } catch (e) {
@@ -181,6 +185,28 @@ export default function Accounts() {
     }
   };
 
+  const handleToggleShowForEntries = async (acc) => {
+    const showForEntries = !acc.show_for_entries;
+    const updateLocalValue = (value) => {
+      setGroups(current => current.map(bucket => ({
+        ...bucket,
+        accounts: bucket.accounts.map(account => (
+          account.id === acc.id
+            ? { ...account, show_for_entries: value }
+            : account
+        )),
+      })));
+    };
+    updateLocalValue(showForEntries);
+    try {
+      await api.put(`/api/accounts/${acc.id}`, { show_for_entries: showForEntries });
+      setError(null);
+    } catch (e) {
+      updateLocalValue(acc.show_for_entries);
+      setError(e.response?.data?.detail || "Не удалось обновить видимость счёта");
+    }
+  };
+
   // --- Currency ops ---
 
   const handleAddCurrency = async (e, acc) => {
@@ -195,19 +221,6 @@ export default function Accounts() {
       fetchGroups();
     } catch (e) {
       setError(e.response?.data?.detail || "Не удалось добавить валюту");
-    }
-  };
-
-  const handleEditBalance = async (acc, bal) => {
-    const newValue = prompt(`Изменить баланс ${bal.currency}:`, bal.balance);
-    if (newValue === null) return;
-    const num = parseFloat(newValue);
-    if (Number.isNaN(num)) { setError("Некорректное число"); return; }
-    try {
-      await api.put(`/api/accounts/${acc.id}/balances/${bal.currency}`, { balance: num });
-      fetchGroups();
-    } catch (e) {
-      setError(e.response?.data?.detail || "Не удалось обновить баланс");
     }
   };
 
@@ -388,9 +401,27 @@ export default function Accounts() {
             <input
               type="checkbox"
               checked={newAccount.include_in_balance}
-              onChange={e => setNewAccount({ ...newAccount, include_in_balance: e.target.checked })}
+              onChange={e => setNewAccount({
+                ...newAccount,
+                include_in_balance: e.target.checked,
+                show_for_entries: newAccount.show_for_entries === newAccount.include_in_balance
+                  ? e.target.checked
+                  : newAccount.show_for_entries,
+              })}
             />
             Учитывать в общем балансе
+          </label>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 6,
+            fontSize: 13, color: "#515c68", cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}>
+            <input
+              type="checkbox"
+              checked={newAccount.show_for_entries}
+              onChange={e => setNewAccount({ ...newAccount, show_for_entries: e.target.checked })}
+            />
+            Показывать для записей
           </label>
           <button type="submit">Создать</button>
         </form>
@@ -413,12 +444,13 @@ export default function Accounts() {
               onDeleteGroup={handleDeleteGroup}
               onDeleteAccount={handleDeleteAccount}
               onToggleInclude={handleToggleInclude}
+              onToggleShowForEntries={handleToggleShowForEntries}
               addingCurrencyTo={addingCurrencyTo}
               setAddingCurrencyTo={setAddingCurrencyTo}
               currencyForm={currencyForm}
               setCurrencyForm={setCurrencyForm}
               onAddCurrency={handleAddCurrency}
-              onEditBalance={handleEditBalance}
+              onAdjustBalance={(account, balance) => setAdjustingBalance({ account, balance })}
               onDeleteCurrency={handleDeleteCurrency}
               onCurrencyClick={goToAccountCurrency}
               activeDrag={activeDrag}
@@ -442,6 +474,19 @@ export default function Accounts() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {adjustingBalance && (
+        <BalanceAdjustmentModal
+          account={adjustingBalance.account}
+          balance={adjustingBalance.balance}
+          onClose={() => setAdjustingBalance(null)}
+          onSaved={() => {
+            setAdjustingBalance(null);
+            fetchGroups();
+            window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -451,9 +496,9 @@ export default function Accounts() {
 function GroupBucket({
   bucket, mainCurrency, expanded, onToggleExpand,
   collapsedGroups, onToggleGroup,
-  onDeleteGroup, onDeleteAccount, onToggleInclude,
+  onDeleteGroup, onDeleteAccount, onToggleInclude, onToggleShowForEntries,
   addingCurrencyTo, setAddingCurrencyTo, currencyForm, setCurrencyForm,
-  onAddCurrency, onEditBalance, onDeleteCurrency, onCurrencyClick,
+  onAddCurrency, onAdjustBalance, onDeleteCurrency, onCurrencyClick,
   activeDrag,
 }) {
   const groupId = bucket.group.id;
@@ -530,12 +575,13 @@ function GroupBucket({
                 onToggleExpand={() => onToggleExpand(acc.id)}
                 onDelete={onDeleteAccount}
                 onToggleInclude={onToggleInclude}
+                onToggleShowForEntries={onToggleShowForEntries}
                 isAddingCurrency={addingCurrencyTo === acc.id}
                 setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
                 currencyForm={currencyForm}
                 setCurrencyForm={setCurrencyForm}
                 onAddCurrency={onAddCurrency}
-                onEditBalance={onEditBalance}
+                onAdjustBalance={onAdjustBalance}
                 onDeleteCurrency={onDeleteCurrency}
                 onCurrencyClick={onCurrencyClick}
               />
@@ -550,10 +596,10 @@ function GroupBucket({
 function AccountRow({
   acc, groupKey, mainCurrency,
   isExpanded, onToggleExpand,
-  onDelete, onToggleInclude,
+  onDelete, onToggleInclude, onToggleShowForEntries,
   isAddingCurrency, setAddingCurrency,
   currencyForm, setCurrencyForm,
-  onAddCurrency, onEditBalance, onDeleteCurrency, onCurrencyClick,
+  onAddCurrency, onAdjustBalance, onDeleteCurrency, onCurrencyClick,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: acc.id,
@@ -639,6 +685,15 @@ function AccountRow({
           </button>
           <button
             type="button"
+            onClick={() => onToggleShowForEntries(acc)}
+            className="btn-ghost"
+            style={{ padding: "3px 8px", fontSize: 12 }}
+            title={acc.show_for_entries ? "Скрыть в формах записей" : "Показывать в формах записей"}
+          >
+            {acc.show_for_entries ? "✓ для записей" : "○ для записей"}
+          </button>
+          <button
+            type="button"
             onClick={() => setAddingCurrency(!isAddingCurrency)}
             className="btn-ghost"
             style={{ padding: "3px 8px", fontSize: 12 }}
@@ -660,47 +715,17 @@ function AccountRow({
 
       {/* Balances detail */}
       {isExpanded && (acc.balances || []).length > 0 && (
-        <div style={{ padding: "0 14px 8px 44px" }}>
+        <div className="account-balances-list" style={{ padding: "0 14px 8px 44px" }}>
           {acc.balances.map(b => (
-            <div
+            <BalanceRow
               key={b.currency}
-              onClick={() => onCurrencyClick(acc.id, b.currency)}
-              title="Перейти к записям в этой валюте по этому счёту"
-              style={{
-                display: "flex", alignItems: "center", gap: 8, padding: "4px 4px",
-                fontSize: 13, color: "#515c68", cursor: "pointer", borderRadius: 6,
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#f6f2e9"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-            >
-              <span style={{ minWidth: 50, fontWeight: 600 }}>{b.currency}</span>
-              <span style={{ flex: 1 }}>
-                {formatMoneyWithCurrency(b.balance, b.currency)}
-              </span>
-              {b.currency !== mainCurrency && (
-                <span style={{ color: "#a6afb8", fontSize: 12 }}>
-                  ≈ {formatMoney(b.balance_in_main)} {currencySymbol(mainCurrency)}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onEditBalance(acc, b); }}
-                className="btn-ghost"
-                style={{ padding: "1px 6px", fontSize: 11 }}
-              >
-                ✎
-              </button>
-              {acc.balances.length > 1 && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onDeleteCurrency(acc, b); }}
-                  className="btn-ghost"
-                  style={{ padding: "1px 6px", fontSize: 11, color: "#c0432b" }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
+              balance={b}
+              mainCurrency={mainCurrency}
+              canDelete={acc.balances.length > 1}
+              onAdjust={() => onAdjustBalance(acc, b)}
+              onHistory={() => onCurrencyClick(acc.id, b.currency)}
+              onDelete={() => onDeleteCurrency(acc, b)}
+            />
           ))}
         </div>
       )}
@@ -739,6 +764,235 @@ function AccountRow({
           </button>
         </form>
       )}
+    </div>
+  );
+}
+
+function BalanceRow({
+  balance,
+  mainCurrency,
+  canDelete,
+  onAdjust,
+  onHistory,
+  onDelete,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const longPressTimer = useRef(null);
+  const longPressed = useRef(false);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  };
+
+  useEffect(() => clearLongPress, []);
+
+  const startLongPress = event => {
+    if (event.pointerType !== "touch" && !window.matchMedia("(max-width: 767px)").matches) return;
+    clearLongPress();
+    longPressed.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressed.current = true;
+      setMenuOpen(true);
+      if (navigator.vibrate) navigator.vibrate(25);
+    }, 550);
+  };
+
+  const openAdjustment = event => {
+    event.stopPropagation();
+    setMenuOpen(false);
+    onAdjust();
+  };
+
+  const openHistory = event => {
+    event.stopPropagation();
+    setMenuOpen(false);
+    onHistory();
+  };
+
+  return (
+    <div
+      className="account-balance-row"
+      onPointerDown={startLongPress}
+      onPointerUp={clearLongPress}
+      onPointerCancel={clearLongPress}
+      onPointerLeave={clearLongPress}
+      onContextMenu={event => {
+        if (!window.matchMedia("(max-width: 767px)").matches) return;
+        event.preventDefault();
+        setMenuOpen(true);
+      }}
+      onClick={() => {
+        if (longPressed.current) {
+          longPressed.current = false;
+          return;
+        }
+        onHistory();
+      }}
+      title="Нажмите для просмотра истории. На мобильном удерживайте для действий."
+    >
+      <span className="account-balance-currency">{balance.currency}</span>
+      <span className="account-balance-amount">
+        {formatMoneyWithCurrency(balance.balance, balance.currency)}
+      </span>
+      {balance.currency !== mainCurrency && (
+        <span className="account-balance-equivalent">
+          ≈ {formatMoney(balance.balance_in_main)} {currencySymbol(mainCurrency)}
+        </span>
+      )}
+      <button
+        type="button"
+        className="balance-action-trigger btn-ghost"
+        onClick={event => {
+          event.stopPropagation();
+          setMenuOpen(value => !value);
+        }}
+        aria-label={`Действия с остатком ${balance.currency}`}
+        aria-expanded={menuOpen}
+      >
+        ▾
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={event => { event.stopPropagation(); onDelete(); }}
+          className="balance-delete-currency btn-ghost"
+          aria-label={`Удалить валюту ${balance.currency}`}
+        >
+          ×
+        </button>
+      )}
+
+      {menuOpen && (
+        <>
+          <button
+            type="button"
+            className="balance-menu-backdrop"
+            aria-label="Закрыть меню остатка"
+            onClick={event => { event.stopPropagation(); setMenuOpen(false); }}
+          />
+          <div className="balance-context-menu" role="menu">
+            <button type="button" role="menuitem" onClick={openAdjustment}>
+              Скорректировать
+            </button>
+            <button type="button" role="menuitem" onClick={openHistory}>
+              Просмотреть историю
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BalanceAdjustmentModal({ account, balance, onClose, onSaved }) {
+  const [desiredBalance, setDesiredBalance] = useState(String(balance.balance));
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const numericBalance = Number.parseFloat(desiredBalance);
+  const difference = Number.isFinite(numericBalance)
+    ? Math.round((numericBalance - balance.balance) * 100) / 100
+    : 0;
+  const adjustmentType = difference >= 0 ? "income" : "expense";
+  const availableCategories = categories.filter(category => category.type === adjustmentType);
+
+  useEffect(() => {
+    api.get("/api/categories/")
+      .then(response => setCategories(response.data || []))
+      .catch(() => setError("Не удалось загрузить категории"));
+  }, []);
+
+  useEffect(() => {
+    if (!categoryId) return;
+    const selected = categories.find(category => String(category.id) === String(categoryId));
+    if (selected && selected.type !== adjustmentType) setCategoryId("");
+  }, [adjustmentType, categories, categoryId]);
+
+  const submit = async event => {
+    event.preventDefault();
+    if (!Number.isFinite(numericBalance)) {
+      setError("Введите корректный остаток");
+      return;
+    }
+    if (Math.abs(difference) < 0.005) {
+      setError("Новый остаток совпадает с текущим");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await api.post(
+        `/api/accounts/${account.id}/balances/${balance.currency}/adjust`,
+        {
+          balance: numericBalance,
+          category_id: categoryId ? Number.parseInt(categoryId, 10) : null,
+        },
+      );
+      onSaved();
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "Не удалось скорректировать остаток");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="balance-adjustment-backdrop" onClick={onClose}>
+      <form className="balance-adjustment-modal" onSubmit={submit} onClick={event => event.stopPropagation()}>
+        <div className="balance-adjustment-head">
+          <h3>Корректировка остатка</h3>
+          <button type="button" className="btn-ghost" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+
+        <div className="balance-adjustment-grid">
+          <label>
+            <span>На счёте</span>
+            <input value={account.name} disabled />
+            <small>{balance.currency}</small>
+          </label>
+          <label>
+            <span>Должно остаться</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              value={desiredBalance}
+              onChange={event => setDesiredBalance(event.target.value)}
+              autoFocus
+              required
+            />
+            <small>{balance.currency}</small>
+          </label>
+          <label>
+            <span>Категория</span>
+            <CategoryPicker
+              categories={availableCategories}
+              value={categoryId}
+              onChange={setCategoryId}
+              placeholder="— не выбрана —"
+            />
+          </label>
+          <div className="balance-adjustment-difference">
+            <span>Запись</span>
+            <strong className={difference >= 0 ? "is-income" : "is-expense"}>
+              {difference > 0 ? "+" : ""}{formatMoney(difference)} {balance.currency}
+            </strong>
+            <small>{difference >= 0 ? "Доход" : "Расход"}</small>
+          </div>
+        </div>
+
+        {error && <div className="balance-adjustment-error">{error}</div>}
+        <div className="balance-adjustment-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>Отменить</button>
+          <button type="submit" disabled={saving || Math.abs(difference) < 0.005}>
+            {saving ? "Корректируем…" : "Скорректировать"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

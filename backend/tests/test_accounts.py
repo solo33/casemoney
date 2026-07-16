@@ -1,4 +1,4 @@
-from tests.conftest import register_and_login, make_account
+from tests.conftest import account_balance, register_and_login, make_account
 
 
 def test_registration_seeds_default_groups_and_accounts(client):
@@ -83,3 +83,65 @@ def test_include_in_balance_excluded_from_total(client, auth):
     r = client.get("/api/dashboard/", headers=auth)
     assert r.status_code == 200
     assert r.json()["total_balance"] == 1000
+
+
+def test_show_for_entries_defaults_to_include_in_balance_and_can_update(client, auth):
+    visible = make_account(
+        client, auth, name="Visible", balance=100, include_in_balance=True,
+    )
+    hidden = make_account(
+        client, auth, name="Hidden", balance=100, include_in_balance=False,
+    )
+
+    assert visible["show_for_entries"] is True
+    assert hidden["show_for_entries"] is False
+
+    response = client.put(
+        f"/api/accounts/{hidden['id']}",
+        headers=auth,
+        json={"show_for_entries": True},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["show_for_entries"] is True
+
+
+def test_balance_adjustment_creates_reversible_transaction(client, auth):
+    acc = make_account(client, auth, name="Кошелёк", balance=1000)
+
+    response = client.post(
+        f"/api/accounts/{acc['id']}/balances/RUB/adjust",
+        headers=auth,
+        json={"balance": 750},
+    )
+    assert response.status_code == 201, response.text
+    adjustment = response.json()
+    assert adjustment["old_balance"] == 1000
+    assert adjustment["new_balance"] == 750
+    assert adjustment["difference"] == -250
+    assert adjustment["type"] == "expense"
+    assert account_balance(client, auth, acc["id"]) == 750
+
+    transactions = client.get(
+        f"/api/transactions/?account_id={acc['id']}&currency=RUB",
+        headers=auth,
+    ).json()["items"]
+    tx = next(item for item in transactions if item["id"] == adjustment["transaction_id"])
+    assert tx["description"] == "Корректировка остатка"
+    assert tx["amount"] == 250
+
+    deleted = client.delete(f"/api/transactions/{tx['id']}", headers=auth)
+    assert deleted.status_code == 204
+    assert account_balance(client, auth, acc["id"]) == 1000
+
+
+def test_balance_adjustment_can_increase_balance(client, auth):
+    acc = make_account(client, auth, balance=100)
+    response = client.post(
+        f"/api/accounts/{acc['id']}/balances/RUB/adjust",
+        headers=auth,
+        json={"balance": 275},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["difference"] == 175
+    assert response.json()["type"] == "income"
+    assert account_balance(client, auth, acc["id"]) == 275

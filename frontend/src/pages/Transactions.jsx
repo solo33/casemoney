@@ -2,7 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
+import AccountOptions, { entryAccountGroups } from "../components/AccountOptions";
 import CategoryOptions from "../components/CategoryOptions";
+import CategoryPicker from "../components/CategoryPicker";
 import {
   COMMON_CURRENCIES,
   currencySymbol,
@@ -23,6 +25,7 @@ export default function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState({ items: [], total: 0 });
   const [accounts, setAccounts] = useState([]);
+  const [accountGroups, setAccountGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -64,13 +67,18 @@ export default function Transactions() {
 
   const loadAccounts = useCallback(async () => {
     const [acc, cat] = await Promise.all([
-      api.get("/api/accounts/"),
+      api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
       api.get("/api/categories/"),
     ]);
-    setAccounts(acc.data);
+    const groups = acc.data || [];
+    const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
+    const visibleGroups = entryAccountGroups(groups);
+    const visibleAccounts = visibleGroups.flatMap(bucket => bucket.accounts || []);
+    setAccountGroups(groups);
+    setAccounts(flatAccounts);
     setCategories(cat.data);
-    if (acc.data.length > 0 && !newTx.account_id) {
-      const first = acc.data[0];
+    if (visibleAccounts.length > 0 && !newTx.account_id) {
+      const first = visibleAccounts[0];
       setNewTx(t => ({
         ...t,
         account_id: String(first.id),
@@ -256,20 +264,21 @@ export default function Transactions() {
           </select>
           <select value={newTx.account_id} onChange={e => setNewTx({ ...newTx, account_id: e.target.value })} required>
             <option value="">— Счёт —</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <AccountOptions groups={accountGroups} />
           </select>
           {newTx.type === "transfer" ? (
             <select value={newTx.to_account_id} onChange={e => setNewTx({ ...newTx, to_account_id: e.target.value })} required>
               <option value="">— На счёт —</option>
-              {accounts.filter(a => String(a.id) !== String(newTx.account_id)).map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              <AccountOptions groups={accountGroups} excludeId={newTx.account_id} />
             </select>
           ) : (
-            <select value={newTx.category_id} onChange={e => setNewTx({ ...newTx, category_id: e.target.value })}>
-              <option value="">— Категория —</option>
-              <CategoryOptions categories={filteredCategoriesForCreate} />
-            </select>
+            <CategoryPicker
+              categories={filteredCategoriesForCreate}
+              value={newTx.category_id}
+              onChange={category_id => setNewTx({ ...newTx, category_id })}
+              placeholder="— Категория —"
+              style={{ minWidth: 180 }}
+            />
           )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
           <input
@@ -383,7 +392,7 @@ export default function Transactions() {
                 editing === tx.id
                   ? <EditRow
                       key={tx.id} tx={tx}
-                      accounts={accounts} categories={categories}
+                      accounts={accounts} accountGroups={accountGroups} categories={categories}
                       onCancel={() => setEditing(null)}
                       onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                     />
@@ -414,7 +423,7 @@ export default function Transactions() {
               />
               {editing === tx.id && (
                 <table className="transactions-mobile-edit"><tbody><EditRow
-                  tx={tx} accounts={accounts} categories={categories}
+                  tx={tx} accounts={accounts} accountGroups={accountGroups} categories={categories}
                   onCancel={() => setEditing(null)}
                   onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                 /></tbody></table>
@@ -507,7 +516,7 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
   );
 }
 
-function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
+function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
@@ -578,20 +587,25 @@ function EditRow({ tx, accounts, categories, onCancel, onSaved }) {
             )}
           </select>
           <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })}>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <AccountOptions groups={accountGroups} includeIds={[form.account_id]} />
           </select>
           {form.type === "transfer" ? (
             <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
               <option value="">— На счёт —</option>
-              {accounts.filter(a => String(a.id) !== String(form.account_id)).map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              <AccountOptions
+                groups={accountGroups}
+                excludeId={form.account_id}
+                includeIds={[form.to_account_id]}
+              />
             </select>
           ) : (
-            <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
-              <option value="">— Без категории —</option>
-              <CategoryOptions categories={cats} />
-            </select>
+            <CategoryPicker
+              categories={cats}
+              value={form.category_id}
+              onChange={category_id => setForm({ ...form, category_id })}
+              placeholder="— Без категории —"
+              style={{ minWidth: 180 }}
+            />
           )}
           <input
             placeholder="Описание"

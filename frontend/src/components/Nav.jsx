@@ -220,20 +220,6 @@ export default function Nav() {
           Выйти
         </button>
 
-        <button
-          onClick={() => setOpen(o => !o)}
-          className="nav-burger"
-          style={{
-            padding: "5px 10px", fontSize: 18, lineHeight: 1,
-            background: "transparent", border: "1px solid rgba(255,255,255,0.18)",
-            color: "var(--text-on-dark)",
-          }}
-          aria-label={open ? "Закрыть меню" : "Открыть меню"}
-          aria-expanded={open}
-          aria-controls="mobile-more-menu"
-        >
-          {open ? "✕" : "☰"}
-        </button>
       </div>
 
       {open && (
@@ -335,14 +321,11 @@ export default function Nav() {
       <style>{`
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
-        .nav-burger { display: none !important; }
         .mobile-bottom-nav { display: none; }
         @media (max-width: 767px) {
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
-          .nav-burger { display: block !important; }
-          nav > div:first-child { padding: 0 12px 0 16px !important; }
-          .nav-burger { margin-left: auto; width: 44px; height: 44px; padding: 0 !important; }
+          nav > div:first-child { padding: 0 16px !important; }
           .nav-mobile-backdrop { position: fixed; inset: 0; z-index: 119; border: 0; border-radius: 0; background: rgba(10,29,44,.48); }
           .nav-mobile-menu {
             position: fixed; z-index: 120; left: 0; right: 0; bottom: 0;
