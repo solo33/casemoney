@@ -474,6 +474,12 @@ hr {
   border: 0;
   border-radius: 0;
 }
+.balance-menu-backdrop:hover,
+.balance-menu-backdrop:focus,
+.balance-menu-backdrop:active {
+  background: transparent;
+  box-shadow: none;
+}
 .balance-context-menu {
   position: absolute;
   top: calc(100% + 3px);
@@ -712,7 +718,10 @@ hr {
   .account-balance-equivalent { display: none; }
   .balance-action-trigger { display: none; }
   .balance-delete-currency { min-width: 40px; min-height: 40px; }
-  .balance-menu-backdrop { background: rgba(15, 30, 45, 0.45); }
+  .balance-menu-backdrop,
+  .balance-menu-backdrop:hover,
+  .balance-menu-backdrop:focus,
+  .balance-menu-backdrop:active { background: rgba(15, 30, 45, 0.45); }
   .balance-context-menu {
     position: fixed;
     top: auto;

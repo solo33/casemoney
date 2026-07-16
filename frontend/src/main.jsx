@@ -6,7 +6,22 @@ import App from './App.jsx'
 
 // Регистрация service worker — autoUpdate включен в vite.config.js,
 // новая версия автоматически активируется при следующем визите.
-registerSW({ immediate: true })
+let reloadingForUpdate = false
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) return
+    reloadingForUpdate = true
+    window.location.reload()
+  })
+}
+
+registerSW({
+  immediate: true,
+  onRegisteredSW(_swUrl, registration) {
+    if (!registration) return
+    window.setInterval(() => registration.update(), 60 * 60 * 1000)
+  },
+})
 
 // Keep the one-shot browser install prompt until the user clicks our link.
 window.addEventListener('beforeinstallprompt', (event) => {

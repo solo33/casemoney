@@ -25,10 +25,11 @@ const RECORD_LINKS = [
   { to: "/history", label: "История" },
 ];
 
-const USEFUL_LINKS = [
-  { to: "/articles", label: "Статьи" },
-  { to: "/help", label: "Помощь" },
-  { to: "/roadmap", label: "Роадмап" },
+const MOBILE_MORE_LINKS = [
+  { to: "/goals", label: "Цели" },
+  { to: "/import", label: "Импорт" },
+  { to: "/history", label: "История изменений" },
+  { to: "/settings/personal", label: "Настройки" },
 ];
 
 // Раздел «Настройки» — выпадающее меню
@@ -41,6 +42,7 @@ const SETTINGS_LINKS = [
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState("more");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, mainCurrency } = useUser();
   const links = BASE_LINKS;
@@ -102,6 +104,20 @@ export default function Nav() {
             CaseMoney
           </span>
         </NavLink>
+
+        <button
+          type="button"
+          className="nav-mobile-burger"
+          onClick={() => {
+            setMobileMenu("burger");
+            setOpen(true);
+          }}
+          aria-label="Открыть дополнительное меню"
+          aria-expanded={open}
+          aria-controls="mobile-more-menu"
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
 
         <div style={{ display: "flex", gap: 2, flex: 1, alignItems: "center" }} className="nav-links-desktop">
           {links.map(l => (
@@ -232,75 +248,44 @@ export default function Nav() {
           />
           <div id="mobile-more-menu" className="nav-mobile-menu" role="dialog" aria-modal="true" aria-label="Дополнительное меню">
           <div className="nav-mobile-sheet-head">
-            <strong>Ещё</strong>
+            <strong>{mobileMenu === "burger" ? "Меню" : "Ещё"}</strong>
             <button type="button" onClick={() => setOpen(false)} className="btn-ghost" aria-label="Закрыть меню">×</button>
           </div>
-          <NavLink to="/goals" style={mobileLinkStyle} onClick={() => setOpen(false)}>Цели</NavLink>
-          <div style={{
-            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
-            letterSpacing: 0.5, padding: "10px 11px 4px",
-          }}>
-            Записи
-          </div>
-          {RECORD_LINKS.slice(1).map(l => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              style={mobileLinkStyle}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </NavLink>
-          ))}
-          <div style={{
-            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
-            letterSpacing: 0.5, padding: "10px 11px 4px",
-          }}>
-            Настройки
-          </div>
-          {settingsLinks.map(l => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              style={mobileLinkStyle}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </NavLink>
-          ))}
-          <div style={{
-            fontSize: 11, color: "#7a8590", textTransform: "uppercase",
-            letterSpacing: 0.5, padding: "10px 11px 4px",
-          }}>
-            Полезное
-          </div>
-          {USEFUL_LINKS.map(l => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              style={mobileLinkStyle}
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </NavLink>
-          ))}
-          <PwaInstallLink style={{
-            ...mobileLinkStyle({ isActive: false }),
-            width: "100%", textAlign: "left", cursor: "pointer",
-          }} />
-          <NavLink to="/settings/currencies" style={mobileLinkStyle} onClick={() => setOpen(false)}>
-            Основная валюта <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{currencySymbol(mainCurrency)} {mainCurrency}</span>
-          </NavLink>
-          <button
-            onClick={handleLogout}
-            style={{
-              marginTop: 8, textAlign: "left", minHeight: 44,
-              background: "transparent", border: "1px solid #e4ddcd",
-              color: "#c0432b",
-            }}
-          >
-            Выйти
-          </button>
+          {mobileMenu === "burger" ? (
+            <>
+              <PwaInstallLink className="nav-mobile-install" />
+              <NavLink to="/help" style={mobileLinkStyle} onClick={() => setOpen(false)}>Помощь</NavLink>
+              {user?.is_admin && (
+                <NavLink to="/admin" style={mobileLinkStyle} onClick={() => setOpen(false)}>Админка</NavLink>
+              )}
+              <button
+                onClick={handleLogout}
+                style={{
+                  marginTop: 8, textAlign: "left", minHeight: 44,
+                  background: "transparent", border: "1px solid #e4ddcd",
+                  color: "#c0432b",
+                }}
+              >
+                Выйти
+              </button>
+            </>
+          ) : (
+            <>
+              {MOBILE_MORE_LINKS.map(l => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  style={mobileLinkStyle}
+                  onClick={() => setOpen(false)}
+                >
+                  {l.label}
+                </NavLink>
+              ))}
+              <NavLink to="/settings/currencies" style={mobileLinkStyle} onClick={() => setOpen(false)}>
+                Основная валюта <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{currencySymbol(mainCurrency)} {mainCurrency}</span>
+              </NavLink>
+            </>
+          )}
           </div>
         </>
       )}
@@ -312,7 +297,10 @@ export default function Nav() {
             <small>{link.label}</small>
           </NavLink>
         ))}
-        <button type="button" onClick={() => setOpen(true)} aria-label="Открыть дополнительные разделы">
+        <button type="button" onClick={() => {
+          setMobileMenu("more");
+          setOpen(true);
+        }} aria-label="Открыть дополнительные разделы">
           <span aria-hidden="true">•••</span>
           <small>Ещё</small>
         </button>
@@ -321,11 +309,19 @@ export default function Nav() {
       <style>{`
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
+        .nav-mobile-burger { display: none; }
         .mobile-bottom-nav { display: none; }
         @media (max-width: 767px) {
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
-          nav > div:first-child { padding: 0 16px !important; }
+          nav > div:first-child { padding: 0 6px 0 12px !important; }
+          .nav-mobile-burger {
+            display: flex; margin-left: auto; width: 48px; height: 48px; padding: 0;
+            align-items: center; justify-content: center; flex: 0 0 48px;
+            border: 0; border-radius: 8px; background: transparent; color: #fff;
+          }
+          .nav-mobile-burger:hover, .nav-mobile-burger:focus { background: rgba(255,255,255,.1); }
+          .nav-mobile-burger span { font-size: 25px; line-height: 1; }
           .nav-mobile-backdrop { position: fixed; inset: 0; z-index: 119; border: 0; border-radius: 0; background: rgba(10,29,44,.48); }
           .nav-mobile-menu {
             position: fixed; z-index: 120; left: 0; right: 0; bottom: 0;
@@ -340,6 +336,12 @@ export default function Nav() {
           .nav-mobile-sheet-head { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 4px 4px 11px; }
           .nav-mobile-sheet-head strong { font-size: 18px; }
           .nav-mobile-sheet-head button { width: 44px; height: 44px; padding: 0; font-size: 20px; }
+          .nav-mobile-install {
+            min-height: 48px; padding: 10px 12px; margin-bottom: 4px;
+            border: 1px solid #d9c79f !important; border-radius: 9px !important;
+            background: #f1eadb !important; color: #173a54 !important;
+            text-align: left; font-weight: 700;
+          }
           .mobile-bottom-nav {
             display: grid; grid-template-columns: repeat(5, 1fr);
             position: fixed; left: 0; right: 0; bottom: 0; z-index: 110;

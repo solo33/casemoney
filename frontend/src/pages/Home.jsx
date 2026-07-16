@@ -6,6 +6,7 @@ import QuickAddInline from "../components/QuickAddInline";
 import { BrandProgress } from "../components/BrandProgress";
 import AccountOptions from "../components/AccountOptions";
 import CategoryPicker from "../components/CategoryPicker";
+import { BalanceActionRow, BalanceAdjustmentModal } from "../components/BalanceActions";
 import { useUser } from "../contexts/UserContext";
 import {
   currencySymbol,
@@ -72,6 +73,7 @@ export default function Home() {
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
   const [categories, setCategories] = useState([]);
   const [editingTx, setEditingTx] = useState(null);
+  const [adjustingBalance, setAdjustingBalance] = useState(null);
   const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
@@ -372,7 +374,14 @@ export default function Home() {
               })
               .filter(bucket => bucket.accounts.length > 0)
               .map(bucket => (
-                <GroupBlock key={bucket.group.id ?? "ungrouped"} bucket={bucket} sym={sym} onAccountClick={goToAccount} />
+                <GroupBlock
+                  key={bucket.group.id ?? "ungrouped"}
+                  bucket={bucket}
+                  sym={sym}
+                  mainCurrency={mainCurrency}
+                  onAccountClick={goToAccount}
+                  onAdjustBalance={(account, balance) => setAdjustingBalance({ account, balance })}
+                />
               ))
           )}
         </Card>
@@ -508,6 +517,18 @@ export default function Home() {
           categories={categories}
           onClose={() => setEditingTx(null)}
           onSaved={() => { setEditingTx(null); fetchAll(); }}
+        />
+      )}
+      {adjustingBalance && (
+        <BalanceAdjustmentModal
+          account={adjustingBalance.account}
+          balance={adjustingBalance.balance}
+          onClose={() => setAdjustingBalance(null)}
+          onSaved={() => {
+            setAdjustingBalance(null);
+            fetchAll();
+            window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
+          }}
         />
       )}
     </div>
@@ -940,7 +961,7 @@ function AccountLoadingStructure() {
   );
 }
 
-function GroupBlock({ bucket, sym, onAccountClick }) {
+function GroupBlock({ bucket, sym, mainCurrency, onAccountClick, onAdjustBalance }) {
   // На телефоне группы свёрнуты по умолчанию — важен итог, детали по тапу
   const [collapsed, setCollapsed] = useState(IS_MOBILE);
   return (
@@ -975,7 +996,13 @@ function GroupBlock({ bucket, sym, onAccountClick }) {
       {!collapsed && (
         <div style={{ margin: "8px 8px 9px 14px", paddingLeft: 10, borderLeft: "2px solid #d9c79f" }}>
           {bucket.accounts.map(acc => (
-            <AccountBlock key={acc.id} acc={acc} onClick={() => onAccountClick(acc.id)} />
+            <AccountBlock
+              key={acc.id}
+              acc={acc}
+              mainCurrency={mainCurrency}
+              onClick={() => onAccountClick(acc.id)}
+              onAdjustBalance={balance => onAdjustBalance(acc, balance)}
+            />
           ))}
         </div>
       )}
@@ -983,11 +1010,10 @@ function GroupBlock({ bucket, sym, onAccountClick }) {
   );
 }
 
-function AccountBlock({ acc, onClick }) {
+function AccountBlock({ acc, mainCurrency, onClick, onAdjustBalance }) {
   const balances = acc.balances || [];
   return (
     <div
-      onClick={onClick}
       style={{
         padding: "7px 8px",
         cursor: onClick ? "pointer" : "default",
@@ -997,7 +1023,7 @@ function AccountBlock({ acc, onClick }) {
       onMouseEnter={e => { e.currentTarget.style.background = "#f6f2e9"; }}
       onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
     >
-      <div style={{
+      <div onClick={onClick} style={{
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
         fontSize: 13,
       }}>
@@ -1005,25 +1031,19 @@ function AccountBlock({ acc, onClick }) {
           {acc.icon && <span>{acc.icon}</span>}
           {acc.name}
         </span>
-        {balances.length === 1 && (
-          <span style={{ color: "#1b2531", fontWeight: 500 }}>
-            {formatMoneyWithCurrency(balances[0].balance, balances[0].currency)}
-          </span>
-        )}
+        <span style={{ color: "#a6afb8", fontSize: 11 }}>история</span>
       </div>
-      {balances.length > 1 && (
-        <div style={{ marginTop: 2, marginLeft: 16 }}>
-          {balances.map(b => (
-            <div key={b.currency} style={{
-              display: "flex", justifyContent: "space-between",
-              fontSize: 12, color: "#7a8590", padding: "1px 0",
-            }}>
-              <span style={{ color: "#a6afb8" }}>{b.currency}</span>
-              <span>{formatMoney(b.balance)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div style={{ marginTop: 2, marginLeft: 16 }}>
+        {balances.map(balance => (
+          <BalanceActionRow
+            key={balance.currency}
+            balance={balance}
+            mainCurrency={mainCurrency}
+            onAdjust={() => onAdjustBalance(balance)}
+            onHistory={onClick}
+          />
+        ))}
+      </div>
     </div>
   );
 }

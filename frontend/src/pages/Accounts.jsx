@@ -829,7 +829,7 @@ function BalanceRow({
         }
         onHistory();
       }}
-      title="Нажмите для просмотра истории. На мобильном удерживайте для действий."
+      aria-label={`Остаток ${balance.currency}. Нажмите для просмотра истории`}
     >
       <span className="account-balance-currency">{balance.currency}</span>
       <span className="account-balance-amount">
