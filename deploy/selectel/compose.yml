@@ -1,0 +1,70 @@
+name: solo32
+
+services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-casemoney}
+      POSTGRES_USER: ${POSTGRES_USER:-casemoney}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - database
+
+  casemoney:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${CASEMONEY_ENV_FILE:-/srv/solo32/secrets/casemoney.env}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-casemoney}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-casemoney}
+      PORT: "8080"
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - database
+      - edge
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      CASEMONEY_SITE_ADDRESS: ${CASEMONEY_SITE_ADDRESS:-:80}
+      ACME_EMAIL: ${ACME_EMAIL:-off}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/caddy-data:/data
+      - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/caddy-config:/config
+    depends_on:
+      casemoney:
+        condition: service_healthy
+    networks:
+      - edge
+
+networks:
+  database:
+    internal: true
+  edge:

@@ -1,0 +1,140 @@
+name: Export encrypted Amvera database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type EXPORT to confirm a read-only encrypted export from Amvera
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: export-amvera-production-database
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Dump, validate, and encrypt PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_DATABASE_URL: ${{ secrets.AMVERA_DATABASE_URL }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - name: Check out encryption recipient
+        uses: actions/checkout@v4
+
+      - name: Validate confirmation and secrets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "$CONFIRMATION" != "EXPORT" ]]; then
+            echo "Confirmation must be exactly EXPORT."
+            exit 1
+          fi
+          if [[ -z "$SOURCE_DATABASE_URL" ]]; then
+            echo "AMVERA_DATABASE_URL secret is required."
+            exit 1
+          fi
+          recipient="$(tr -d '\r\n' < deploy/selectel/amvera-export-recipient.txt)"
+          if [[ ! "$recipient" =~ ^age1 ]]; then
+            echo "The committed age public recipient is missing or invalid."
+            exit 1
+          fi
+
+      - name: Install export tools
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y age
+          docker pull postgres:18
+
+      - name: Export and encrypt
+        id: export
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          export PGSSLNEGOTIATION=postgres
+
+          export_dir="${RUNNER_TEMP}/amvera-export"
+          dump_file="${export_dir}/casemoney.dump"
+          tables_file="${export_dir}/source-tables.txt"
+          counts_file="${export_dir}/source-counts.tsv"
+          archive_file="${export_dir}/casemoney-export.tar"
+          encrypted_file="${archive_file}.age"
+          checksum_file="${encrypted_file}.sha256"
+          recipient="$(tr -d '\r\n' < deploy/selectel/amvera-export-recipient.txt)"
+          mkdir -m 700 "$export_dir"
+          trap 'rm -f "$dump_file" "$tables_file" "$counts_file" "$archive_file"' EXIT
+
+          source_psql() {
+            docker run --rm \
+              -e DATABASE_URL="$SOURCE_DATABASE_URL" \
+              -e PGSSLNEGOTIATION=postgres \
+              postgres:18 \
+              sh -c 'exec psql "$DATABASE_URL" "$@"' sh "$@"
+          }
+
+          echo "Checking the Amvera connection and PostgreSQL version..."
+          source_version="$(source_psql -XAtc 'SHOW server_version;')"
+          echo "Connected to PostgreSQL ${source_version}."
+
+          echo "Creating a private temporary dump..."
+          docker run --rm \
+            -e DATABASE_URL="$SOURCE_DATABASE_URL" \
+            -e PGSSLNEGOTIATION=postgres \
+            -v "${export_dir}:/export" \
+            postgres:18 \
+            sh -c 'exec pg_dump --format=custom --compress=6 --no-owner --no-acl --dbname "$DATABASE_URL" --file /export/casemoney.dump'
+          test -s "$dump_file"
+
+          echo "Validating the dump before encryption..."
+          docker run --rm \
+            -v "${export_dir}:/export:ro" \
+            postgres:18 \
+            pg_restore --list /export/casemoney.dump >/dev/null
+
+          echo "Recording the exact source table list and row counts..."
+          source_psql -XAtc \
+            "SELECT format('%I.%I', schemaname, tablename) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY 1;" \
+            >"$tables_file"
+          test -s "$tables_file"
+          : >"$counts_file"
+          while IFS= read -r qualified_table; do
+            row_count="$(source_psql -XAtc "SELECT count(*) FROM ${qualified_table};")"
+            printf '%s\t%s\n' "$qualified_table" "$row_count" >>"$counts_file"
+          done <"$tables_file"
+
+          tar -C "$export_dir" -cf "$archive_file" \
+            casemoney.dump source-tables.txt source-counts.tsv
+
+          echo "Encrypting the export bundle before artifact upload..."
+          age --recipient "$recipient" --output "$encrypted_file" "$archive_file"
+          sha256sum "$encrypted_file" >"$checksum_file"
+          rm -f "$dump_file" "$tables_file" "$counts_file" "$archive_file"
+
+          echo "encrypted_file=$encrypted_file" >>"$GITHUB_OUTPUT"
+          echo "checksum_file=$checksum_file" >>"$GITHUB_OUTPUT"
+          {
+            echo "### Encrypted Amvera export created"
+            echo "- Source PostgreSQL: ${source_version}"
+            echo "- Plaintext dump validation: passed"
+            echo "- Exact table list and row counts: included"
+            echo "- Encryption: age; the private key remains only on Selectel"
+            echo "- Artifact retention: 1 day"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload encrypted artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: casemoney-amvera-${{ github.run_id }}
+          path: |
+            ${{ steps.export.outputs.encrypted_file }}
+            ${{ steps.export.outputs.checksum_file }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
