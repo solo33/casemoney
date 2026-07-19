@@ -75,13 +75,13 @@ export default function Nav() {
   });
 
   return (
-    <nav style={{
+    <nav className="app-nav" style={{
       background: "#173a54",
       position: "sticky",
       top: 0,
       zIndex: 100,
     }}>
-      <div style={{
+      <div className="app-nav-inner" style={{
         maxWidth: 1180,
         margin: "0 auto",
         padding: "0 20px",
@@ -312,9 +312,10 @@ export default function Nav() {
         .nav-mobile-burger { display: none; }
         .mobile-bottom-nav { display: none; }
         @media (max-width: 767px) {
+          .app-nav { padding-top: env(safe-area-inset-top, 0px); }
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
-          nav > div:first-child { padding: 0 6px 0 12px !important; }
+          .app-nav-inner { padding: 0 6px 0 12px !important; }
           .nav-mobile-burger {
             display: flex; margin-left: auto; width: 48px; height: 48px; padding: 0;
             align-items: center; justify-content: center; flex: 0 0 48px;

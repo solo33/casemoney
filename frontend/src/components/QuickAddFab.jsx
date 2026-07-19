@@ -393,7 +393,7 @@ export default function QuickAddFab() {
             @keyframes fab-fade { from { opacity: 0 } to { opacity: 1 } }
             @keyframes fab-slide { from { transform: translateY(100%) } to { transform: translateY(0) } }
             @media (max-width: 767px) {
-              .quick-add-sheet { top: 58px; max-height: none !important; border-radius: 18px 18px 0 0 !important; padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }
+              .quick-add-sheet { top: calc(58px + env(safe-area-inset-top, 0px)); max-height: none !important; border-radius: 18px 18px 0 0 !important; padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }
               .quick-add-sheet input, .quick-add-sheet select { min-height: 46px; }
             }
           `}</style>

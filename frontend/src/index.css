@@ -426,7 +426,7 @@ hr {
 
 @media (max-width: 640px) {
   .cm-global-progress {
-    top: 62px;
+    top: calc(62px + env(safe-area-inset-top, 0px));
     right: 8px;
     max-width: calc(100vw - 16px);
     padding: 5px 8px;
@@ -595,15 +595,19 @@ hr {
   .page > h1:first-child { font-size: 25px !important; margin-bottom: 10px !important; }
 
   button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  input, select, textarea { font-size: 16px !important; }
   .page button:not(.btn-link), .page select, .page input { min-height: 44px; }
   .register-secondary-links a:nth-child(1), .register-secondary-links a:nth-child(3) { display: none; }
 
   .analysis-nav {
-    flex-wrap: nowrap !important; overflow-x: auto; scrollbar-width: none;
-    margin: 0 -12px 14px !important; padding: 0 12px 10px !important;
+    display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px !important; overflow: visible;
+    margin: 0 0 14px !important; padding: 0 !important;
   }
-  .analysis-nav::-webkit-scrollbar { display: none; }
-  .analysis-nav-link { flex: 0 0 auto; min-height: 42px; display: inline-flex; align-items: center; }
+  .analysis-nav-link {
+    width: 100%; min-width: 0; min-height: 42px;
+    display: inline-flex; align-items: center; justify-content: center; text-align: center;
+  }
 
   /* Shared mobile bottom sheets */
   .mobile-sheet-backdrop {
@@ -664,7 +668,7 @@ hr {
   .account-group-delete { width: 40px; height: 40px; padding: 0 !important; }
 
   /* Report summary */
-  .report-period-controls { gap: 8px !important; position: sticky; top: 58px; z-index: 20; margin: 0 -12px 12px !important; padding: 8px 12px; background: rgba(246,242,233,.97); border-bottom: 1px solid var(--line); }
+  .report-period-controls { gap: 8px !important; position: sticky; top: calc(58px + env(safe-area-inset-top, 0px)); z-index: 20; margin: 0 -12px 12px !important; padding: 8px 12px; background: rgba(246,242,233,.97); border-bottom: 1px solid var(--line); }
   .report-period-controls > div { width: 100%; }
   .report-period-controls > div:first-child { display: grid !important; grid-template-columns: repeat(3, 1fr); }
   .report-period-controls > div:last-child { display: grid !important; grid-template-columns: 44px 1fr 44px; }
