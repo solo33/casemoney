@@ -2,7 +2,9 @@ FROM node:22-alpine AS frontend-build
 
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+# Веб-сборке не нужны install-скрипты sharp из мобильного генератора иконок.
+# Amvera периодически не может скачать libvips с GitHub и роняет весь образ.
+RUN npm ci --ignore-scripts
 COPY frontend/ ./
 RUN npm run build:verify
 
