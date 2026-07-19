@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily PostgreSQL backups for solo32 applications
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=solo32-postgres-backup.service
+
+[Install]
+WantedBy=timers.target
