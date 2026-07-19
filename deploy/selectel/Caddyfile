@@ -12,3 +12,5 @@
 		-Server
 	}
 }
+
+import /etc/caddy/sites/*.caddy

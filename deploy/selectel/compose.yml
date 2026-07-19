@@ -56,6 +56,7 @@ services:
       - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_SITES_ROOT:-/srv/solo32/platform/caddy-sites}:/etc/caddy/sites:ro
       - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/caddy-data:/data
       - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/caddy-config:/config
     depends_on:
