@@ -16,7 +16,12 @@ const client = axios.create({
 })
 
 const NETWORK_RETRY_DELAYS = [1000, 2000, 4000]
+const TEMPORARY_SERVICE_STATUSES = new Set([502, 503, 504])
 let activeRequests = 0
+
+export function isRetryableServiceError(error) {
+  return !error.response?.status || TEMPORARY_SERVICE_STATUSES.has(error.response.status)
+}
 
 function wait(ms) {
   return new Promise(resolve => window.setTimeout(resolve, ms))
@@ -94,8 +99,16 @@ client.interceptors.response.use(
       }
     } else {
       const { status, data } = error.response
-      if (status >= 500) {
-        error.response.data = { ...data, detail: 'Ошибка сервера. Попробуйте позже.' }
+      if (TEMPORARY_SERVICE_STATUSES.has(status)) {
+        error.response.data = {
+          ...data,
+          detail: 'Сервис временно обновляется. Повторите через минуту.',
+        }
+      } else if (status >= 500) {
+        error.response.data = {
+          ...data,
+          detail: `Ошибка сервера (${status}). Операция не подтверждена сервером.`,
+        }
       } else if (data?.detail && typeof data.detail !== 'string') {
         // FastAPI 422: detail — массив объектов валидации
         error.response.data = { ...data, detail: 'Проверьте правильность заполнения полей.' }

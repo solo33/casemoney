@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
@@ -11,6 +11,8 @@ import {
   formatMoney,
   sortCurrenciesRubFirst,
 } from "../utils/money";
+import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
+import { submitOrQueueTransaction } from "../services/offlineMutations";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -31,6 +33,7 @@ export default function Transactions() {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const createRequestRef = useRef(null);
 
   // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
   const [filters, setFilters] = useState(() => ({
@@ -154,12 +157,18 @@ export default function Transactions() {
         to_account_id: newTx.type === "transfer" ? parseInt(newTx.to_account_id) : undefined,
       };
       if (newTx.date) payload.date = new Date(newTx.date).toISOString();
-      await api.post("/api/transactions/", payload);
+      const requestKey = idempotencyKeyFor(createRequestRef, payload);
+      const result = await submitOrQueueTransaction(payload, requestKey);
+      clearIdempotencyKey(createRequestRef);
       setNewTx(t => ({ ...t, amount: "", description: "", category_id: "" }));
       setEditing(null);
       setPage(0);
-      loadTransactions();
-      loadAccounts(); // обновим балансы
+      if (!result.queued) {
+        loadTransactions();
+        loadAccounts(); // обновим балансы
+      } else {
+        setError("Запись сохранена на устройстве и отправится автоматически при появлении связи");
+      }
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка создания");
     }

@@ -1,11 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
-import api from "../api/client";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import api, { isRetryableServiceError } from "../api/client";
 import AccountOptions, { entryAccountGroups } from "./AccountOptions";
 import CategoryPicker from "./CategoryPicker";
 import {
   COMMON_CURRENCIES,
   sortCurrenciesRubFirst,
 } from "../utils/money";
+import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
+import useTransferQuote from "../hooks/useTransferQuote";
+import { submitOrQueueTransaction } from "../services/offlineMutations";
 
 // Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
@@ -30,11 +33,16 @@ export default function QuickAddFab() {
     currency: "",       // выбранная валюта (из balances счёта или COMMON)
     category_id: "",
     to_account_id: "",  // счёт-получатель для перевода
+    to_amount: "",
+    to_currency: "",
     description: "",
     date: new Date().toISOString().slice(0, 10),
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [retryable, setRetryable] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
+  const requestRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -106,6 +114,7 @@ export default function QuickAddFab() {
     setOpen(false);
     setStep(1);
     setError(null);
+    setRetryable(false);
   };
 
   const continueToDetails = () => {
@@ -127,6 +136,38 @@ export default function QuickAddFab() {
     accountBalances.map(b => b.currency)
   );
 
+  const selectedTargetAccount = useMemo(
+    () => accounts.find(a => String(a.id) === String(form.to_account_id)),
+    [accounts, form.to_account_id]
+  );
+  const targetCurrencies = sortCurrenciesRubFirst(
+    (selectedTargetAccount?.balances || []).map(balance => balance.currency)
+  );
+
+  useEffect(() => {
+    if (form.type !== "transfer" || !selectedTargetAccount) return;
+    const codes = targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES;
+    if (!codes.includes(form.to_currency)) {
+      setForm(current => ({ ...current, to_currency: codes[0] || "" }));
+    }
+  }, [form.type, selectedTargetAccount, targetCurrencies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyTransferQuote = useCallback((toAmount) => {
+    setForm(current => current.to_amount === toAmount
+      ? current
+      : { ...current, to_amount: toAmount });
+  }, []);
+  const { quote, loading: quoteLoading } = useTransferQuote({
+    enabled: form.type === "transfer",
+    amount: form.amount,
+    fromCurrency: form.currency,
+    toCurrency: form.to_currency,
+    onQuote: applyTransferQuote,
+  });
+  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) >= 0
+    ? Number(form.to_amount) / Number(form.amount)
+    : quote?.rate;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (step === 1) {
@@ -134,6 +175,7 @@ export default function QuickAddFab() {
       return;
     }
     setError(null);
+    setSavedLocally(false);
     if (!form.account_id) { setError("Выберите счёт"); return; }
     if (!form.amount || parseFloat(form.amount) <= 0) { setError("Введите сумму"); return; }
     if (!form.currency) { setError("Выберите валюту"); return; }
@@ -142,11 +184,15 @@ export default function QuickAddFab() {
       if (String(form.to_account_id) === String(form.account_id)) {
         setError("Счёт-источник и получатель совпадают"); return;
       }
+      if (!form.to_currency) { setError("Выберите валюту счёта-получателя"); return; }
+      if (!form.to_amount || parseFloat(form.to_amount) <= 0) {
+        setError("Введите сумму зачисления"); return;
+      }
     }
 
     setSubmitting(true);
     try {
-      await api.post("/api/transactions/", {
+      const payload = {
         amount: parseFloat(form.amount),
         type: form.type,
         currency: form.currency,
@@ -154,13 +200,20 @@ export default function QuickAddFab() {
         account_id: parseInt(form.account_id),
         category_id: form.type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : undefined,
+        to_amount: form.type === "transfer" ? parseFloat(form.to_amount) : undefined,
+        to_currency: form.type === "transfer" ? form.to_currency : undefined,
         date: form.date ? new Date(`${form.date}T12:00:00`).toISOString() : undefined,
-      });
-      window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
-      setForm(f => ({ ...f, amount: "", description: "", category_id: "" }));
-      close();
+      };
+      const requestKey = idempotencyKeyFor(requestRef, payload);
+      const result = await submitOrQueueTransaction(payload, requestKey);
+      clearIdempotencyKey(requestRef);
+      if (!result.queued) window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
+      setForm(f => ({ ...f, amount: "", to_amount: "", description: "", category_id: "" }));
+      setSavedLocally(result.queued);
+      if (!result.queued) close();
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка сохранения");
+      setRetryable(isRetryableServiceError(e));
     } finally {
       setSubmitting(false);
     }
@@ -324,13 +377,41 @@ export default function QuickAddFab() {
                   <span style={{ fontSize: 12, color: "#7a8590" }}>На счёт</span>
                   <select
                     value={form.to_account_id}
-                    onChange={e => setForm({ ...form, to_account_id: e.target.value })}
+                    onChange={e => setForm({ ...form, to_account_id: e.target.value, to_currency: "", to_amount: "" })}
                     required
                     style={{ width: "100%", marginTop: 4 }}
                   >
                     <option value="">— получатель —</option>
                     <AccountOptions groups={accountGroups} excludeId={form.account_id} />
                   </select>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0.01"
+                      step="0.01"
+                      value={form.to_amount}
+                      onChange={e => setForm({ ...form, to_amount: e.target.value })}
+                      placeholder={quoteLoading ? "Считаем…" : "Сумма зачисления"}
+                      required
+                      style={{ flex: 1, minWidth: 0 }}
+                    />
+                    <select
+                      value={form.to_currency}
+                      onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
+                      style={{ width: 104 }}
+                    >
+                      {(targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES).map(currency => (
+                        <option key={currency} value={currency}>{currency}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <small style={{ display: "block", marginTop: 6, color: "#7a8590" }}>
+                    {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate > 0
+                      ? `1 ${form.currency} = ${displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} ${form.to_currency}`
+                      : "Сумма зачисления может отличаться от суммы списания"}
+                    {quoteLoading ? " · обновляем курс…" : ""}
+                  </small>
                 </label>
               ) : (
                 <label style={{ display: "block", marginBottom: 12 }}>
@@ -368,7 +449,19 @@ export default function QuickAddFab() {
               </label>
 
               {error && (
-                <p style={{ color: "#c0432b", fontSize: 13, marginBottom: 12 }}>{error}</p>
+                <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 12 }}>
+                  <span>{error}</span>
+                  {retryable && (
+                    <button type="submit" className="btn-ghost" disabled={submitting} style={{ width: "100%", minHeight: 42, marginTop: 8 }}>
+                      Повторить
+                    </button>
+                  )}
+                </div>
+              )}
+              {savedLocally && (
+                <p style={{ color: "#167a4a", fontSize: 13, marginBottom: 12 }}>
+                  Сохранено на устройстве. Запись отправится автоматически после восстановления связи.
+                </p>
               )}
 
               <button

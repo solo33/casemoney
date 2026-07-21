@@ -6,6 +6,11 @@ import QuickAddInline from "../components/QuickAddInline";
 import { BrandProgress } from "../components/BrandProgress";
 import AccountOptions from "../components/AccountOptions";
 import CategoryPicker from "../components/CategoryPicker";
+import {
+  LOCAL_TRANSACTION_EVENT,
+  listPendingTransactions,
+  removeOfflineMutation,
+} from "../services/offlineMutations";
 import { BalanceActionRow, BalanceAdjustmentModal } from "../components/BalanceActions";
 import { useUser } from "../contexts/UserContext";
 import {
@@ -172,19 +177,25 @@ export default function Home() {
 
   // Записи за выбранный день
   const fetchDay = useCallback(async (dateStr) => {
+    const localItems = await listPendingTransactions(dateStr).catch(() => []);
     try {
       const res = await api.get("/api/transactions/", {
         params: { date_from: dateStr, date_to: dateStr, limit: 100 },
       });
-      setDayTx(res.data.items || []);
+      setDayTx([...localItems, ...(res.data.items || [])]);
     } catch {
-      setDayTx([]);
+      setDayTx(localItems);
     }
   }, []);
 
   const handleDeleteTx = async (tx) => {
     if (!confirm("Удалить запись?")) return;
     try {
+      if (tx.pending_sync && tx.offline_mutation_id) {
+        await removeOfflineMutation(tx.offline_mutation_id);
+        setDayTx(current => current.filter(item => item.id !== tx.id));
+        return;
+      }
       await api.delete(`/api/transactions/${tx.id}`);
       fetchAll();
       fetchDay(selectedDate);
@@ -198,6 +209,18 @@ export default function Home() {
     window.addEventListener(TX_ADDED_EVENT, reload);
     return () => window.removeEventListener(TX_ADDED_EVENT, reload);
   }, [fetchAll, fetchDay, selectedDate]);
+
+  useEffect(() => {
+    const onLocalTransaction = (event) => {
+      const transaction = event.detail?.transaction;
+      if (!transaction) return;
+      const localDate = String(transaction.date || "").slice(0, 10);
+      if (localDate !== selectedDate) return;
+      setDayTx(current => [transaction, ...current.filter(item => item.id !== transaction.id)]);
+    };
+    window.addEventListener(LOCAL_TRANSACTION_EVENT, onLocalTransaction);
+    return () => window.removeEventListener(LOCAL_TRANSACTION_EVENT, onLocalTransaction);
+  }, [selectedDate]);
 
   useEffect(() => { fetchAll(); }, [mainCurrency, fetchAll]);
 
@@ -515,7 +538,11 @@ export default function Home() {
           accountGroups={accountOptions}
           categories={categories}
           onClose={() => setEditingTx(null)}
-          onSaved={() => { setEditingTx(null); fetchAll(); }}
+          onSaved={() => {
+            setEditingTx(null);
+            fetchAll();
+            fetchDay(selectedDate);
+          }}
         />
       )}
       {adjustingBalance && (
@@ -700,9 +727,15 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
         {tx.type === "expense" ? "−" : tx.type === "income" ? "+" : ""}{formatMoneyWithCurrency(tx.amount, tx.currency)}
       </div>
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+        {tx.pending_sync && (
+          <span style={{ color: tx.sync_error ? "#c0432b" : "#9a6d17", fontSize: 11, marginRight: 6 }}>
+            {tx.sync_error ? "Ошибка синхронизации" : "На устройстве"}
+          </span>
+        )}
         <button
           type="button"
           onClick={onEdit}
+          disabled={tx.pending_sync}
           className="btn-ghost"
           style={{ padding: "3px 7px", fontSize: 12, border: "none", background: "transparent", color: "#7a8590" }}
           title="Изменить"

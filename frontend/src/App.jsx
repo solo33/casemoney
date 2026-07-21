@@ -5,6 +5,8 @@ import QuickAddFab from './components/QuickAddFab'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import CookieBanner from './components/CookieBanner'
 import { GlobalNetworkProgress } from './components/BrandProgress'
+import MobilePwaInstallPrompt from './components/MobilePwaInstallPrompt'
+import OfflineSyncStatus from './components/OfflineSyncStatus'
 import { UserProvider } from './contexts/UserContext'
 
 const Login = lazy(() => import('./pages/Login'))
@@ -46,6 +48,8 @@ function ProtectedRoute({ children }) {
       <EmailVerifyBanner />
       {children}
       <QuickAddFab />
+      <MobilePwaInstallPrompt />
+      <OfflineSyncStatus />
     </UserProvider>
   )
 }

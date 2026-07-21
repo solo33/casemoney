@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import api from "../api/client";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import api, { isRetryableServiceError } from "../api/client";
 import { TX_ADDED_EVENT } from "./QuickAddFab";
 import AccountOptions, { entryAccountGroups } from "./AccountOptions";
 import CategoryPicker from "./CategoryPicker";
 import { COMMON_CURRENCIES, sortCurrenciesRubFirst } from "../utils/money";
+import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
+import useTransferQuote from "../hooks/useTransferQuote";
+import { submitOrQueueTransaction } from "../services/offlineMutations";
 
 const TABS = [
   { value: "expense",  label: "↘ Расход",  color: "#c0432b" },
@@ -37,11 +40,16 @@ export default function QuickAddInline({
     currency: "",
     category_id: "",
     to_account_id: "",
+    to_amount: "",
+    to_currency: "",
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
+  const [retryable, setRetryable] = useState(false);
+  const requestRef = useRef(null);
 
   const applyOptions = useCallback((buckets, cats) => {
     const visibleBuckets = entryAccountGroups(buckets);
@@ -101,6 +109,38 @@ export default function QuickAddInline({
     (selectedAccount?.balances || []).map(b => b.currency)
   );
 
+  const selectedTargetAccount = useMemo(
+    () => accounts.find(a => String(a.id) === String(form.to_account_id)),
+    [accounts, form.to_account_id]
+  );
+  const targetCurrencies = sortCurrenciesRubFirst(
+    (selectedTargetAccount?.balances || []).map(balance => balance.currency)
+  );
+
+  useEffect(() => {
+    if (type !== "transfer" || !selectedTargetAccount) return;
+    const codes = targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES;
+    if (!codes.includes(form.to_currency)) {
+      setForm(current => ({ ...current, to_currency: codes[0] || "" }));
+    }
+  }, [type, selectedTargetAccount, targetCurrencies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyTransferQuote = useCallback((toAmount) => {
+    setForm(current => current.to_amount === toAmount
+      ? current
+      : { ...current, to_amount: toAmount });
+  }, []);
+  const { quote, loading: quoteLoading } = useTransferQuote({
+    enabled: type === "transfer",
+    amount: form.amount,
+    fromCurrency: form.currency,
+    toCurrency: form.to_currency,
+    onQuote: applyTransferQuote,
+  });
+  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) >= 0
+    ? Number(form.to_amount) / Number(form.amount)
+    : quote?.rate;
+
   const filteredCategories = type === "transfer"
     ? categories
     : categories.filter(c => c.type === type);
@@ -110,7 +150,9 @@ export default function QuickAddInline({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setRetryable(false);
     setSuccess(false);
+    setSavedLocally(false);
     if (!form.amount || parseFloat(form.amount) <= 0) {
       setError("Введите сумму"); return;
     }
@@ -120,6 +162,10 @@ export default function QuickAddInline({
       if (!form.to_account_id) { setError("Выберите счёт-получатель"); return; }
       if (String(form.to_account_id) === String(form.account_id)) {
         setError("Счёт-источник и получатель совпадают"); return;
+      }
+      if (!form.to_currency) { setError("Выберите валюту счёта-получателя"); return; }
+      if (!form.to_amount || parseFloat(form.to_amount) <= 0) {
+        setError("Введите сумму зачисления"); return;
       }
     }
 
@@ -133,18 +179,24 @@ export default function QuickAddInline({
         account_id: parseInt(form.account_id),
         category_id: type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
         to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
+        to_amount: type === "transfer" ? parseFloat(form.to_amount) : undefined,
+        to_currency: type === "transfer" ? form.to_currency : undefined,
       };
       if (dateVal) payload.date = new Date(dateVal).toISOString();
-      await api.post("/api/transactions/", payload);
-      window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
+      const requestKey = idempotencyKeyFor(requestRef, payload);
+      const result = await submitOrQueueTransaction(payload, requestKey);
+      clearIdempotencyKey(requestRef);
+      if (!result.queued) window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
       // reset суммы/описания/категории, сохраняем счёт+валюту+дату
-      setForm(f => ({ ...f, amount: "", description: "", category_id: "" }));
+      setForm(f => ({ ...f, amount: "", to_amount: "", description: "", category_id: "" }));
+      setSavedLocally(result.queued);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 1500);
       // событие сам перезагрузит данные на странице
       loadOptions();
     } catch (err) {
       setError(err.response?.data?.detail || "Ошибка сохранения");
+      setRetryable(isRetryableServiceError(err));
     } finally {
       setSubmitting(false);
     }
@@ -217,13 +269,13 @@ export default function QuickAddInline({
           </select>
         </div>
 
-        {/* Row 2: Категория (или счёт-получатель для перевода) + Дата */}
+        {/* Row 2: категория или отдельная сумма зачисления для перевода */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 110px 90px", gap: 10, alignItems: "center", marginBottom: 10 }}>
           <label style={lbl}>{type === "transfer" ? "На счёт" : "Категория"}</label>
           {type === "transfer" ? (
             <select
               value={form.to_account_id}
-              onChange={e => setForm({ ...form, to_account_id: e.target.value })}
+              onChange={e => setForm({ ...form, to_account_id: e.target.value, to_currency: "", to_amount: "" })}
               required
             >
               <option value="">— получатель —</option>
@@ -236,13 +288,49 @@ export default function QuickAddInline({
               onChange={category_id => setForm({ ...form, category_id })}
             />
           )}
-          <input
-            type="date"
-            value={dateVal}
-            onChange={e => setDateVal(e.target.value)}
-            className="qai-date"
-          />
+          {type === "transfer" ? (
+            <>
+              <input
+                type="number"
+                inputMode="decimal"
+                placeholder={quoteLoading ? "Считаем…" : "Зачислить"}
+                min="0.01"
+                step="0.01"
+                value={form.to_amount}
+                onChange={e => setForm({ ...form, to_amount: e.target.value })}
+                required
+                style={{ fontWeight: 600, fontSize: 16, textAlign: "right" }}
+              />
+              <select
+                value={form.to_currency}
+                onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
+              >
+                {(targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES).map(currency => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <input
+              type="date"
+              value={dateVal}
+              onChange={e => setDateVal(e.target.value)}
+              className="qai-date"
+            />
+          )}
         </div>
+
+        {type === "transfer" && (
+          <div className="transfer-rate-row">
+            <span>
+              {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate > 0
+                ? `Курс: 1 ${form.currency} = ${displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} ${form.to_currency}`
+                : "Сумма списания и зачисления указываются отдельно"}
+              {quoteLoading ? " · обновляем курс…" : ""}
+            </span>
+            <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} />
+          </div>
+        )}
 
         {/* Row 3: Примечание */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "center", marginBottom: 12 }}>
@@ -257,10 +345,21 @@ export default function QuickAddInline({
 
         {/* Errors + submit */}
         {error && (
-          <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 10 }}>{error}</div>
+          <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span>{error}</span>
+            {retryable && (
+              <button type="submit" className="btn-ghost" disabled={submitting} style={{ minHeight: 34, padding: "5px 10px" }}>
+                Повторить
+              </button>
+            )}
+          </div>
         )}
         {success && (
-          <div style={{ color: "#167a4a", fontSize: 13, marginBottom: 10 }}>Запись сохранена</div>
+          <div style={{ color: "#167a4a", fontSize: 13, marginBottom: 10 }}>
+            {savedLocally
+              ? "Изменение сохранено на устройстве и отправится автоматически при появлении связи"
+              : "Запись сохранена"}
+          </div>
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -286,11 +385,15 @@ export default function QuickAddInline({
 
       <style>{`
         .qai-date { grid-column: 3 / span 2; }
+        .transfer-rate-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -2px 0 10px 78px; color: #7a8590; font-size: 12px; }
+        .transfer-rate-row input { width: 200px; }
         @media (max-width: 600px) {
           form > div[style*="grid-template-columns"] {
             grid-template-columns: 1fr !important;
           }
           .qai-date { grid-column: auto !important; }
+          .transfer-rate-row { margin-left: 0; align-items: stretch; flex-direction: column; }
+          .transfer-rate-row input { width: 100%; }
         }
       `}</style>
     </div>

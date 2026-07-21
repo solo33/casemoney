@@ -45,6 +45,7 @@ export default function Nav() {
   const [mobileMenu, setMobileMenu] = useState("more");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, mainCurrency } = useUser();
+  const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const links = BASE_LINKS;
   const settingsLinks = user?.is_admin
     ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
@@ -91,7 +92,7 @@ export default function Nav() {
         gap: 4,
       }}>
         {/* Бренд */}
-        <NavLink to="/home" style={{
+        <NavLink to="/home" className="app-nav-brand" style={{
           display: "flex", alignItems: "center", gap: 9,
           marginRight: 16, textDecoration: "none", flexShrink: 0,
         }}>
@@ -103,6 +104,14 @@ export default function Nav() {
           }}>
             CaseMoney
           </span>
+        </NavLink>
+
+        <NavLink
+          to="/settings/personal"
+          className="nav-user-mobile"
+          title={user?.email || accountLabel}
+        >
+          {accountLabel}
         </NavLink>
 
         <button
@@ -187,7 +196,7 @@ export default function Nav() {
           </div>
         </div>
 
-        {/* Plan badge */}
+        {/* Current account */}
         <NavLink
           to="/settings/personal"
           className="nav-settings-desktop"
@@ -200,12 +209,13 @@ export default function Nav() {
             borderRadius: 999,
             whiteSpace: "nowrap",
             fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
+            maxWidth: 160,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
-          title="Тариф Personal"
+          title={user?.email || accountLabel}
         >
-          Personal
+          {accountLabel}
         </NavLink>
 
         {/* Текущая основная валюта */}
@@ -310,14 +320,20 @@ export default function Nav() {
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
         .nav-mobile-burger { display: none; }
+        .nav-user-mobile { display: none; }
         .mobile-bottom-nav { display: none; }
         @media (max-width: 767px) {
           .app-nav { padding-top: env(safe-area-inset-top, 0px); }
           .nav-links-desktop { display: none !important; }
           .nav-settings-desktop { display: none !important; }
           .app-nav-inner { padding: 0 6px 0 12px !important; }
+          .nav-user-mobile {
+            display: block; margin-left: auto; max-width: 96px; overflow: hidden;
+            color: rgba(244,241,232,.82); font-size: 12px; font-weight: 600;
+            text-decoration: none; text-overflow: ellipsis; white-space: nowrap;
+          }
           .nav-mobile-burger {
-            display: flex; margin-left: auto; width: 48px; height: 48px; padding: 0;
+            display: flex; margin-left: 0; width: 48px; height: 48px; padding: 0;
             align-items: center; justify-content: center; flex: 0 0 48px;
             border: 0; border-radius: 8px; background: transparent; color: #fff;
           }

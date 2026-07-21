@@ -1,8 +1,12 @@
 from datetime import date, datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+import hashlib
+import json
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -19,6 +23,34 @@ from app.services import exchange as exchange_svc
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
+
+
+def _request_hash(data: TransactionCreate) -> str:
+    canonical = json.dumps(
+        data.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _existing_idempotent_transaction(
+    db: Session,
+    user_id: int,
+    request_id: str,
+    request_hash: str,
+) -> Optional[Transaction]:
+    transaction = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
+        Transaction.client_request_id == request_id,
+    ).first()
+    if transaction and transaction.client_request_hash != request_hash:
+        raise HTTPException(
+            status_code=409,
+            detail="Ключ повтора уже использован для другой операции.",
+        )
+    return transaction
 
 
 def get_current_user_id(
@@ -273,9 +305,21 @@ def get_transactions(
 @router.post("/", response_model=TransactionResponse, status_code=201)
 def create_transaction(
     data: TransactionCreate,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    request_id = idempotency_key.strip() if idempotency_key else None
+    if request_id and len(request_id) > 64:
+        raise HTTPException(status_code=400, detail="Слишком длинный ключ повтора.")
+    request_hash = _request_hash(data) if request_id else None
+    if request_id:
+        existing = _existing_idempotent_transaction(
+            db, user_id, request_id, request_hash
+        )
+        if existing:
+            return existing
+
     account = db.query(Account).filter(
         Account.id == data.account_id, Account.user_id == user_id
     ).first()
@@ -316,12 +360,24 @@ def create_transaction(
         to_account_id=to_account_id,
         to_amount=to_amount,
         to_currency=to_currency,
+        client_request_id=request_id,
+        client_request_hash=request_hash,
     )
     db.add(transaction)
-    db.flush()
-    _apply_tx_effect(db, transaction, reverse=False)
-    _write_history(db, user_id, transaction, "created")
-    db.commit()
+    try:
+        db.flush()
+        _apply_tx_effect(db, transaction, reverse=False)
+        _write_history(db, user_id, transaction, "created")
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if request_id:
+            existing = _existing_idempotent_transaction(
+                db, user_id, request_id, request_hash
+            )
+            if existing:
+                return existing
+        raise
     db.refresh(transaction)
     return transaction
 

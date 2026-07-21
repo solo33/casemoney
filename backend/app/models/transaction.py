@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -13,6 +13,13 @@ class TransactionType(enum.Enum):
 
 class Transaction(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "client_request_id",
+            name="uq_transactions_user_client_request",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float, nullable=False)
@@ -29,6 +36,9 @@ class Transaction(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # Protects financial writes from duplicate browser retries.
+    client_request_id = Column(String(64), nullable=True)
+    client_request_hash = Column(String(64), nullable=True)
 
     # Для переводов: счёт-получатель и сумма зачисления (в его валюте).
     # У income/expense эти поля NULL.

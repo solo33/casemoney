@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List
@@ -18,6 +19,15 @@ from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/currencies", tags=["currencies"])
 security = HTTPBearer()
+
+
+class CurrencyConversionResponse(BaseModel):
+    from_currency: str
+    to_currency: str
+    amount: float
+    converted: float
+    rate: float
+    source: str
 
 
 def get_current_user_id(
@@ -73,6 +83,33 @@ def list_currencies(
     return CurrenciesResponse(
         main_currency=main,
         currencies=[_serialize(uc, db, user_id, main) for uc in items],
+    )
+
+
+@router.get("/convert", response_model=CurrencyConversionResponse)
+def convert_currency(
+    amount: float = Query(..., ge=0),
+    from_currency: str = Query(..., alias="from", min_length=2, max_length=10),
+    to_currency: str = Query(..., alias="to", min_length=2, max_length=10),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Preview a transfer using the same user-specific rate as transaction creation."""
+    from_code = from_currency.upper()
+    to_code = to_currency.upper()
+    try:
+        rate, source = exchange_svc.get_rate_for_user(
+            db, user_id, from_code, to_code,
+        )
+    except exchange_svc.ExchangeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return CurrencyConversionResponse(
+        from_currency=from_code,
+        to_currency=to_code,
+        amount=amount,
+        converted=round(amount * rate, 2),
+        rate=rate,
+        source=source,
     )
 
 
