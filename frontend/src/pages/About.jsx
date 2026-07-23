@@ -1,20 +1,46 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { APP_FULL_VERSION } from "../config/version";
 import { SUPPORT_EMAIL } from "../config/contacts";
 import { PublicPage, card, paragraph } from "./Articles";
 
 export default function About() {
   const [updateStatus, setUpdateStatus] = useState("idle");
+  const [serverVersion, setServerVersion] = useState(null);
+
+  const loadServerVersion = async () => {
+    const response = await fetch(`/version.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Version file is unavailable");
+    const data = await response.json();
+    if (!data.version) throw new Error("Version is missing");
+    setServerVersion(data.version);
+    return data.version;
+  };
+
+  useEffect(() => {
+    loadServerVersion().catch(() => {});
+  }, []);
 
   const checkForUpdates = async () => {
     setUpdateStatus("checking");
     try {
+      const latestVersion = await loadServerVersion();
+      if (latestVersion === APP_FULL_VERSION) {
+        setUpdateStatus("current");
+        return;
+      }
+
       if ("serviceWorker" in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(registrations.map(registration => registration.update()));
+        registrations.forEach(registration => {
+          registration.waiting?.postMessage({ type: "SKIP_WAITING" });
+        });
       }
       setUpdateStatus("ready");
-      window.setTimeout(() => window.location.reload(), 500);
+      window.setTimeout(() => {
+        window.location.replace(`/about?updated=${Date.now()}`);
+      }, 1200);
     } catch {
       setUpdateStatus("error");
     }
@@ -32,7 +58,10 @@ export default function About() {
         </section>
 
         <section style={card}>
-          <InfoRow label="Версия" value={APP_FULL_VERSION} mono />
+          <InfoRow label="Установленная версия" value={APP_FULL_VERSION} mono />
+          {serverVersion && serverVersion !== APP_FULL_VERSION && (
+            <InfoRow label="Версия на сервере" value={serverVersion} mono />
+          )}
           <InfoRow label="Сайт" value={<a href="https://casemoney.ru">casemoney.ru</a>} />
           <InfoRow label="Поддержка" value={<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>} />
           <div style={{ marginTop: 18 }}>
@@ -40,13 +69,19 @@ export default function About() {
               {updateStatus === "checking" ? "Проверяем обновления…" : "Проверить обновления"}
             </button>
             {updateStatus === "ready" && <p style={statusStyle}>Проверка завершена. Приложение перезапускается…</p>}
+            {updateStatus === "current" && <p style={statusStyle}>Установлена актуальная версия.</p>}
             {updateStatus === "error" && <p style={{ ...statusStyle, color: "#b42318" }}>Не удалось проверить обновления. Попробуйте ещё раз.</p>}
           </div>
         </section>
 
         <section style={{ ...card, color: "#515c68", fontSize: 14, lineHeight: 1.6 }}>
           <div>© 2026 CaseMoney. Все права защищены.</div>
-          <div>Использование сервиса регулируется Пользовательским соглашением и Политикой конфиденциальности.</div>
+          <div>
+            Использование сервиса регулируется{" "}
+            <Link to="/terms" style={documentLinkStyle}>Пользовательским соглашением</Link>
+            {" "}и{" "}
+            <Link to="/privacy" style={documentLinkStyle}>Политикой конфиденциальности</Link>.
+          </div>
         </section>
       </div>
     </PublicPage>
@@ -66,4 +101,11 @@ const statusStyle = {
   margin: "10px 0 0",
   color: "#287a52",
   fontSize: 13,
+};
+
+const documentLinkStyle = {
+  color: "#9c6f1d",
+  fontWeight: 600,
+  textDecoration: "underline",
+  textUnderlineOffset: 2,
 };

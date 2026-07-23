@@ -83,6 +83,10 @@ async function saveMutation(mutation) {
 }
 
 export async function submitOrQueueTransaction(payload, idempotencyKey) {
+  if (navigator.onLine === false) {
+    return queueTransaction(payload, idempotencyKey);
+  }
+
   try {
     const response = await api.post("/api/transactions/", payload, {
       headers: { "Idempotency-Key": idempotencyKey },
@@ -91,32 +95,36 @@ export async function submitOrQueueTransaction(payload, idempotencyKey) {
   } catch (error) {
     if (!isRetryableServiceError(error)) throw error;
 
-    const userId = currentUserId();
-    if (!userId) throw error;
-    const id = idempotencyKey;
-    const mutation = await saveMutation({
-      id,
-      userId,
-      method: "post",
-      url: "/api/transactions/",
-      data: payload,
-      headers: { "Idempotency-Key": idempotencyKey },
-      createdAt: new Date().toISOString(),
-      status: "pending",
-      kind: "transaction",
-    });
-    const localTransaction = {
-      ...payload,
-      id: `local:${id}`,
-      date: payload.date || mutation.createdAt,
-      pending_sync: true,
-      offline_mutation_id: id,
-    };
-    window.dispatchEvent(new CustomEvent(LOCAL_TRANSACTION_EVENT, {
-      detail: { transaction: localTransaction },
-    }));
-    return { queued: true, transaction: localTransaction };
+    return queueTransaction(payload, idempotencyKey);
   }
+}
+
+async function queueTransaction(payload, idempotencyKey) {
+  const userId = currentUserId();
+  if (!userId) throw new Error("Не удалось определить пользователя для локального сохранения");
+  const id = idempotencyKey;
+  const mutation = await saveMutation({
+    id,
+    userId,
+    method: "post",
+    url: "/api/transactions/",
+    data: payload,
+    headers: { "Idempotency-Key": idempotencyKey },
+    createdAt: new Date().toISOString(),
+    status: "pending",
+    kind: "transaction",
+  });
+  const localTransaction = {
+    ...payload,
+    id: `local:${id}`,
+    date: payload.date || mutation.createdAt,
+    pending_sync: true,
+    offline_mutation_id: id,
+  };
+  window.dispatchEvent(new CustomEvent(LOCAL_TRANSACTION_EVENT, {
+    detail: { transaction: localTransaction },
+  }));
+  return { queued: true, transaction: localTransaction };
 }
 
 export async function syncOfflineMutations() {
@@ -131,6 +139,7 @@ export async function syncOfflineMutations() {
         url: mutation.url,
         data: mutation.data,
         headers: mutation.headers,
+        skipGlobalProgress: true,
       });
       await removeOfflineMutation(mutation.id);
       synced += 1;

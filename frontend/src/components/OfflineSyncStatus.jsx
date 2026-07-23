@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BrandProgress } from "./BrandProgress";
 import {
   listOfflineMutations,
@@ -11,6 +11,7 @@ export default function OfflineSyncStatus() {
   const [pending, setPending] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const syncInFlight = useRef(false);
 
   const refresh = useCallback(async () => {
     const items = await listOfflineMutations();
@@ -19,10 +20,12 @@ export default function OfflineSyncStatus() {
   }, []);
 
   const sync = useCallback(async () => {
+    if (syncInFlight.current) return;
     if (!navigator.onLine) {
       await refresh();
       return;
     }
+    syncInFlight.current = true;
     setSyncing(true);
     try {
       const result = await syncOfflineMutations();
@@ -31,6 +34,7 @@ export default function OfflineSyncStatus() {
       }
       await refresh();
     } finally {
+      syncInFlight.current = false;
       setSyncing(false);
     }
   }, [refresh]);

@@ -214,12 +214,6 @@ export default function Settings() {
             title="Cookie"
             description="Какие технические данные хранит браузер и зачем"
           />
-          <NavRow
-            to="/about"
-            icon="ⓘ"
-            title="О программе"
-            description="Версия приложения, авторские права и проверка обновлений"
-          />
         </div>
       </Section>
 

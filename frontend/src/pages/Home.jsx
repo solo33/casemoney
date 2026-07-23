@@ -12,6 +12,7 @@ import {
   removeOfflineMutation,
 } from "../services/offlineMutations";
 import { BalanceActionRow, BalanceAdjustmentModal } from "../components/BalanceActions";
+import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 import { useUser } from "../contexts/UserContext";
 import {
   currencySymbol,
@@ -104,6 +105,20 @@ export default function Home() {
     setTrendLoading(true);
     setAccountsLoading(true);
 
+    const cached = cachedAccountsAndCategories();
+    if (cached) {
+      setAccountOptions(cached.accountGroups);
+      setCategories(cached.categories);
+    }
+    if (navigator.onLine === false) {
+      setInitialLoading(false);
+      setBalanceLoading(false);
+      setTrendLoading(false);
+      setAccountsLoading(false);
+      setError(cached ? null : "Для работы без сети сначала откройте приложение онлайн");
+      return;
+    }
+
     const params = {
       period: "month",
       year: flowYear,
@@ -119,12 +134,33 @@ export default function Home() {
     ]);
     if (!isCurrent()) return;
     if (firstStage[0].status === "fulfilled") setSummary(firstStage[0].value.data);
-    if (firstStage[1].status === "fulfilled") setCategories(firstStage[1].value.data);
-    if (firstStage[2].status === "fulfilled") setAccountOptions(firstStage[2].value.data);
+    const nextCategories = firstStage[1].status === "fulfilled"
+      ? firstStage[1].value.data
+      : cached?.categories;
+    const nextAccountOptions = firstStage[2].status === "fulfilled"
+      ? firstStage[2].value.data
+      : cached?.accountGroups;
+    if (nextCategories) setCategories(nextCategories);
+    if (nextAccountOptions) setAccountOptions(nextAccountOptions);
+    if (firstStage[1].status === "fulfilled" || firstStage[2].status === "fulfilled") {
+      saveReferenceData({
+        categories: nextCategories || [],
+        accountGroups: nextAccountOptions || [],
+      });
+    }
     if (firstStage.some(result => result.status === "rejected")) {
       setError("Часть данных главной страницы пока недоступна");
     }
     setInitialLoading(false);
+
+    // Если весь первый пакет недоступен, последующие запросы также не запускаем.
+    // Это завершает индикаторы и оставляет доступными сохранённые счета/категории.
+    if (firstStage.every(result => result.status === "rejected")) {
+      setBalanceLoading(false);
+      setTrendLoading(false);
+      setAccountsLoading(false);
+      return;
+    }
 
     // Этап 2: общий баланс и последние изменённые записи.
     try {

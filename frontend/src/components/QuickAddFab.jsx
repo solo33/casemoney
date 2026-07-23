@@ -9,6 +9,7 @@ import {
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
+import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 
 // Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
@@ -46,30 +47,45 @@ export default function QuickAddFab() {
 
   useEffect(() => {
     if (!open) return;
+    const applyOptions = (rawGroups, rawCategories) => {
+      const groups = entryAccountGroups(rawGroups || []);
+      const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
+      setAccountGroups(groups);
+      setAccounts(flatAccounts);
+      setCategories(rawCategories || []);
+      setForm(f => {
+        const currentExists = flatAccounts.some(account => String(account.id) === String(f.account_id));
+        if (currentExists || flatAccounts.length === 0) return f;
+        return {
+          ...f,
+          account_id: String(flatAccounts[0].id),
+          currency: sortCurrenciesRubFirst(
+            (flatAccounts[0].balances || []).map(balance => balance.currency)
+          )[0] || "",
+        };
+      });
+    };
+
+    const cached = cachedAccountsAndCategories();
+    if (cached) applyOptions(cached.accountGroups, cached.categories);
+    if (navigator.onLine === false) {
+      if (!cached) setError("Для работы без сети сначала откройте приложение онлайн");
+      return;
+    }
+
     Promise.all([
       api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
       api.get("/api/categories/"),
     ])
       .then(([acc, cat]) => {
-        const groups = entryAccountGroups(acc.data || []);
-        const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
-        setAccountGroups(groups);
-        setAccounts(flatAccounts);
-        setCategories(cat.data);
-        if (flatAccounts.length > 0) {
-          setForm(f => {
-            const next = { ...f };
-            if (!next.account_id) {
-              next.account_id = String(flatAccounts[0].id);
-              next.currency = sortCurrenciesRubFirst(
-                (flatAccounts[0].balances || []).map(balance => balance.currency)
-              )[0] || "";
-            }
-            return next;
-          });
-        }
+        const rawGroups = acc.data || [];
+        const nextCategories = cat.data || [];
+        applyOptions(rawGroups, nextCategories);
+        saveReferenceData({ accountGroups: rawGroups, categories: nextCategories });
       })
-      .catch(() => setError("Не удалось загрузить счета/категории"));
+      .catch(() => {
+        if (!cached) setError("Не удалось загрузить счета/категории");
+      });
   }, [open]);
 
   // При смене счёта подставляем первую валюту этого счёта
@@ -146,7 +162,7 @@ export default function QuickAddFab() {
 
   useEffect(() => {
     if (form.type !== "transfer" || !selectedTargetAccount) return;
-    const codes = targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES;
+    const codes = targetCurrencies;
     if (!codes.includes(form.to_currency)) {
       setForm(current => ({ ...current, to_currency: codes[0] || "" }));
     }
@@ -401,7 +417,7 @@ export default function QuickAddFab() {
                       onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
                       style={{ width: 104 }}
                     >
-                      {(targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES).map(currency => (
+                      {targetCurrencies.map(currency => (
                         <option key={currency} value={currency}>{currency}</option>
                       ))}
                     </select>

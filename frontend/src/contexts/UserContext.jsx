@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api from "../api/client";
+import { cachedUserData, saveReferenceData } from "../services/offlineReferenceData";
 
 const UserContext = createContext({
   user: null,
@@ -12,22 +13,30 @@ const UserContext = createContext({
 });
 
 export function UserProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => cachedUserData());
   const [limits, setLimits] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    const cached = cachedUserData();
+    if (cached) setUser(cached);
+    if (navigator.onLine === false) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get("/api/me/");
       setUser(res.data);
+      saveReferenceData({ user: res.data });
     } catch {
-      setUser(null);
+      setUser(current => current || cached);
     } finally {
       setLoading(false);
     }
   }, []);
 
   const refreshLimits = useCallback(async () => {
+    if (navigator.onLine === false) return;
     try {
       const res = await api.get("/api/me/limits");
       setLimits(res.data);

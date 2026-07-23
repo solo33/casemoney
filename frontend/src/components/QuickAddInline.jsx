@@ -7,6 +7,7 @@ import { COMMON_CURRENCIES, sortCurrenciesRubFirst } from "../utils/money";
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
+import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 
 const TABS = [
   { value: "expense",  label: "↘ Расход",  color: "#c0432b" },
@@ -72,8 +73,24 @@ export default function QuickAddInline({
   }, []);
 
   const loadOptions = useCallback(async () => {
+    const cached = cachedAccountsAndCategories();
+    if (cached) applyOptions(cached.accountGroups, cached.categories);
+
     if (externalAccountGroups && externalCategories) {
-      applyOptions(externalAccountGroups, externalCategories);
+      if (externalAccountGroups.length || externalCategories.length) {
+        applyOptions(externalAccountGroups, externalCategories);
+        saveReferenceData({
+          accountGroups: externalAccountGroups,
+          categories: externalCategories,
+        });
+      } else if (!cached) {
+        applyOptions([], []);
+      }
+      return;
+    }
+
+    if (navigator.onLine === false) {
+      if (!cached) setError("Для работы без сети сначала откройте приложение онлайн");
       return;
     }
 
@@ -82,9 +99,12 @@ export default function QuickAddInline({
         api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
         api.get("/api/categories/"),
       ]);
-      applyOptions(grp.data || [], cat.data || []);
+      const groups = grp.data || [];
+      const nextCategories = cat.data || [];
+      applyOptions(groups, nextCategories);
+      saveReferenceData({ accountGroups: groups, categories: nextCategories });
     } catch {
-      setError("Не удалось загрузить счета и категории");
+      if (!cached) setError("Не удалось загрузить счета и категории");
     }
   }, [applyOptions, externalAccountGroups, externalCategories]);
 
@@ -119,7 +139,7 @@ export default function QuickAddInline({
 
   useEffect(() => {
     if (type !== "transfer" || !selectedTargetAccount) return;
-    const codes = targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES;
+    const codes = targetCurrencies;
     if (!codes.includes(form.to_currency)) {
       setForm(current => ({ ...current, to_currency: codes[0] || "" }));
     }
@@ -305,7 +325,7 @@ export default function QuickAddInline({
                 value={form.to_currency}
                 onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
               >
-                {(targetCurrencies.length ? targetCurrencies : COMMON_CURRENCIES).map(currency => (
+                {targetCurrencies.map(currency => (
                   <option key={currency} value={currency}>{currency}</option>
                 ))}
               </select>

@@ -13,9 +13,10 @@ const DEFAULT_API_URL = import.meta.env.DEV
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL || DEFAULT_API_URL,
+  timeout: 4000,
 })
 
-const NETWORK_RETRY_DELAYS = [1000, 2000, 4000]
+const NETWORK_RETRY_DELAYS = [750]
 const TEMPORARY_SERVICE_STATUSES = new Set([502, 503, 504])
 let activeRequests = 0
 
@@ -31,6 +32,8 @@ function shouldRetryNetworkRequest(error) {
   const method = error.config?.method?.toLowerCase()
   const retryCount = error.config?.__casemoneyRetryCount || 0
   return (
+    navigator.onLine !== false
+    &&
     !error.response
     && error.code !== 'ERR_CANCELED'
     && (method === 'get' || method === 'head' || method === 'options')

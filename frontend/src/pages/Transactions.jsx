@@ -13,6 +13,7 @@ import {
 } from "../utils/money";
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
+import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -69,26 +70,40 @@ export default function Transactions() {
   });
 
   const loadAccounts = useCallback(async () => {
-    const [acc, cat] = await Promise.all([
-      api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
-      api.get("/api/categories/"),
-    ]);
-    const groups = acc.data || [];
-    const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
-    const visibleGroups = entryAccountGroups(groups);
-    const visibleAccounts = visibleGroups.flatMap(bucket => bucket.accounts || []);
-    setAccountGroups(groups);
-    setAccounts(flatAccounts);
-    setCategories(cat.data);
-    if (visibleAccounts.length > 0 && !newTx.account_id) {
-      const first = visibleAccounts[0];
-      setNewTx(t => ({
-        ...t,
-        account_id: String(first.id),
-        currency: sortCurrenciesRubFirst(
-          (first.balances || []).map(balance => balance.currency)
-        )[0] || "RUB",
-      }));
+    const applyOptions = (groups, nextCategories) => {
+      const flatAccounts = groups.flatMap(bucket => bucket.accounts || []);
+      const visibleGroups = entryAccountGroups(groups);
+      const visibleAccounts = visibleGroups.flatMap(bucket => bucket.accounts || []);
+      setAccountGroups(groups);
+      setAccounts(flatAccounts);
+      setCategories(nextCategories);
+      if (visibleAccounts.length > 0 && !newTx.account_id) {
+        const first = visibleAccounts[0];
+        setNewTx(t => ({
+          ...t,
+          account_id: String(first.id),
+          currency: sortCurrenciesRubFirst(
+            (first.balances || []).map(balance => balance.currency)
+          )[0] || "RUB",
+        }));
+      }
+    };
+
+    const cached = cachedAccountsAndCategories();
+    if (cached) applyOptions(cached.accountGroups, cached.categories);
+    if (navigator.onLine === false) return;
+
+    try {
+      const [acc, cat] = await Promise.all([
+        api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
+        api.get("/api/categories/"),
+      ]);
+      const groups = acc.data || [];
+      const nextCategories = cat.data || [];
+      applyOptions(groups, nextCategories);
+      saveReferenceData({ accountGroups: groups, categories: nextCategories });
+    } catch (error) {
+      if (!cached) throw error;
     }
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 

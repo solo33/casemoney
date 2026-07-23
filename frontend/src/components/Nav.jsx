@@ -30,6 +30,7 @@ const MOBILE_MORE_LINKS = [
   { to: "/import", label: "Импорт" },
   { to: "/history", label: "История изменений" },
   { to: "/settings/personal", label: "Настройки" },
+  { to: "/about", label: "О программе" },
 ];
 
 // Раздел «Настройки» — выпадающее меню
@@ -37,6 +38,7 @@ const SETTINGS_LINKS = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
+  { to: "/about", label: "О программе" },
 ];
 
 export default function Nav() {
