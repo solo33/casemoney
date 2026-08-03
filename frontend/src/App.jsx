@@ -7,6 +7,7 @@ import CookieBanner from './components/CookieBanner'
 import { GlobalNetworkProgress } from './components/BrandProgress'
 import MobilePwaInstallPrompt from './components/MobilePwaInstallPrompt'
 import OfflineSyncStatus from './components/OfflineSyncStatus'
+import YandexMetrikaRouteTracker from './components/YandexMetrikaRouteTracker'
 import { UserProvider } from './contexts/UserContext'
 
 const Login = lazy(() => import('./pages/Login'))
@@ -29,6 +30,7 @@ const Categories = lazy(() => import('./pages/Categories'))
 const Currencies = lazy(() => import('./pages/Currencies'))
 const Import = lazy(() => import('./pages/Import'))
 const ImportFile = lazy(() => import('./pages/ImportFile'))
+const TBankImport = lazy(() => import('./pages/TBankImport'))
 const Transactions = lazy(() => import('./pages/Transactions'))
 const Settings = lazy(() => import('./pages/Settings'))
 const History = lazy(() => import('./pages/History'))
@@ -36,6 +38,7 @@ const Articles = lazy(() => import('./pages/Articles'))
 const Help = lazy(() => import('./pages/Help'))
 const Roadmap = lazy(() => import('./pages/Roadmap'))
 const About = lazy(() => import('./pages/About'))
+const Family = lazy(() => import('./pages/Family'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -69,6 +72,7 @@ function PublicContentRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <YandexMetrikaRouteTracker />
       <Suspense fallback={<div className="page">Загрузка...</div>}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -173,6 +177,15 @@ export default function App() {
         />
 
         <Route
+          path="/import/tbank"
+          element={
+            <ProtectedRoute>
+              <TBankImport />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/transactions"
           element={
             <ProtectedRoute>
@@ -209,6 +222,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Currencies />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings/family"
+          element={
+            <ProtectedRoute>
+              <Family />
             </ProtectedRoute>
           }
         />

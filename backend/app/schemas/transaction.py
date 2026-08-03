@@ -15,6 +15,8 @@ class TransactionCreate(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
+    is_family_expense: bool = False
+    reimbursement_amount: Optional[float] = Field(None, ge=0)
 
 
 class TransactionUpdate(BaseModel):
@@ -28,6 +30,8 @@ class TransactionUpdate(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
+    is_family_expense: Optional[bool] = None
+    reimbursement_amount: Optional[float] = Field(None, ge=0)
 
 
 class TransactionResponse(BaseModel):
@@ -43,6 +47,9 @@ class TransactionResponse(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = None
+    family_id: Optional[int] = None
+    is_family_expense: bool = False
+    reimbursement_amount: float = 0
 
     class Config:
         from_attributes = True

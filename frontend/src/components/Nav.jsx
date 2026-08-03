@@ -26,6 +26,7 @@ const RECORD_LINKS = [
 ];
 
 const MOBILE_MORE_LINKS = [
+  { to: "/settings/family", label: "Семейные финансы" },
   { to: "/goals", label: "Цели" },
   { to: "/import", label: "Импорт" },
   { to: "/history", label: "История изменений" },
@@ -38,6 +39,7 @@ const SETTINGS_LINKS = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
+  { to: "/settings/family", label: "Семейные финансы" },
   { to: "/about", label: "О программе" },
 ];
 

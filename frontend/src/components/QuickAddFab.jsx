@@ -38,6 +38,8 @@ export default function QuickAddFab() {
     to_currency: "",
     description: "",
     date: new Date().toISOString().slice(0, 10),
+    is_family_expense: false,
+    reimbursement_amount: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -219,12 +221,24 @@ export default function QuickAddFab() {
         to_amount: form.type === "transfer" ? parseFloat(form.to_amount) : undefined,
         to_currency: form.type === "transfer" ? form.to_currency : undefined,
         date: form.date ? new Date(`${form.date}T12:00:00`).toISOString() : undefined,
+        is_family_expense: form.type === "expense" && form.is_family_expense,
+        reimbursement_amount: form.type === "expense" && form.is_family_expense
+          ? parseFloat(form.reimbursement_amount || form.amount)
+          : undefined,
       };
       const requestKey = idempotencyKeyFor(requestRef, payload);
       const result = await submitOrQueueTransaction(payload, requestKey);
       clearIdempotencyKey(requestRef);
       if (!result.queued) window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
-      setForm(f => ({ ...f, amount: "", to_amount: "", description: "", category_id: "" }));
+      setForm(f => ({
+        ...f,
+        amount: "",
+        to_amount: "",
+        description: "",
+        category_id: "",
+        is_family_expense: false,
+        reimbursement_amount: "",
+      }));
       setSavedLocally(result.queued);
       if (!result.queued) close();
     } catch (e) {
@@ -463,6 +477,48 @@ export default function QuickAddFab() {
                   style={{ width: "100%", marginTop: 4 }}
                 />
               </label>
+
+              {form.type === "expense" && (
+                <div style={{
+                  padding: 12,
+                  marginBottom: 14,
+                  border: "1px solid #ead7a8",
+                  borderRadius: 10,
+                  background: "#fff8e6",
+                }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 14 }}>
+                    <input
+                      type="checkbox"
+                      checked={form.is_family_expense}
+                      onChange={event => setForm({
+                        ...form,
+                        is_family_expense: event.target.checked,
+                        reimbursement_amount: event.target.checked
+                          ? (form.reimbursement_amount || form.amount)
+                          : "",
+                      })}
+                      style={{ width: 20, height: 20 }}
+                    />
+                    Общая семейная покупка
+                  </label>
+                  {form.is_family_expense && (
+                    <label style={{ display: "block", marginTop: 10 }}>
+                      <span style={{ fontSize: 12, color: "#7a8590" }}>К возмещению, {form.currency}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max={form.amount || undefined}
+                        step="0.01"
+                        value={form.reimbursement_amount}
+                        onChange={event => setForm({ ...form, reimbursement_amount: event.target.value })}
+                        placeholder={form.amount || "0"}
+                        style={{ width: "100%", marginTop: 4 }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
 
               {error && (
                 <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 12 }}>

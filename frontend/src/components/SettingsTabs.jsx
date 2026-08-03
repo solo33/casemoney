@@ -4,6 +4,7 @@ const tabs = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
+  { to: "/settings/family", label: "Семья" },
 ];
 
 export default function SettingsTabs() {

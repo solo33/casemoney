@@ -31,6 +31,8 @@ import app.models.exchange_rate   # noqa: F401
 import app.models.user_currency   # noqa: F401
 import app.models.goal            # noqa: F401
 import app.models.app_config      # noqa: F401
+import app.models.bank_import_mapping  # noqa: F401
+import app.models.family          # noqa: F401
 
 test_engine = create_engine(
     "sqlite://",
@@ -57,6 +59,7 @@ def _fresh_db(monkeypatch):
     monkeypatch.setattr(
         "app.api.auth.send_registration_notification", lambda *args: True
     )
+    monkeypatch.setattr("app.api.family.send_email", lambda *args: True)
     yield
     Base.metadata.drop_all(bind=test_engine)
     # сбрасываем кэш курсов между тестами

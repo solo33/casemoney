@@ -44,6 +44,8 @@ export default function QuickAddInline({
     to_amount: "",
     to_currency: "",
     description: "",
+    is_family_expense: false,
+    reimbursement_amount: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -201,6 +203,10 @@ export default function QuickAddInline({
         to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
         to_amount: type === "transfer" ? parseFloat(form.to_amount) : undefined,
         to_currency: type === "transfer" ? form.to_currency : undefined,
+        is_family_expense: type === "expense" && form.is_family_expense,
+        reimbursement_amount: type === "expense" && form.is_family_expense
+          ? parseFloat(form.reimbursement_amount || form.amount)
+          : undefined,
       };
       if (dateVal) payload.date = new Date(dateVal).toISOString();
       const requestKey = idempotencyKeyFor(requestRef, payload);
@@ -208,7 +214,15 @@ export default function QuickAddInline({
       clearIdempotencyKey(requestRef);
       if (!result.queued) window.dispatchEvent(new CustomEvent(TX_ADDED_EVENT));
       // reset суммы/описания/категории, сохраняем счёт+валюту+дату
-      setForm(f => ({ ...f, amount: "", to_amount: "", description: "", category_id: "" }));
+      setForm(f => ({
+        ...f,
+        amount: "",
+        to_amount: "",
+        description: "",
+        category_id: "",
+        is_family_expense: false,
+        reimbursement_amount: "",
+      }));
       setSavedLocally(result.queued);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 1500);
@@ -363,6 +377,38 @@ export default function QuickAddInline({
           />
         </div>
 
+        {type === "expense" && (
+          <div className="family-expense-fields">
+            <label>
+              <input
+                type="checkbox"
+                checked={form.is_family_expense}
+                onChange={event => setForm({
+                  ...form,
+                  is_family_expense: event.target.checked,
+                  reimbursement_amount: event.target.checked ? (form.reimbursement_amount || form.amount) : "",
+                })}
+              />
+              Общая семейная покупка
+            </label>
+            {form.is_family_expense && (
+              <label>
+                <span>К возмещению</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={form.amount || undefined}
+                  step="0.01"
+                  value={form.reimbursement_amount}
+                  onChange={event => setForm({ ...form, reimbursement_amount: event.target.value })}
+                  placeholder={form.amount || "0"}
+                />
+                <span>{form.currency}</span>
+              </label>
+            )}
+          </div>
+        )}
+
         {/* Errors + submit */}
         {error && (
           <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -407,6 +453,10 @@ export default function QuickAddInline({
         .qai-date { grid-column: 3 / span 2; }
         .transfer-rate-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -2px 0 10px 78px; color: #7a8590; font-size: 12px; }
         .transfer-rate-row input { width: 200px; }
+        .family-expense-fields { margin: 0 0 12px 78px; padding: 10px 12px; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 8px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .family-expense-fields label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #515c68; }
+        .family-expense-fields input[type="checkbox"] { width: 18px; height: 18px; }
+        .family-expense-fields input[type="number"] { width: 120px; }
         @media (max-width: 600px) {
           form > div[style*="grid-template-columns"] {
             grid-template-columns: 1fr !important;
@@ -414,6 +464,7 @@ export default function QuickAddInline({
           .qai-date { grid-column: auto !important; }
           .transfer-rate-row { margin-left: 0; align-items: stretch; flex-direction: column; }
           .transfer-rate-row input { width: 100%; }
+          .family-expense-fields { margin-left: 0; align-items: stretch; flex-direction: column; }
         }
       `}</style>
     </div>

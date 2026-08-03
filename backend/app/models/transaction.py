@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, UniqueConstraint
+from sqlalchemy import Boolean, Column, Integer, String, Float, ForeignKey, DateTime, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -45,5 +45,11 @@ class Transaction(Base):
     to_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
     to_amount = Column(Float, nullable=True)
     to_currency = Column(String(10), nullable=True)
+
+    # Семейная операция видна участникам семьи в отдельном отчёте. Она всё
+    # равно принадлежит владельцу счёта и не открывает семье его прочие данные.
+    family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
+    is_family_expense = Column(Boolean, nullable=False, default=False)
+    reimbursement_amount = Column(Float, nullable=False, default=0)
 
     account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")

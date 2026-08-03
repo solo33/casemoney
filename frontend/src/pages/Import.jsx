@@ -1,51 +1,39 @@
 import { Link } from "react-router-dom";
 
+
 export default function Import() {
   return (
-    <div className="page" style={{ maxWidth: 900 }}>
-      <div style={{ marginBottom: 12 }}>
-        <Link to="/transactions" style={{ fontSize: 13, color: "#173a54", textDecoration: "none" }}>
-          ← К записям
-        </Link>
-      </div>
-      <h1 style={{ marginBottom: 8 }}>Импорт</h1>
+    <div className="page" style={{ maxWidth: 920 }}>
+      <Link className="tbank-back-link" to="/transactions">← К записям</Link>
+      <h1>Импорт</h1>
       <p style={{ color: "#7a8590", marginBottom: 24, fontSize: 14 }}>
-        Загрузите файл с операциями, проверьте найденные счета, категории и валюты, затем подтвердите импорт.
+        Выберите источник. Перед сохранением CaseMoney покажет найденные
+        операции и попросит проверить сопоставления.
       </p>
 
-      <Link
-        to="/import/file"
-        style={{
-          display: "block",
-          background: "#fffdf7",
-          border: "1px solid #e4ddcd",
-          borderRadius: 10,
-          padding: 18,
-          textDecoration: "none",
-          maxWidth: 520,
-        }}
-      >
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📥</div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "#1b2531", marginBottom: 6 }}>
-          Импорт из CSV или Excel
-        </div>
-        <div style={{ fontSize: 13, color: "#7a8590", lineHeight: 1.5 }}>
-          Поддерживаются файлы CSV, XLSX и XLS со структурой колонок:
-          <code style={{
-            display: "block",
-            marginTop: 8,
-            padding: "8px 10px",
-            background: "#efe9db",
-            border: "1px solid #e4ddcd",
-            borderRadius: 6,
-            color: "#515c68",
-            whiteSpace: "nowrap",
-            overflowX: "auto",
-          }}>
-            date;account;category;amount;currency;description;transfer
-          </code>
-        </div>
-      </Link>
+      <div className="import-source-grid">
+        <Link className="import-source-card is-tbank" to="/import/tbank">
+          <div className="import-source-logo">T</div>
+          <div>
+            <strong>Т‑Банк</strong>
+            <span>
+              Импорт официальной CSV-выгрузки, сопоставление карт и категорий,
+              объединение переводов и защита от дублей.
+            </span>
+          </div>
+        </Link>
+
+        <Link className="import-source-card" to="/import/file">
+          <div className="import-source-logo is-generic">CSV</div>
+          <div>
+            <strong>Универсальный CSV или Excel</strong>
+            <span>
+              Для выгрузок CaseMoney, HomeMoney и подготовленных вручную
+              файлов CSV, XLSX или XLS.
+            </span>
+          </div>
+        </Link>
+      </div>
     </div>
   );
 }

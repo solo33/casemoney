@@ -23,6 +23,11 @@ from app.models.user_currency import UserCurrency  # noqa: F401
 from app.models.goal import Goal  # noqa: F401
 from app.models.app_config import AppConfig  # noqa: F401
 from app.models.transaction_history import TransactionHistory  # noqa: F401
+from app.models.bank_import_mapping import (  # noqa: F401
+    BankAccountMapping,
+    BankCategoryMapping,
+)
+from app.models.family import Family, FamilyMember, FamilySettlement  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -38,6 +43,7 @@ from app.api.export_csv import router as export_router
 from app.api.goals import router as goals_router
 from app.api.admin import router as admin_router
 from app.api.support import router as support_router
+from app.api.family import router as family_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 
@@ -95,6 +101,7 @@ app.include_router(export_router)
 app.include_router(goals_router)
 app.include_router(admin_router)
 app.include_router(support_router)
+app.include_router(family_router)
 
 
 @app.on_event("startup")

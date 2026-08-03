@@ -16,6 +16,7 @@ from app.models.account import Account
 from app.models.account_balance import AccountBalance
 from app.models.category import Category
 from app.models.transaction_history import TransactionHistory
+from app.models.family import FamilyMember
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
@@ -179,6 +180,39 @@ def _expand_categories(db: Session, user_id: int, category_id: int) -> list[int]
         Category.parent_id == category_id,
     ).all()
     return [category_id] + [c[0] for c in children]
+
+
+def _family_fields(
+    db: Session,
+    user_id: int,
+    tx_type: TransactionType,
+    amount: float,
+    is_family_expense: bool,
+    reimbursement_amount: Optional[float],
+) -> tuple[Optional[int], bool, float]:
+    if not is_family_expense:
+        return None, False, 0
+    if tx_type != TransactionType.expense:
+        raise HTTPException(
+            status_code=400,
+            detail="Семейной можно отметить только расходную операцию",
+        )
+    membership = db.query(FamilyMember).filter(
+        FamilyMember.user_id == user_id,
+        FamilyMember.status == "active",
+    ).first()
+    if not membership:
+        raise HTTPException(
+            status_code=400,
+            detail="Сначала создайте или примите семейное пространство",
+        )
+    reimbursable = amount if reimbursement_amount is None else reimbursement_amount
+    if reimbursable < 0 or reimbursable > amount:
+        raise HTTPException(
+            status_code=400,
+            detail="Сумма к возмещению должна быть от 0 до суммы расхода",
+        )
+    return membership.family_id, True, float(reimbursable)
 
 
 class TransactionsPage(BaseModel):
@@ -348,6 +382,14 @@ def create_transaction(
     if data.category_id is not None and tx_type != TransactionType.transfer:
         _ensure_own_category(db, user_id, data.category_id)
 
+    family_id, is_family_expense, reimbursement_amount = _family_fields(
+        db,
+        user_id,
+        tx_type,
+        data.amount,
+        data.is_family_expense,
+        data.reimbursement_amount,
+    )
     transaction = Transaction(
         amount=data.amount,
         currency=currency,
@@ -362,6 +404,9 @@ def create_transaction(
         to_currency=to_currency,
         client_request_id=request_id,
         client_request_hash=request_hash,
+        family_id=family_id,
+        is_family_expense=is_family_expense,
+        reimbursement_amount=reimbursement_amount,
     )
     db.add(transaction)
     try:
@@ -440,6 +485,15 @@ def update_transaction(
         )
     else:
         tx.to_account_id = tx.to_amount = tx.to_currency = None
+
+    tx.family_id, tx.is_family_expense, tx.reimbursement_amount = _family_fields(
+        db,
+        user_id,
+        tx.type,
+        tx.amount,
+        bool(tx.is_family_expense),
+        tx.reimbursement_amount,
+    )
 
     # Применяем новый эффект
     _apply_tx_effect(db, tx, reverse=False)
