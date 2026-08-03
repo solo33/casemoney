@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.models.category import Category
@@ -50,6 +51,16 @@ def seed_default_accounts(db: Session, user_id: int, currency: str = "RUB"):
 
 def seed_demo_user(db: Session):
     """Создаёт демонстрационный аккаунт для главной страницы входа."""
+    # Uvicorn runs the startup hook in every worker. On PostgreSQL, let only
+    # one worker rebuild the demo data to avoid concurrent DELETE/INSERT races.
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        acquired = db.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_id)"),
+            {"lock_id": 0x434153454D4F4E45},  # "CASEMONE"
+        ).scalar()
+        if not acquired:
+            return
+
     user = db.query(User).filter(User.email == "test@test.com").first()
     if user is None:
         user = User(email="test@test.com", username="test", hashed_password=hash_password("test12345"))
