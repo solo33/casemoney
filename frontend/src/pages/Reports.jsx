@@ -16,6 +16,8 @@ const GRANULARITIES = [
   { key: "year", label: "Год" },
 ];
 
+const TREND_PERIODS = [3, 6, 12, 24];
+
 const RU_MONTHS_FULL = ["январь","февраль","март","апрель","май","июнь","июль","август","сентябрь","октябрь","ноябрь","декабрь"];
 
 function isoDate(d) {
@@ -74,6 +76,8 @@ export default function Reports() {
   const [anchor, setAnchor] = useState(new Date());   // опорная дата периода
   const [drillCatId, setDrillCatId] = useState(null);   // id выбранной корневой для drill-down в pie
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [breakdownType, setBreakdownType] = useState("expense");
+  const [trendMonths, setTrendMonths] = useState(6);
 
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
@@ -82,18 +86,24 @@ export default function Reports() {
 
   const label = periodLabel(gran, anchor);
 
+  const trendEndDate = gran === "year"
+    ? `${anchor.getFullYear()}-12-31`
+    : isoDate(anchor);
+  const breakdownLabel = breakdownType === "income" ? "Доходы" : "Расходы";
+  const breakdownGenitive = breakdownType === "income" ? "доходов" : "расходов";
+
   const fetchData = useCallback(() => {
     setLoading(true);
     setError(null);
-    const params = buildPeriodParams(gran, anchor);
+    const params = { ...buildPeriodParams(gran, anchor), breakdown_type: breakdownType };
     Promise.all([
       api.get("/api/reports/summary", { params }),
-      api.get("/api/reports/monthly-trend", { params: { months: 6 } }),
+      api.get("/api/reports/monthly-trend", { params: { months: trendMonths, end_date: trendEndDate } }),
     ])
       .then(([s, t]) => { setSummary(s.data); setTrend(t.data); })
       .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
-  }, [gran, anchor]);
+  }, [gran, anchor, breakdownType, trendMonths, trendEndDate]);
 
   // Значение для пикера (<input>) под текущую гранулярность
   const pickerValue = gran === "day"
@@ -118,6 +128,11 @@ export default function Reports() {
 
   // Перезагружаем при смене основной валюты пользователя
   useEffect(() => { fetchData(); }, [mainCurrency, fetchData]);
+
+  useEffect(() => {
+    setDrillCatId(null);
+    setExpandedRows(new Set());
+  }, [breakdownType]);
 
   const sym = currencySymbol(summary?.main_currency || mainCurrency);
 
@@ -167,11 +182,11 @@ export default function Reports() {
     Расходы: p.expense,
   })) : [];
 
-  // Клик по сумме категории → Записи с фильтром (категория + расход + период)
+  // Клик по сумме категории → Записи с фильтром (категория + тип + период)
   const goToCategory = (catId) => {
     if (!summary) return;
     const params = new URLSearchParams({
-      type: "expense",
+      type: breakdownType,
       date_from: summary.date_from,
       date_to: summary.date_to,
     });
@@ -256,8 +271,24 @@ export default function Reports() {
 
           {/* Графики */}
           <div className="report-chart-grid" style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-            {/* Bar — 6 месяцев */}
-            <Card title="Доходы и расходы (6 месяцев)" kind="trend" style={{ flex: 2, minWidth: 320 }}>
+            <Card
+              title={`Доходы и расходы · ${trendMonths} мес.`}
+              kind="trend"
+              style={{ flex: 2, minWidth: 320 }}
+              right={(
+                <label style={{ display: "flex", alignItems: "center", gap: 5, color: "#7a8590", fontSize: 12 }}>
+                  Период
+                  <select
+                    value={trendMonths}
+                    onChange={event => setTrendMonths(Number(event.target.value))}
+                    aria-label="Период графика доходов и расходов"
+                    style={{ padding: "3px 5px", fontSize: 12 }}
+                  >
+                    {TREND_PERIODS.map(months => <option key={months} value={months}>{months} мес.</option>)}
+                  </select>
+                </label>
+              )}
+            >
               {barData.length === 0 ? (
                 <p style={{ color: "#a6afb8" }}>Нет данных</p>
               ) : (
@@ -275,15 +306,15 @@ export default function Reports() {
               )}
             </Card>
 
-            {/* Pie — расходы по категориям с drill-down */}
+            {/* Pie — выбранный тип операций по категориям с drill-down */}
             <Card
               kind="pie"
               title={
                 drillRoot
                   ? `${drillRoot.category_icon ? drillRoot.category_icon + " " : ""}${drillRoot.category_name} — подкатегории`
-                  : `Расходы по категориям · ${label}`
+                  : `${breakdownLabel} по категориям · ${label}`
               }
-              right={drillRoot && (
+              right={drillRoot ? (
                 <button
                   type="button"
                   onClick={() => setDrillCatId(null)}
@@ -292,11 +323,11 @@ export default function Reports() {
                 >
                   ← Назад
                 </button>
-              )}
+              ) : undefined}
               style={{ flex: 1, minWidth: 280 }}
             >
               {pieData.length === 0 ? (
-                <p style={{ color: "#a6afb8" }}>Нет расходов за период</p>
+                <p style={{ color: "#a6afb8" }}>Нет {breakdownGenitive} за период</p>
               ) : (
                 <>
                   {!drillRoot && pieData.some(p => p.drillable) && (
@@ -348,9 +379,32 @@ export default function Reports() {
             </Card>
           </div>
 
-          {/* Таблица топ категорий с раскрывающимися подкатегориями */}
-          {summary.category_breakdown.length > 0 && (
-            <Card title="Расходы по категориям" kind="categories">
+          {/* Таблица категорий с раскрывающимися подкатегориями */}
+          <Card
+              title={`${breakdownLabel} по категориям`}
+              kind="categories"
+              right={(
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[
+                    ["expense", "Расходы"],
+                    ["income", "Доходы"],
+                  ].map(([type, title]) => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={breakdownType === type ? "" : "btn-ghost"}
+                      onClick={() => setBreakdownType(type)}
+                      style={{ fontSize: 12, padding: "4px 8px" }}
+                    >
+                      {title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            >
+              {summary.category_breakdown.length === 0 ? (
+                <p style={{ color: "#a6afb8", margin: 0 }}>Нет {breakdownGenitive} за период.</p>
+              ) : (
               <div className="table-wrap">
                 <table className="report-table">
                   <thead>
@@ -459,8 +513,8 @@ export default function Reports() {
                   </tbody>
                 </table>
               </div>
-            </Card>
-          )}
+              )}
+          </Card>
         </>
       )}
     </div>

@@ -559,14 +559,21 @@ def get_annual_balances(
 @router.get("/monthly-trend", response_model=MonthlyTrendResponse)
 def get_monthly_trend(
     months: int = Query(6, ge=1, le=24),
+    end_date: Optional[date] = Query(
+        None,
+        description="Последний месяц графика; по умолчанию текущий месяц",
+    ),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     main = accounts_svc.get_user_main_currency(db, user_id)
-    now = datetime.now(timezone.utc)
+    # График должен следовать за выбранным на сводке периодом, а не всегда
+    # заканчиваться текущим месяцем. Внутри месяца считаем полный календарный
+    # месяц — это делает сравнение столбцов предсказуемым.
+    reference = end_date or datetime.now(timezone.utc).date()
 
-    start_year = now.year
-    start_month = now.month - (months - 1)
+    start_year = reference.year
+    start_month = reference.month - (months - 1)
     while start_month <= 0:
         start_month += 12
         start_year -= 1
@@ -587,9 +594,12 @@ def get_monthly_trend(
     y, m = start_year, start_month
     for _ in range(months):
         key = f"{y:04d}-{m:02d}"
+        label = RU_MONTHS[m].capitalize()
+        if months > 12:
+            label = f"{RU_MONTHS[m][:3].capitalize()}. {y}"
         points_map[key] = {
             "month": key,
-            "label": RU_MONTHS[m].capitalize(),
+            "label": label,
             "income": 0.0,
             "expense": 0.0,
         }

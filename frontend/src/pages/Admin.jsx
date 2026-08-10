@@ -307,6 +307,11 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(user.plan || "personal");
+
+  useEffect(() => {
+    setSelectedPlan(user.plan || "personal");
+  }, [user.id, user.plan]);
 
   const flash = (m, err = false) => {
     err ? setError(m) : setMsg(m);
@@ -372,6 +377,34 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
       {/* План */}
       <Section title="План">
         <div style={{ marginBottom: 10 }}><PlanBadge plan={user.plan} /></div>
+        <label style={{ display: "grid", gap: 5, marginBottom: 10 }}>
+          <span style={{ fontSize: 13, color: "#515c68" }}>Назначить тариф</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <select
+              value={selectedPlan}
+              disabled={busy}
+              onChange={event => setSelectedPlan(event.target.value)}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="personal">Personal — бесплатно</option>
+              <option value="family">Family — семейные функции</option>
+            </select>
+            <button
+              type="button"
+              disabled={busy || selectedPlan === user.plan}
+              onClick={() => {
+                const planLabel = selectedPlan === "family" ? "Family" : "Personal";
+                if (!confirm(`Назначить пользователю тариф ${planLabel}?`)) return;
+                patch({ plan: selectedPlan }, `Тариф ${planLabel} назначен администратором`);
+              }}
+            >
+              Назначить
+            </button>
+          </div>
+        </label>
+        <div style={{ fontSize: 12, color: "#7a8590", margin: "-3px 0 12px" }}>
+          Назначение действует сразу, отменяет активное автопродление и не требует оплаты.
+        </div>
         <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
           <input
             type="checkbox"
