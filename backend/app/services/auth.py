@@ -16,6 +16,11 @@ ALGORITHM = "HS256"
 # пароль заново на том же устройстве каждые полчаса. 30 дней.
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
+
+def normalize_email(value: str) -> str:
+    """Return the canonical representation used for storage and lookup."""
+    return value.strip().lower()
+
 # Защита от запуска без секрета / с тестовыми значениями
 _BANNED_SECRETS = {"supersecretkey123", "secret", "changeme", "test", "changeme_long_random_string"}
 if not SECRET_KEY:

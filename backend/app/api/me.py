@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,7 +13,7 @@ from app.models.category import Category
 from app.models.account_group import AccountGroup
 from app.models.user_currency import UserCurrency
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
-from app.services.auth import decode_token, hash_password, verify_password
+from app.services.auth import decode_token, hash_password, normalize_email, verify_password
 from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -53,15 +55,21 @@ def update_me(
     if "main_currency" in update_fields and update_fields["main_currency"]:
         update_fields["main_currency"] = update_fields["main_currency"].upper()
     if "email" in update_fields and update_fields["email"]:
+        update_fields["email"] = normalize_email(str(update_fields["email"]))
         # проверим уникальность
         other = db.query(User).filter(
-            User.email == update_fields["email"], User.id != user_id,
+            func.lower(func.trim(User.email)) == update_fields["email"],
+            User.id != user_id,
         ).first()
         if other:
             raise HTTPException(status_code=400, detail="Email уже занят")
     for k, v in update_fields.items():
         setattr(user, k, v)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email уже занят")
     db.refresh(user)
     if "main_currency" in update_fields:
         from app.services import exchange as exchange_svc

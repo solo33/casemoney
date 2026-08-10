@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, Request
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +17,7 @@ from app.services.auth import (
     hash_password, verify_password, create_access_token,
     create_activation_token, verify_activation_token,
     create_reset_token, verify_reset_token,
+    normalize_email,
 )
 from app.services.email import (
     send_activation_email, send_registration_notification,
@@ -96,7 +99,7 @@ def _create_user(
 ) -> User:
     """Создаёт пользователя + дефолтные валюту/категории/счета."""
     user = User(
-        email=email,
+        email=normalize_email(email),
         username=username,
         hashed_password=hashed_password,
         email_verified=email_verified,
@@ -159,7 +162,8 @@ def register(
     if not cfg.registration_enabled:
         raise HTTPException(status_code=403, detail="Регистрация временно закрыта")
 
-    if db.query(User).filter(User.email == data.email).first():
+    email = normalize_email(str(data.email))
+    if db.query(User).filter(func.lower(func.trim(User.email)) == email).first():
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
     hashed = hash_password(data.password)
@@ -167,13 +171,17 @@ def register(
     # Create the account immediately. When verification is required, access is
     # granted only for the seven-day grace period and the email can be verified
     # at any point using the activation link.
-    user = _create_user(
-        db,
-        data.email,
-        data.username,
-        hashed,
-        email_verified=not cfg.require_email_verification,
-    )
+    try:
+        user = _create_user(
+            db,
+            email,
+            data.username,
+            hashed,
+            email_verified=not cfg.require_email_verification,
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
     background.add_task(
         _notify_registration,
         user.email,
@@ -206,8 +214,9 @@ def verify_code(
     db: Session = Depends(get_db),
 ):
     """Проверяет код и создаёт пользователя. Возвращает токен (автологин)."""
+    email = normalize_email(str(data.email))
     pending = db.query(PendingRegistration).filter(
-        PendingRegistration.email == data.email
+        func.lower(func.trim(PendingRegistration.email)) == email
     ).first()
     if not pending:
         raise HTTPException(status_code=400, detail="Заявка не найдена. Запросите код заново.")
@@ -227,12 +236,18 @@ def verify_code(
         raise HTTPException(status_code=400, detail="Неверный код")
 
     # На случай гонки — проверим, что email ещё не занят
-    if db.query(User).filter(User.email == pending.email).first():
+    if db.query(User).filter(
+        func.lower(func.trim(User.email)) == normalize_email(pending.email)
+    ).first():
         db.delete(pending)
         db.commit()
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
 
-    user = _create_user(db, pending.email, pending.username, pending.hashed_password)
+    try:
+        user = _create_user(db, pending.email, pending.username, pending.hashed_password)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
     background.add_task(
         _notify_registration,
         user.email,
@@ -282,7 +297,8 @@ def forgot_password(
 ):
     """Запрос сброса пароля. Всегда отвечаем ok=True (не раскрываем, есть ли
     такой email), но письмо шлём только если пользователь реально существует."""
-    user = db.query(User).filter(User.email == data.email).first()
+    email = normalize_email(str(data.email))
+    user = db.query(User).filter(func.lower(func.trim(User.email)) == email).first()
     if user and user.is_active:
         background.add_task(_send_reset, user)
     return ForgotPasswordResponse(ok=True, smtp_configured=is_smtp_configured())
@@ -306,7 +322,8 @@ def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 @limiter.limit("20/minute;200/hour")
 def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
+    email = normalize_email(str(data.email))
+    user = db.query(User).filter(func.lower(func.trim(User.email)) == email).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
     if not user.is_active:
@@ -387,7 +404,8 @@ def resend_activation(
     db: Session = Depends(get_db),
 ):
     """Повторно отправить письмо активации. Не раскрываем существует ли email."""
-    user = db.query(User).filter(User.email == data.email).first()
+    email = normalize_email(str(data.email))
+    user = db.query(User).filter(func.lower(func.trim(User.email)) == email).first()
     if user and not user.email_verified and _can_resend_verification(user):
         _record_verification_email_attempt(db, user)
         background.add_task(_send_activation, user)

@@ -5,6 +5,15 @@ import { useUser } from "../contexts/UserContext";
 
 const PAGE = 50;
 
+function uniqueUsers(items = []) {
+  const seen = new Set();
+  return items.filter(item => {
+    if (!item || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
 export default function Admin() {
   const { user, loading: userLoading } = useUser();
   const [tab, setTab] = useState("users");
@@ -72,7 +81,7 @@ function NotificationsTab() {
 
   useEffect(() => {
     api.get("/api/admin/users", { params: { limit: 200, offset: 0 } })
-      .then(response => setUsers(response.data.items || []))
+      .then(response => setUsers(uniqueUsers(response.data.items)))
       .catch(() => setUsers([]));
   }, []);
 
@@ -154,7 +163,7 @@ function UsersTab({ adminId }) {
       const params = { limit: PAGE, offset: page * PAGE };
       Object.entries(filters).forEach(([k, v]) => { if (v !== "") params[k] = v; });
       const r = await api.get("/api/admin/users", { params });
-      setData(r.data);
+      setData({ ...r.data, items: uniqueUsers(r.data.items) });
     } catch (e) {
       setError(e.response?.data?.detail || "Ошибка загрузки");
     } finally {

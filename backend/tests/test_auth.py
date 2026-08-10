@@ -152,6 +152,33 @@ def test_duplicate_email_rejected(client):
     assert response.status_code == 400
 
 
+def test_duplicate_email_is_case_insensitive(client):
+    register_and_login(client, email="duplicate-case@test.com")
+    response = client.post("/api/auth/register", json={
+        "email": "DUPLICATE-CASE@test.com",
+        "username": "duplicate-case-2",
+        "password": "secret1",
+    })
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Email уже зарегистрирован"
+
+
+def test_email_is_normalized_and_login_is_case_insensitive(client):
+    response = client.post("/api/auth/register", json={
+        "email": "Normalized-Email@test.com",
+        "username": "normalized-email",
+        "password": "secret1",
+    })
+    assert response.status_code == 200
+    assert _get_user("normalized-email@test.com") is not None
+
+    login_response = client.post("/api/auth/login", json={
+        "email": "NORMALIZED-EMAIL@test.com",
+        "password": "secret1",
+    })
+    assert login_response.status_code == 200
+
+
 def test_duplicate_username_is_allowed(client):
     first = client.post("/api/auth/register", json={
         "email": "same-name-one@test.com",
