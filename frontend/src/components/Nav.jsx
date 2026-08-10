@@ -34,6 +34,8 @@ const MOBILE_MORE_LINKS = [
   { to: "/import", label: "Импорт" },
   { to: "/history", label: "История изменений" },
   { to: "/settings/personal", label: "Настройки" },
+  { to: "/articles", label: "Статьи" },
+  { to: "/help", label: "Помощь" },
   { to: "/about", label: "О программе" },
 ];
 
@@ -43,6 +45,8 @@ const SETTINGS_LINKS = [
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/family", label: "Семейные финансы" },
+  { to: "/articles", label: "Статьи" },
+  { to: "/help", label: "Помощь" },
   { to: "/about", label: "О программе" },
 ];
 
