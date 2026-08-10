@@ -198,6 +198,7 @@ input[type="number"] {
 }
 
 .amount-input-with-calculator { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.amount-input-with-calculator:focus-within { z-index: 170; }
 .amount-input-with-calculator > input { flex: 1; min-width: 0; padding-right: 38px !important; }
 .amount-calculator-trigger { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #596978; font-size: 17px; }
 .amount-calculator-trigger:hover { background: #eee8dc; }

@@ -259,11 +259,13 @@ export default function QuickAddInline({
   };
 
   return (
-    <div style={{
+    <div className="quick-add-inline" style={{
       background: "#fffdf7",
       border: "1px solid #e4ddcd",
       borderRadius: 10,
-      overflow: "hidden",
+      overflow: "visible",
+      position: "relative",
+      zIndex: 5,
     }}>
       {/* Tabs */}
       <div style={{ display: "flex", justifyContent: "flex-start" }}>
