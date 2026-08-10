@@ -207,7 +207,9 @@ input[type="number"] {
 .amount-calculator > small { display: block; margin: -2px 0 7px; color: #c0432b; }
 .amount-calculator-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .amount-calculator-grid button { min-width: 0; min-height: 36px; padding: 5px; background: #f4efe4; color: #173a54; }
+.amount-calculator-grid button:hover { background: #e7dbc5; color: #173a54; }
 .amount-calculator-grid button.is-result { background: #173a54; color: #fff; }
+.amount-calculator-grid button.is-result:hover { background: #285979; color: #fff; }
 .single-currency { display: inline-flex; align-items: center; justify-content: center; min-width: 64px; min-height: 40px; padding: 7px 10px; border: 1px solid #e4ddcd; border-radius: 7px; background: #f7f3ea; color: #43505c; font-weight: 700; }
 .transfer-swap-button { min-width: 36px; min-height: 36px; padding: 5px 8px; border: 1px solid #c9d6df; background: #edf4f8; color: #2f6296; font-size: 18px; line-height: 1; }
 @media (max-width: 600px) {

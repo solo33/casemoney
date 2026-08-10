@@ -88,6 +88,43 @@ def test_loan_disbursement_increases_account_without_becoming_income(client):
     assert summary["total_income"] == 0
 
 
+def test_delete_credit_removes_linked_payments_and_restores_balances(client):
+    auth = register_and_login(client, "credit-delete@test.com")
+    enable_family("credit-delete@test.com")
+    account = make_account(client, auth, balance=10_000)
+
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Удаляемый заём",
+            "kind": "loan",
+            "currency": "RUB",
+            "original_amount": 50_000,
+            "current_balance": 50_000,
+            "funds_received": True,
+            "funds_account_id": account["id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    credit = created.json()
+    assert account_balance(client, auth, account["id"]) == 60_000
+
+    paid = client.post(
+        f"/api/credits/{credit['id']}/payments",
+        headers=auth,
+        json={"amount": 5_000, "account_id": account["id"]},
+    )
+    assert paid.status_code == 201, paid.text
+    assert account_balance(client, auth, account["id"]) == 55_000
+
+    deleted = client.delete(f"/api/credits/{credit['id']}", headers=auth)
+    assert deleted.status_code == 204, deleted.text
+    assert client.get("/api/credits/", headers=auth).json() == []
+    assert client.get("/api/transactions/", headers=auth).json()["items"] == []
+    assert account_balance(client, auth, account["id"]) == 10_000
+
+
 def test_mortgage_without_disbursement_does_not_change_account(client):
     auth = register_and_login(client, "mortgage-no-cash@test.com")
     enable_family("mortgage-no-cash@test.com")

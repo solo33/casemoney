@@ -291,6 +291,47 @@ def update_credit(
     return _serialize(db, credit)
 
 
+@router.delete("/{credit_id}", status_code=204)
+def delete_credit(
+    credit_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(require_family),
+):
+    """Delete an obligation together with the ledger entries created for it.
+
+    Credit payments are not standalone operations: deleting only their records
+    would leave expenses/income in account balances.  Revert and remove every
+    linked transaction in the same database transaction instead.
+    """
+    credit = db.query(CreditObligation).filter(
+        CreditObligation.id == credit_id,
+        CreditObligation.user_id == user_id,
+    ).first()
+    if not credit:
+        raise HTTPException(status_code=404, detail="Кредит или долг не найден")
+
+    transaction_ids = [
+        payment.transaction_id
+        for payment in credit.payments
+        if payment.transaction_id is not None
+    ]
+    if credit.funding_transaction_id is not None:
+        transaction_ids.append(credit.funding_transaction_id)
+
+    for transaction_id in set(transaction_ids):
+        transaction = db.query(Transaction).filter(
+            Transaction.id == transaction_id,
+            Transaction.user_id == user_id,
+        ).first()
+        if transaction:
+            _apply_tx_effect(db, transaction, reverse=True)
+            _write_history(db, user_id, transaction, "deleted")
+            db.delete(transaction)
+
+    db.delete(credit)
+    db.commit()
+
+
 @router.post("/{credit_id}/payments", response_model=CreditPaymentResponse, status_code=201)
 def register_payment(
     credit_id: int,
