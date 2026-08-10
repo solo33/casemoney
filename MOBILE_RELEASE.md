@@ -208,7 +208,7 @@ adb exec-out screencap -p > screen-01.png
 
 ```gradle
 versionCode 2          // только увеличивать, целое число
-versionName "1.0.1"    // человекочитаемое, любое
+versionName "1.1.0"    // человекочитаемое, соответствует APP_VERSION
 ```
 
 `versionCode` назад уменьшать нельзя.
