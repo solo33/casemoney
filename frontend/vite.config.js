@@ -27,7 +27,7 @@ export default defineConfig({
       manifest: {
         name: 'CaseMoney — личная бухгалтерия',
         short_name: 'CaseMoney',
-        description: 'Счета в разных валютах, категории, годовые отчёты.',
+        description: 'Учёт личных и семейных финансов: счета, операции, бюджеты, цели, кредиты, импорт и отчёты.',
         lang: 'ru',
         start_url: '/',
         scope: '/',

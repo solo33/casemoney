@@ -14,6 +14,10 @@ import {
 import { BalanceActionRow, BalanceAdjustmentModal } from "../components/BalanceActions";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 import { useUser } from "../contexts/UserContext";
+import CreditWidget from "../components/CreditWidget";
+import AmountInput from "../components/AmountInput";
+import CurrencyField from "../components/CurrencyField";
+import useTransferQuote from "../hooks/useTransferQuote";
 import {
   currencySymbol,
   formatMoney,
@@ -365,6 +369,7 @@ export default function Home() {
 
       {/* ============== LEFT SIDEBAR ============== */}
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <CreditWidget />
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
         <Card className="home-balance-card">
           <h3 style={sectionTitle}>Баланс</h3>
@@ -806,6 +811,8 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
     account_id: String(tx.account_id),
     category_id: tx.category_id ? String(tx.category_id) : "",
     to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
+    to_amount: tx.to_amount != null ? String(tx.to_amount) : "",
+    to_currency: tx.to_currency || "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
   });
@@ -816,6 +823,32 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
   const accCurrencies = sortCurrenciesRubFirst(
     (acc?.balances || []).map(b => b.currency)
   );
+  const targetAccount = accounts.find(a => String(a.id) === form.to_account_id);
+  const targetCurrencies = sortCurrenciesRubFirst(
+    (targetAccount?.balances || []).map(b => b.currency)
+  );
+  const sameTransferCurrency = form.type === "transfer"
+    && Boolean(form.currency)
+    && form.currency === form.to_currency;
+  useEffect(() => {
+    if (form.type !== "transfer" || !targetAccount) return;
+    if (!targetCurrencies.includes(form.to_currency)) {
+      setForm(current => ({ ...current, to_currency: targetCurrencies[0] || "", to_amount: "" }));
+    }
+  }, [form.type, targetAccount, targetCurrencies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const applyTransferQuote = useCallback(toAmount => {
+    setForm(current => current.to_amount === toAmount ? current : { ...current, to_amount: toAmount });
+  }, []);
+  const { loading: quoteLoading } = useTransferQuote({
+    enabled: form.type === "transfer" && !sameTransferCurrency,
+    amount: form.amount,
+    fromCurrency: form.currency,
+    toCurrency: form.to_currency,
+    onQuote: applyTransferQuote,
+  });
+  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) > 0
+    ? Number(form.to_amount) / Number(form.amount)
+    : null;
   const cats = form.type === "transfer"
     ? [] : categories.filter(c => c.type === form.type);
 
@@ -826,6 +859,8 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
       if (String(form.to_account_id) === String(form.account_id)) {
         setErr("Счёт-источник и получатель совпадают"); return;
       }
+      if (!form.to_currency) { setErr("Выберите валюту счёта-получателя"); return; }
+      if (!sameTransferCurrency && !(parseFloat(form.to_amount) > 0)) { setErr("Введите сумму зачисления"); return; }
     }
     setSaving(true);
     setErr(null);
@@ -837,6 +872,8 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
         account_id: parseInt(form.account_id),
         category_id: form.type === "transfer" || !form.category_id ? null : parseInt(form.category_id),
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
+        to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : null,
+        to_currency: form.type === "transfer" ? form.to_currency : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       });
@@ -887,30 +924,37 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
-          <input
+          <AmountInput
             type="number" step="0.01" min="0.01" value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
-            required style={{ flex: 1, textAlign: "right", fontWeight: 600, fontSize: 16 }}
+            required inputStyle={{ width: "100%", textAlign: "right", fontWeight: 600, fontSize: 16 }}
           />
-          <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} style={{ width: 90 }}>
-            {(accCurrencies.length ? accCurrencies : [form.currency]).map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <CurrencyField currencies={accCurrencies.length ? accCurrencies : [form.currency]} value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} />
         </div>
 
-        <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })} required>
+        <select value={form.account_id} onChange={e => {
+          const account = accounts.find(item => String(item.id) === e.target.value);
+          const currencies = sortCurrenciesRubFirst((account?.balances || []).map(balance => balance.currency));
+          setForm({ ...form, account_id: e.target.value, currency: currencies[0] || form.currency });
+        }} required>
           <option value="">{form.type === "transfer" ? "— Со счёта —" : "— Счёт —"}</option>
           <AccountOptions groups={accountGroups} includeIds={[form.account_id]} />
         </select>
 
         {form.type === "transfer" ? (
-          <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
-            <option value="">— На счёт (получатель) —</option>
-            <AccountOptions
-              groups={accountGroups}
-              excludeId={form.account_id}
-              includeIds={[form.to_account_id]}
-            />
-          </select>
+          <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 8 }}>
+            <button type="button" className="transfer-swap-button" disabled={!form.to_account_id} onClick={() => {
+              const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
+              setForm(current => ({ ...current, account_id: current.to_account_id, currency: current.to_currency, amount: creditedAmount || "", to_account_id: current.account_id, to_currency: current.currency, to_amount: current.amount || "" }));
+            }} aria-label="Поменять счета отправки и получения местами" title="Поменять счета местами">⇄</button>
+            <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value, to_currency: "", to_amount: "" })} required>
+              <option value="">— На счёт (получатель) —</option>
+              <AccountOptions groups={accountGroups} excludeId={form.account_id} includeIds={[form.to_account_id]} />
+            </select>
+            {!sameTransferCurrency && <AmountInput type="number" step="0.01" min="0.01" value={form.to_amount} onChange={e => setForm({ ...form, to_amount: e.target.value })} placeholder={quoteLoading ? "Считаем…" : "Сумма зачисления"} required inputStyle={{ width: "100%" }} />}
+            <CurrencyField currencies={targetCurrencies.length ? targetCurrencies : [form.to_currency].filter(Boolean)} value={form.to_currency} onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })} />
+            {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate && <small style={{ gridColumn: "1 / -1", color: "#7a8590" }}>1 {form.currency} = {displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} {form.to_currency}</small>}
+          </div>
         ) : (
           <CategoryPicker
             categories={cats}

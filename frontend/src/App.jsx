@@ -3,12 +3,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
+import DemoSessionBanner from './components/DemoSessionBanner'
 import CookieBanner from './components/CookieBanner'
 import { GlobalNetworkProgress } from './components/BrandProgress'
 import MobilePwaInstallPrompt from './components/MobilePwaInstallPrompt'
 import OfflineSyncStatus from './components/OfflineSyncStatus'
 import YandexMetrikaRouteTracker from './components/YandexMetrikaRouteTracker'
-import { UserProvider } from './contexts/UserContext'
+import Seo from './components/Seo'
+import { UserProvider, useUser } from './contexts/UserContext'
 
 const Login = lazy(() => import('./pages/Login'))
 const Register = lazy(() => import('./pages/Register'))
@@ -35,10 +37,14 @@ const Transactions = lazy(() => import('./pages/Transactions'))
 const Settings = lazy(() => import('./pages/Settings'))
 const History = lazy(() => import('./pages/History'))
 const Articles = lazy(() => import('./pages/Articles'))
+const ArticlePage = lazy(() => import('./pages/ArticlePage'))
+const Landing = lazy(() => import('./pages/Landing'))
 const Help = lazy(() => import('./pages/Help'))
 const Roadmap = lazy(() => import('./pages/Roadmap'))
 const About = lazy(() => import('./pages/About'))
 const Family = lazy(() => import('./pages/Family'))
+const Credits = lazy(() => import('./pages/Credits'))
+const Billing = lazy(() => import('./pages/Billing'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -47,7 +53,9 @@ function ProtectedRoute({ children }) {
   }
   return (
     <UserProvider>
+      <Seo title="CaseMoney" description="Личный кабинет CaseMoney" path={window.location.pathname} noindex />
       <Nav />
+      <DemoSessionBanner />
       <EmailVerifyBanner />
       {children}
       <QuickAddFab />
@@ -69,12 +77,20 @@ function PublicContentRoute({ children }) {
   )
 }
 
+function FamilyPlanRoute({ children }) {
+  const { user, loading } = useUser()
+  if (loading) return <div className="page">Загрузка...</div>
+  if (user?.plan !== 'family') return <Navigate to="/settings/billing" replace />
+  return children
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <YandexMetrikaRouteTracker />
       <Suspense fallback={<div className="page">Загрузка...</div>}>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/activate" element={<Activate />} />
@@ -84,6 +100,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/cookies" element={<Cookies />} />
           <Route path="/articles" element={<PublicContentRoute><Articles /></PublicContentRoute>} />
+          <Route path="/articles/:slug" element={<PublicContentRoute><ArticlePage /></PublicContentRoute>} />
           <Route path="/help" element={<PublicContentRoute><Help /></PublicContentRoute>} />
           <Route path="/roadmap" element={<PublicContentRoute><Roadmap /></PublicContentRoute>} />
           <Route path="/about" element={<PublicContentRoute><About /></PublicContentRoute>} />
@@ -227,10 +244,28 @@ export default function App() {
         />
 
         <Route
+          path="/settings/billing"
+          element={
+            <ProtectedRoute>
+              <Billing />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/settings/family"
           element={
             <ProtectedRoute>
-              <Family />
+              <FamilyPlanRoute><Family /></FamilyPlanRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/credits"
+          element={
+            <ProtectedRoute>
+              <FamilyPlanRoute><Credits /></FamilyPlanRoute>
             </ProtectedRoute>
           }
         />

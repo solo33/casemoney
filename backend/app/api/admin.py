@@ -15,16 +15,17 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.account import Account
-from app.models.account_balance import AccountBalance
-from app.models.account_group import AccountGroup
 from app.models.category import Category
 from app.models.transaction import Transaction
-from app.models.user_currency import UserCurrency
+from app.models.notification import Notification
+from app.models.billing import Subscription
 from app.schemas.admin import (
     AdminUserSummary, AdminUsersPage, AdminUserUpdate,
     AdminPasswordReset, AdminStats, AdminConfig, AdminConfigUpdate,
 )
+from app.schemas.notification import AdminNotificationCreate
 from app.services.auth import decode_token, hash_password
+from app.services.user_cleanup import delete_user_completely
 from app.services import app_config as app_config_svc
 from app.services.email import is_smtp_configured
 
@@ -46,6 +47,32 @@ def get_admin_user_id(
     return user_id
 
 
+@router.post("/notifications", status_code=201)
+def create_notification(
+    data: AdminNotificationCreate,
+    db: Session = Depends(get_db),
+    _: int = Depends(get_admin_user_id),
+):
+    query = db.query(User)
+    if data.user_id is not None:
+        query = query.filter(User.id == data.user_id)
+    recipients = query.all()
+    if data.user_id is not None and not recipients:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    notifications = [
+        Notification(
+            user_id=user.id,
+            title=data.title.strip(),
+            message=data.message.strip(),
+            link=data.link,
+        )
+        for user in recipients
+    ]
+    db.add_all(notifications)
+    db.commit()
+    return {"recipients_count": len(notifications)}
+
+
 def _summary(db: Session, u: User) -> AdminUserSummary:
     acc_count = db.query(Account).filter(Account.user_id == u.id).count()
     cat_count = db.query(Category).filter(Category.user_id == u.id).count()
@@ -57,6 +84,10 @@ def _summary(db: Session, u: User) -> AdminUserSummary:
         is_active=u.is_active,
         is_admin=u.is_admin,
         main_currency=u.main_currency,
+        plan=u.plan,
+        plan_source=u.plan_source,
+        plan_expires_at=u.plan_expires_at,
+        family_upgrade_enabled=u.family_upgrade_enabled,
         created_at=u.created_at,
         accounts_count=acc_count,
         categories_count=cat_count,
@@ -121,6 +152,14 @@ def update_user(
         if admins_left == 0:
             raise HTTPException(status_code=400, detail="Нельзя снять admin с последнего администратора")
 
+    if "plan" in update:
+        u.plan_source = "admin"
+        u.plan_expires_at = None
+        subscription = db.query(Subscription).filter(Subscription.user_id == u.id).first()
+        if subscription:
+            # Администраторская выдача тарифа не должна приводить к скрытому
+            # следующему списанию по ранее оплаченной подписке.
+            subscription.cancel_at_period_end = True
     for k, v in update.items():
         setattr(u, k, v)
     db.commit()
@@ -155,16 +194,7 @@ def delete_user(
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
-    # Cascade delete всех данных
-    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
-    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
-    if acc_ids:
-        db.query(AccountBalance).filter(AccountBalance.account_id.in_(acc_ids)).delete(synchronize_session=False)
-    db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
-    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
-    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
-    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
-    db.delete(u)
+    delete_user_completely(db, user_id)
     db.commit()
 
 

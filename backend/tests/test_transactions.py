@@ -84,6 +84,33 @@ def test_cross_currency_transfer_uses_explicit_destination_amount(client, auth):
     assert account_balance(client, auth, target["id"], "EUR") == 25.25
 
 
+def test_edit_cross_currency_transfer_updates_both_currencies(client, auth):
+    source = make_account(client, auth, name="Source", balance=1000, currency="RUB")
+    target = make_account(client, auth, name="Target", balance=20, currency="EUR")
+    created = client.post("/api/transactions/", headers=auth, json={
+        "amount": 500,
+        "type": "transfer",
+        "currency": "RUB",
+        "account_id": source["id"],
+        "to_account_id": target["id"],
+        "to_amount": 5,
+        "to_currency": "EUR",
+    }).json()
+
+    edited = client.patch(f"/api/transactions/{created['id']}", headers=auth, json={
+        "amount": 600,
+        "currency": "RUB",
+        "to_amount": 7.5,
+        "to_currency": "EUR",
+    })
+
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["to_amount"] == 7.5
+    assert edited.json()["to_currency"] == "EUR"
+    assert account_balance(client, auth, source["id"], "RUB") == 400
+    assert account_balance(client, auth, target["id"], "EUR") == 27.5
+
+
 def test_user_currency_conversion_preview(client, auth, monkeypatch):
     monkeypatch.setattr(
         "app.api.currencies.exchange_svc.get_rate_for_user",

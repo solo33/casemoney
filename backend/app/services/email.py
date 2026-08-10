@@ -267,6 +267,7 @@ def send_registration_notification(
     if not REGISTRATION_NOTIFY_EMAIL:
         return False
 
+
     email_html = _html.escape(user_email)
     username_html = _html.escape(username)
     registered_at_html = _html.escape(registered_at)
@@ -293,6 +294,65 @@ def send_registration_notification(
 </body></html>
 """
     return send_email(REGISTRATION_NOTIFY_EMAIL, subject, text, html)
+
+
+def send_credit_payment_reminder(
+    to_email: str,
+    username: str,
+    credit_name: str,
+    due_date,
+    amount: float | None,
+    currency: str,
+    overdue: bool,
+    credit_url: str,
+    is_income: bool = False,
+) -> bool:
+    """Send a reminder for an upcoming expense or deposit income."""
+    due = due_date.strftime("%d.%m.%Y")
+    amount_text = f"{amount:g} {currency}" if amount else "сумма не указана"
+    if is_income:
+        status_text = "Поступление не отмечено" if overdue else "Приближается дата поступления"
+        event_label = "Ожидаемый доход"
+        date_label = "Дата поступления"
+    else:
+        status_text = "Платёж просрочен" if overdue else "Приближается дата платежа"
+        event_label = "Платёж"
+        date_label = "Дата платежа"
+    subject = f"CaseMoney — {status_text.lower()}: {credit_name}"
+    text = (
+        f"Здравствуйте, {username}!\n\n"
+        f"{status_text} по обязательству «{credit_name}».\n"
+        f"{date_label}: {due}\n"
+        f"{event_label}: {amount_text}\n\n"
+        f"Открыть обязательства и депозиты: {credit_url}\n\n"
+        "— CaseMoney"
+    )
+    username_html = _html.escape(username)
+    name_html = _html.escape(credit_name)
+    amount_html = _html.escape(amount_text)
+    url_html = _html.escape(credit_url, quote=True)
+    status_color = "#c83f2b" if overdue else "#9c7b3c"
+    html = f"""\
+<!doctype html>
+<html><body style="font-family: system-ui, sans-serif; background: #f6f2e9; padding: 32px;">
+  <div style="max-width: 560px; margin: 0 auto; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 28px;">
+    <h1 style="font-family: Georgia, serif; color: #173a54; font-size: 25px; margin: 0 0 18px;">CaseMoney</h1>
+    <p style="color: #515c68; line-height: 1.6;">Здравствуйте, <strong>{username_html}</strong>!</p>
+    <h2 style="color: {status_color}; font-size: 20px; margin: 18px 0 12px;">{status_text}</h2>
+    <p style="color: #1b2531; line-height: 1.7;">
+      <strong>{name_html}</strong><br>
+      {date_label}: {due}<br>
+      {event_label}: {amount_html}
+    </p>
+    <p style="margin: 24px 0 0;">
+      <a href="{url_html}" style="display:inline-block;background:#173a54;color:#fff;text-decoration:none;padding:12px 20px;border-radius:7px;font-weight:600;">
+        Открыть обязательства и депозиты
+      </a>
+    </p>
+  </div>
+</body></html>
+"""
+    return send_email(to_email, subject, text, html)
 
 
 def send_code_email(to_email: str, username: str, code: str) -> bool:

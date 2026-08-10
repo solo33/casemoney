@@ -16,9 +16,8 @@ from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
 from app.services.email import app_url, send_email
+from app.services.plans import ensure_family_plan
 
-
-router = APIRouter(prefix="/api/family", tags=["family"])
 security = HTTPBearer()
 
 
@@ -29,6 +28,20 @@ def current_user_id(
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     return int(payload["sub"])
+
+
+def require_family_plan(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+) -> None:
+    ensure_family_plan(db, user_id)
+
+
+router = APIRouter(
+    prefix="/api/family",
+    tags=["family"],
+    dependencies=[Depends(require_family_plan)],
+)
 
 
 def active_membership(db: Session, user_id: int) -> Optional[FamilyMember]:

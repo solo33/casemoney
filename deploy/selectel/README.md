@@ -26,12 +26,26 @@ used to verify the restored Selectel database.
 
 ## PostgreSQL backups
 
-`backup-postgres.sh` creates compressed custom-format dumps for the `casemoney`
-and `toppulse` databases, writes SHA-256 checksums, and keeps 14 days by default.
+`backup-postgres.sh` creates compressed custom-format dumps for the `casemoney`,
+`toppulse`, and `smetafact` databases, verifies that PostgreSQL can read each dump, writes
+SHA-256 checksums, and keeps the latest 7 successful daily backups per database.
 Install it as `/usr/local/sbin/solo32-postgres-backup`, install the matching
 service and timer from `systemd/`, then enable `solo32-postgres-backup.timer`.
 At least once after setup, restore a dump into a temporary database and compare
 critical row counts; a backup is not considered verified until restore succeeds.
+
+The timer runs daily at 03:30 server time. Install or update it from the repository:
+
+```bash
+install -m 0750 deploy/selectel/backup-postgres.sh /usr/local/sbin/solo32-postgres-backup
+install -m 0644 deploy/selectel/systemd/solo32-postgres-backup.service /etc/systemd/system/
+install -m 0644 deploy/selectel/systemd/solo32-postgres-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now solo32-postgres-backup.timer
+systemctl start solo32-postgres-backup.service
+systemctl status solo32-postgres-backup.service --no-pager
+systemctl list-timers solo32-postgres-backup.timer --no-pager
+```
 
 ## Domain cutover
 

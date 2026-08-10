@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { APP_FULL_VERSION } from "../config/version";
 import { SUPPORT_EMAIL } from "../config/contacts";
-import { PublicPage, card, paragraph } from "./Articles";
+import PublicPage, { card, paragraph } from "../components/PublicPage";
 
 export default function About() {
   const [updateStatus, setUpdateStatus] = useState("idle");
@@ -47,7 +47,11 @@ export default function About() {
   };
 
   return (
-    <PublicPage title="О программе">
+    <PublicPage
+      title="О программе CaseMoney"
+      description="О сервисе CaseMoney для учёта личных и семейных финансов, установленная версия, контакты поддержки и юридические документы."
+      path="/about"
+    >
       <div style={{ display: "grid", gap: 16 }}>
         <section style={{ ...card, textAlign: "center" }}>
           <img src="/icon.svg" alt="" width={72} height={72} style={{ borderRadius: 18 }} />

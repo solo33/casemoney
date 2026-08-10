@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -28,6 +30,9 @@ from app.models.bank_import_mapping import (  # noqa: F401
     BankCategoryMapping,
 )
 from app.models.family import Family, FamilyMember, FamilySettlement  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
+from app.models.credit import CreditObligation, CreditPayment  # noqa: F401
+from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -44,8 +49,16 @@ from app.api.goals import router as goals_router
 from app.api.admin import router as admin_router
 from app.api.support import router as support_router
 from app.api.family import router as family_router
+from app.api.notifications import router as notifications_router
+from app.api.credits import router as credits_router
+from app.api.billing import router as billing_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
+from app.services.credit_reminders import process_credit_reminders
+from app.services.billing import process_subscription_renewals
+from app.services.demo_cleanup import cleanup_expired_demo_users
+
+log = logging.getLogger("casemoney.credit_reminders")
 
 _ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "1") not in ("0", "false", "off")
 limiter = Limiter(key_func=get_remote_address, default_limits=[], enabled=_ratelimit_enabled)
@@ -102,10 +115,19 @@ app.include_router(goals_router)
 app.include_router(admin_router)
 app.include_router(support_router)
 app.include_router(family_router)
+app.include_router(notifications_router)
+app.include_router(credits_router)
+app.include_router(billing_router)
 
 
 @app.on_event("startup")
 def seed_demo_data():
+    # Статический test@test.com — только для локальной разработки. По
+    # умолчанию выключен: держать в общей проде постоянно доступный на
+    # запись аккаунт с публичным паролем не нужно — для публичного демо
+    # есть изолированные одноразовые аккаунты (create_ephemeral_demo_user).
+    if os.getenv("SEED_STATIC_DEMO", "0").lower() not in ("1", "true", "yes"):
+        return
     db = SessionLocal()
     try:
         seed_demo_user(db)
@@ -152,6 +174,109 @@ def readiness():
         db.close()
 
 
+async def _credit_reminder_loop() -> None:
+    interval = max(60, int(os.getenv("CREDIT_REMINDER_INTERVAL_SECONDS", "3600")))
+    while True:
+        db = SessionLocal()
+        try:
+            system_count, email_count = await asyncio.to_thread(process_credit_reminders, db)
+            if system_count or email_count:
+                log.info(
+                    "Processed credit reminders: system=%s, email=%s",
+                    system_count,
+                    email_count,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            db.rollback()
+            log.exception("Credit reminder worker failed")
+        finally:
+            db.close()
+        await asyncio.sleep(interval)
+
+
+async def _billing_loop() -> None:
+    interval = max(300, int(os.getenv("BILLING_WORKER_INTERVAL_SECONDS", "3600")))
+    while True:
+        db = SessionLocal()
+        try:
+            renewed, expired = await asyncio.to_thread(process_subscription_renewals, db)
+            if renewed or expired:
+                log.info("Processed subscriptions: renewed=%s expired=%s", renewed, expired)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            db.rollback()
+            log.exception("Billing worker failed")
+        finally:
+            db.close()
+        await asyncio.sleep(interval)
+
+
+async def _demo_cleanup_loop() -> None:
+    interval = max(60, int(os.getenv("DEMO_CLEANUP_INTERVAL_SECONDS", "1800")))
+    while True:
+        db = SessionLocal()
+        try:
+            removed = await asyncio.to_thread(cleanup_expired_demo_users, db)
+            if removed:
+                log.info("Removed expired demo accounts: %s", removed)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            db.rollback()
+            log.exception("Demo cleanup worker failed")
+        finally:
+            db.close()
+        await asyncio.sleep(interval)
+
+
+@app.on_event("startup")
+async def start_credit_reminder_worker():
+    default_enabled = "0" if not _ratelimit_enabled else "1"
+    enabled = os.getenv("CREDIT_REMINDER_WORKER_ENABLED", default_enabled).lower() not in (
+        "0",
+        "false",
+        "off",
+    )
+    if enabled:
+        app.state.credit_reminder_task = asyncio.create_task(_credit_reminder_loop())
+    billing_enabled = os.getenv("BILLING_WORKER_ENABLED", default_enabled).lower() not in ("0", "false", "off")
+    if billing_enabled:
+        app.state.billing_task = asyncio.create_task(_billing_loop())
+    # Очистка демо-аккаунтов нужна везде, где ими вообще пользуются
+    # (включая локальную разработку) — не привязываем к _ratelimit_enabled.
+    demo_cleanup_enabled = os.getenv("DEMO_CLEANUP_WORKER_ENABLED", "1").lower() not in ("0", "false", "off")
+    if demo_cleanup_enabled:
+        app.state.demo_cleanup_task = asyncio.create_task(_demo_cleanup_loop())
+
+
+@app.on_event("shutdown")
+async def stop_credit_reminder_worker():
+    task = getattr(app.state, "credit_reminder_task", None)
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    billing_task = getattr(app.state, "billing_task", None)
+    if billing_task:
+        billing_task.cancel()
+        try:
+            await billing_task
+        except asyncio.CancelledError:
+            pass
+    demo_cleanup_task = getattr(app.state, "demo_cleanup_task", None)
+    if demo_cleanup_task:
+        demo_cleanup_task.cancel()
+        try:
+            await demo_cleanup_task
+        except asyncio.CancelledError:
+            pass
+
+
 _STATIC_DIR = Path(os.getenv("STATIC_DIR", Path(__file__).resolve().parents[1] / "static"))
 _STATIC_ROOT = _STATIC_DIR.resolve()
 
@@ -178,6 +303,12 @@ def frontend_spa(full_path: str):
     requested = (_STATIC_DIR / full_path).resolve()
     if requested.is_relative_to(_STATIC_ROOT) and requested.is_file():
         return _frontend_file(requested, immutable=full_path.startswith("assets/"))
+
+    # Public routes receive build-generated index files with route-specific
+    # metadata and readable fallback content for search crawlers.
+    route_index = requested / "index.html"
+    if requested.is_relative_to(_STATIC_ROOT) and route_index.is_file():
+        return _frontend_file(route_index)
 
     index = _STATIC_DIR / "index.html"
     if index.is_file():

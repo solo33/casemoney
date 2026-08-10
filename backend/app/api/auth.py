@@ -21,7 +21,7 @@ from app.services.email import (
     send_reset_email, app_url, is_smtp_configured,
 )
 from app.services.app_config import get_config
-from app.seeds import seed_default_categories, seed_default_accounts
+from app.seeds import seed_default_categories, seed_default_accounts, create_ephemeral_demo_user
 from datetime import datetime, timedelta, timezone
 
 # Параметры кода подтверждения
@@ -324,6 +324,23 @@ def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
             )
 
     token = _create_user_access_token(user)
+    return {"access_token": token, "token_type": "bearer"}
+
+
+# Токен эфемерного демо чуть короче TTL самого аккаунта в demo_cleanup.py —
+# так фоновый воркер никогда не удалит песочницу из-под ещё живой сессии.
+DEMO_TOKEN_LIFETIME = timedelta(hours=3)
+
+
+@router.post("/demo", response_model=Token)
+@limiter.limit("20/hour")
+def demo_login(request: Request, db: Session = Depends(get_db)):
+    """Публичная кнопка «Заполнить демо-вход»: создаёт изолированный
+    одноразовый аккаунт с каноничным набором демо-данных и сразу логинит в
+    него. Отдельно от статического test@test.com (см. app/seeds.py) —
+    каждый посетитель получает свою песочницу, не видит чужих правок."""
+    user = create_ephemeral_demo_user(db)
+    token = create_access_token({"sub": str(user.id)}, expires_delta=DEMO_TOKEN_LIFETIME)
     return {"access_token": token, "token_type": "bearer"}
 
 

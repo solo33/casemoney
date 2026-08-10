@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import PwaInstallLink from "../components/PwaInstallLink";
-import { login, getPublicConfig } from "../api/auth";
+import { login, demoLogin, getPublicConfig } from "../api/auth";
 
-const DEMO_EMAIL = "test@test.com";
-const REAL_LOGIN_FLAG = "cm_used_real_login";
+export const REAL_LOGIN_FLAG = "cm_used_real_login";
+export const DEMO_SESSION_FLAG = "cm_demo_session";
 
 export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
   // Кнопку демо-входа показываем, только если с этого устройства ещё ни разу
   // не логинились под настоящим аккаунтом (флаг переживает разлогин).
@@ -31,14 +32,30 @@ export default function Login() {
     try {
       const res = await login(form);
       localStorage.setItem("token", res.data.access_token);
-      if (form.email.trim().toLowerCase() !== DEMO_EMAIL) {
-        localStorage.setItem(REAL_LOGIN_FLAG, "1");
-      }
+      localStorage.removeItem(DEMO_SESSION_FLAG);
+      localStorage.setItem(REAL_LOGIN_FLAG, "1");
       navigate("/home");
     } catch (err) {
       setError(err.response?.data?.detail || "Неверный email или пароль");
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Каждый клик создаёт свой изолированный одноразовый аккаунт на бэкенде —
+  // это не логин под общими test@test.com/test12345.
+  const handleDemoLogin = async () => {
+    setError("");
+    setDemoBusy(true);
+    try {
+      const res = await demoLogin();
+      localStorage.setItem("token", res.data.access_token);
+      localStorage.setItem(DEMO_SESSION_FLAG, "1");
+      navigate("/home");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Не удалось создать демо-доступ");
+    } finally {
+      setDemoBusy(false);
     }
   };
 
@@ -167,13 +184,14 @@ export default function Login() {
             }}>
               <button
                 type="button"
-                onClick={() => setForm({ email: DEMO_EMAIL, password: "test12345" })}
+                onClick={handleDemoLogin}
+                disabled={demoBusy}
                 style={{ padding: "7px 12px", fontSize: 13, fontWeight: 700 }}
               >
-                Заполнить демо-вход
+                {demoBusy ? "Готовим песочницу…" : "Демо-вход без регистрации"}
               </button>
               <span style={{ fontSize: 12.5, color: "#7a8590" }}>
-                {DEMO_EMAIL} · test12345
+                Свежий аккаунт с тестовыми данными, удаляется через несколько часов
               </span>
             </div>
           )}

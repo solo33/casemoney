@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register, verifyCode, getPublicConfig } from "../api/auth";
+import { DEMO_SESSION_FLAG, REAL_LOGIN_FLAG } from "./Login";
+
+function markRealLogin(token) {
+  localStorage.setItem("token", token);
+  localStorage.removeItem(DEMO_SESSION_FLAG);
+  localStorage.setItem(REAL_LOGIN_FLAG, "1");
+}
 
 export default function Register() {
   const navigate = useNavigate();
@@ -31,7 +38,7 @@ export default function Register() {
       const res = await register(form);
       setSmtpOk(res.data.smtp_configured);
       if (res.data.access_token) {
-        localStorage.setItem("token", res.data.access_token);
+        markRealLogin(res.data.access_token);
         navigate("/home");
         return;
       }
@@ -55,7 +62,7 @@ export default function Register() {
     setBusy(true);
     try {
       const res = await verifyCode(form.email, code.trim());
-      localStorage.setItem("token", res.data.access_token);
+      markRealLogin(res.data.access_token);
       navigate("/home");
     } catch (err) {
       setError(err.response?.data?.detail || "Неверный код");

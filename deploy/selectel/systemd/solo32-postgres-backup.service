@@ -1,8 +1,9 @@
 [Unit]
-Description=Backup CaseMoney and Upmetr PostgreSQL databases
+Description=Backup PostgreSQL databases for solo32 applications
 Requires=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
+Environment=KEEP_BACKUPS=7
 ExecStart=/usr/local/sbin/solo32-postgres-backup

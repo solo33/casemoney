@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /home
+Disallow: /accounts
+Disallow: /transactions
+Disallow: /reports
+Disallow: /goals
+Disallow: /credits
+Disallow: /settings
+Disallow: /admin
+Disallow: /history
+Disallow: /import
+Disallow: /login
+Disallow: /register
+Disallow: /activate
+Disallow: /forgot-password
+Disallow: /reset-password
+Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term&yclid&gclid /
+
+Sitemap: https://casemoney.ru/sitemap.xml

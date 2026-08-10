@@ -31,10 +31,12 @@ export default function Admin() {
         borderBottom: "1px solid #e4ddcd",
       }}>
         <TabBtn active={tab === "users"} onClick={() => setTab("users")}>Пользователи</TabBtn>
+        <TabBtn active={tab === "notifications"} onClick={() => setTab("notifications")}>Уведомления</TabBtn>
         <TabBtn active={tab === "stats"} onClick={() => setTab("stats")}>Система</TabBtn>
       </div>
 
       {tab === "users" && <UsersTab adminId={user.id} />}
+      {tab === "notifications" && <NotificationsTab />}
       {tab === "stats" && <StatsTab />}
     </div>
   );
@@ -58,6 +60,81 @@ function TabBtn({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+function NotificationsTab() {
+  const [users, setUsers] = useState([]);
+  const [form, setForm] = useState({ user_id: "", title: "", message: "", link: "" });
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    api.get("/api/admin/users", { params: { limit: 200, offset: 0 } })
+      .then(response => setUsers(response.data.items || []))
+      .catch(() => setUsers([]));
+  }, []);
+
+  const send = async event => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const response = await api.post("/api/admin/notifications", {
+        title: form.title.trim(),
+        message: form.message.trim(),
+        link: form.link.trim() || null,
+        user_id: form.user_id ? Number(form.user_id) : null,
+      });
+      setResult(`Уведомление отправлено: ${response.data.recipients_count} получателей`);
+      setForm(current => ({ ...current, title: "", message: "", link: "" }));
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "Не удалось отправить уведомление");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={send} style={{
+      maxWidth: 720, background: "#fffdf7", border: "1px solid #e4ddcd",
+      borderRadius: 10, padding: 18, display: "grid", gap: 12,
+    }}>
+      <div>
+        <h3 style={{ margin: "0 0 4px" }}>Новое уведомление</h3>
+        <p style={{ margin: 0, color: "#7a8590", fontSize: 13 }}>
+          Выберите пользователя или оставьте «Всем пользователям».
+        </p>
+      </div>
+      <label>
+        <span style={{ display: "block", marginBottom: 5, fontSize: 13 }}>Получатель</span>
+        <select value={form.user_id} onChange={event => setForm({ ...form, user_id: event.target.value })} style={{ width: "100%" }}>
+          <option value="">Всем пользователям</option>
+          {users.map(user => (
+            <option key={user.id} value={user.id}>{user.username} — {user.email}</option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span style={{ display: "block", marginBottom: 5, fontSize: 13 }}>Заголовок</span>
+        <input required maxLength={160} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} style={{ width: "100%" }} />
+      </label>
+      <label>
+        <span style={{ display: "block", marginBottom: 5, fontSize: 13 }}>Сообщение</span>
+        <textarea required maxLength={4000} rows={5} value={form.message} onChange={event => setForm({ ...form, message: event.target.value })} style={{ width: "100%", resize: "vertical" }} />
+      </label>
+      <label>
+        <span style={{ display: "block", marginBottom: 5, fontSize: 13 }}>Ссылка (необязательно)</span>
+        <input placeholder="/goals или https://..." maxLength={500} value={form.link} onChange={event => setForm({ ...form, link: event.target.value })} style={{ width: "100%" }} />
+      </label>
+      {error && <div style={{ color: "#c0432b" }}>{typeof error === "string" ? error : "Проверьте заполнение полей"}</div>}
+      {result && <div style={{ color: "#167a4a" }}>{result}</div>}
+      <button type="submit" disabled={busy} style={{ justifySelf: "start" }}>
+        {busy ? "Отправляем..." : "Отправить уведомление"}
+      </button>
+    </form>
   );
 }
 
@@ -186,7 +263,7 @@ function UsersTab({ adminId }) {
                   </td>
                   <td style={td}>{u.username}</td>
                   <td style={td}>
-                    <PlanBadge />
+                    <PlanBadge plan={u.plan} />
                   </td>
                   <td style={{ ...td, color: u.is_active ? "#167a4a" : "#c0432b" }}>
                     {u.is_active ? "активен" : "заблокирован"}
@@ -285,9 +362,21 @@ function UserDetail({ user, adminId, onClose, onChanged }) {
 
       {/* План */}
       <Section title="План">
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#173a54" }}>Personal</div>
-        <div style={{ fontSize: 12, color: "#7a8590", marginTop: 4 }}>
-          Все текущие функции доступны без ограничений. Управление платными тарифами пока отключено.
+        <div style={{ marginBottom: 10 }}><PlanBadge plan={user.plan} /></div>
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={Boolean(user.family_upgrade_enabled)}
+            disabled={busy || user.plan === "family"}
+            onChange={event => patch(
+              { family_upgrade_enabled: event.target.checked },
+              event.target.checked ? "Пользователь может подключить Family" : "Подключение Family отключено",
+            )}
+          />
+          <span>Разрешить пользователю перейти на Family</span>
+        </label>
+        <div style={{ fontSize: 12, color: "#7a8590", marginTop: 6 }}>
+          После включения пользователь увидит выбор тестового периода, месяца или года в разделе «Тариф и оплата».
         </div>
       </Section>
 
@@ -501,7 +590,7 @@ function StatsTab() {
               </div>
               <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
                 <strong style={{ color: "#167a4a" }}>Personal.</strong> Новые пользователи получают
-                доступ ко всем текущим функциям без ограничений. Платные тарифы пока отключены.
+                личные финансы. Семейное пространство доступно после назначения тарифа Family.
               </div>
             </div>
           </div>
@@ -585,16 +674,17 @@ function Kpi({ label, value, sub, color }) {
   );
 }
 
-function PlanBadge() {
+function PlanBadge({ plan = "personal" }) {
+  const family = plan === "family";
   return (
     <span style={{
       fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 10,
       textTransform: "uppercase", letterSpacing: 0.5,
-      background: "transparent",
-      color: "#173a54",
-      border: "1px solid #173a54",
+      background: family ? "#fff2cc" : "transparent",
+      color: family ? "#8a641d" : "#173a54",
+      border: `1px solid ${family ? "#c99b3b" : "#173a54"}`,
     }}>
-      Personal
+      {family ? "Family" : "Personal"}
     </span>
   );
 }

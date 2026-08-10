@@ -1,14 +1,17 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import Seo from "../../components/Seo";
 
 // Общий каркас для юридических страниц (публичные, без авторизации).
 export default function LegalLayout({ title, updated, children }) {
+  const location = useLocation();
   return (
     <div style={{ minHeight: "100svh", background: "#f6f2e9" }}>
+      <Seo title={`${title} — CaseMoney`} description={`${title} сервиса CaseMoney для учёта личных и семейных финансов.`} path={location.pathname} />
       <header style={{
         maxWidth: 820, margin: "0 auto", padding: "20px 24px",
         display: "flex", alignItems: "center", gap: 10,
       }}>
-        <Link to="/login" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+        <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
           <img src="/icon.svg" alt="" width={32} height={32} style={{ borderRadius: 9 }} />
           <span style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, color: "#173a54" }}>
             CaseMoney

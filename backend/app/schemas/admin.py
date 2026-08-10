@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 
 
@@ -10,6 +10,10 @@ class AdminUserSummary(BaseModel):
     is_active: bool
     is_admin: bool
     main_currency: str
+    plan: Literal["personal", "family"]
+    plan_source: str = "default"
+    plan_expires_at: Optional[datetime] = None
+    family_upgrade_enabled: bool = False
     created_at: Optional[datetime]
     accounts_count: int = 0
     categories_count: int = 0
@@ -26,6 +30,8 @@ class AdminUsersPage(BaseModel):
 class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
+    plan: Optional[Literal["personal", "family"]] = None
+    family_upgrade_enabled: Optional[bool] = None
 
 
 class AdminPasswordReset(BaseModel):

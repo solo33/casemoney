@@ -100,6 +100,8 @@ export default function Settings() {
       {/* Тариф */}
       <PlanCard
         limits={limits}
+        plan={user?.plan || "personal"}
+        familyUpgradeEnabled={Boolean(user?.family_upgrade_enabled)}
       />
 
       {/* Профиль */}
@@ -339,7 +341,7 @@ function FlashBox({ color, bg, border, children }) {
 const muted = { color: "#7a8590", fontSize: 13, margin: 0 };
 
 
-function PlanCard({ limits }) {
+function PlanCard({ limits, plan, familyUpgradeEnabled }) {
   const u = limits?.usage || {};
   const items = [
     { key: "accounts", label: "Счета" },
@@ -357,13 +359,21 @@ function PlanCard({ limits }) {
           margin: 0, fontFamily: "var(--serif)", fontSize: 20,
           fontWeight: 600, color: "#1b2531",
         }}>
-          Personal
+          {plan === "family" ? "Family" : "Personal"}
         </h3>
       </div>
 
       <p style={{ ...muted, marginBottom: 12 }}>
-        Все текущие функции доступны в Personal: счета, категории, валюты, импорт, экспорт и отчеты.
+        {plan === "family"
+          ? "Family включает все возможности Personal и семейные финансы."
+          : "Personal включает личные счета, категории, валюты, импорт, экспорт и отчеты."}
       </p>
+
+      {plan === "personal" && familyUpgradeEnabled && (
+        <Link to="/settings/billing" style={{ display: "inline-block", marginBottom: 14, fontWeight: 700 }}>
+          Перейти на Family →
+        </Link>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
         {items.map(it => {

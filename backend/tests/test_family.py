@@ -1,9 +1,47 @@
-from tests.conftest import make_account, register_and_login
+from tests.conftest import TestingSessionLocal, make_account, register_and_login
+from app.models.user import User
+
+
+def enable_family_plan(email: str) -> None:
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == email).one()
+        user.plan = "family"
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_personal_plan_cannot_use_family_features(client):
+    auth = register_and_login(client, "personal-family@test.com")
+
+    response = client.post(
+        "/api/family/",
+        headers=auth,
+        json={"name": "Недоступная семья"},
+    )
+    assert response.status_code == 403
+
+    account = make_account(client, auth, balance=1000)
+    transaction = client.post(
+        "/api/transactions/",
+        headers=auth,
+        json={
+            "type": "expense",
+            "amount": 100,
+            "currency": "RUB",
+            "account_id": account["id"],
+            "is_family_expense": True,
+        },
+    )
+    assert transaction.status_code == 403
 
 
 def test_family_expense_is_shared_without_exposing_personal_transactions(client):
     owner = register_and_login(client, "owner-family@test.com")
     member = register_and_login(client, "member-family@test.com")
+    enable_family_plan("owner-family@test.com")
+    enable_family_plan("member-family@test.com")
 
     created = client.post(
         "/api/family/",
@@ -67,6 +105,8 @@ def test_family_expense_is_shared_without_exposing_personal_transactions(client)
 def test_settlement_reduces_outstanding_without_creating_expense(client):
     owner = register_and_login(client, "payer@test.com")
     member = register_and_login(client, "recipient@test.com")
+    enable_family_plan("payer@test.com")
+    enable_family_plan("recipient@test.com")
     family = client.post(
         "/api/family/", headers=owner, json={"name": "Семья"}
     )

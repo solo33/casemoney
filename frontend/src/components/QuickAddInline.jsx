@@ -8,6 +8,9 @@ import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
+import { useUser } from "../contexts/UserContext";
+import AmountInput from "./AmountInput";
+import CurrencyField from "./CurrencyField";
 
 const TABS = [
   { value: "expense",  label: "↘ Расход",  color: "#c0432b" },
@@ -27,6 +30,8 @@ export default function QuickAddInline({
   accountGroups: externalAccountGroups,
   categories: externalCategories,
 }) {
+  const { user } = useUser();
+  const hasFamilyPlan = user?.plan === "family";
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);
@@ -138,6 +143,9 @@ export default function QuickAddInline({
   const targetCurrencies = sortCurrenciesRubFirst(
     (selectedTargetAccount?.balances || []).map(balance => balance.currency)
   );
+  const sameTransferCurrency = type === "transfer"
+    && Boolean(form.currency)
+    && form.currency === form.to_currency;
 
   useEffect(() => {
     if (type !== "transfer" || !selectedTargetAccount) return;
@@ -153,7 +161,7 @@ export default function QuickAddInline({
       : { ...current, to_amount: toAmount });
   }, []);
   const { quote, loading: quoteLoading } = useTransferQuote({
-    enabled: type === "transfer",
+    enabled: type === "transfer" && !sameTransferCurrency,
     amount: form.amount,
     fromCurrency: form.currency,
     toCurrency: form.to_currency,
@@ -162,6 +170,20 @@ export default function QuickAddInline({
   const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) >= 0
     ? Number(form.to_amount) / Number(form.amount)
     : quote?.rate;
+
+  const swapTransferAccounts = () => {
+    if (!form.account_id || !form.to_account_id) return;
+    const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
+    setForm(current => ({
+      ...current,
+      account_id: current.to_account_id,
+      currency: current.to_currency,
+      amount: creditedAmount || "",
+      to_account_id: current.account_id,
+      to_currency: current.currency,
+      to_amount: current.amount || "",
+    }));
+  };
 
   const filteredCategories = type === "transfer"
     ? categories
@@ -186,7 +208,7 @@ export default function QuickAddInline({
         setError("Счёт-источник и получатель совпадают"); return;
       }
       if (!form.to_currency) { setError("Выберите валюту счёта-получателя"); return; }
-      if (!form.to_amount || parseFloat(form.to_amount) <= 0) {
+      if (!sameTransferCurrency && (!form.to_amount || parseFloat(form.to_amount) <= 0)) {
         setError("Введите сумму зачисления"); return;
       }
     }
@@ -201,10 +223,10 @@ export default function QuickAddInline({
         account_id: parseInt(form.account_id),
         category_id: type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
         to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
-        to_amount: type === "transfer" ? parseFloat(form.to_amount) : undefined,
+        to_amount: type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : undefined,
         to_currency: type === "transfer" ? form.to_currency : undefined,
-        is_family_expense: type === "expense" && form.is_family_expense,
-        reimbursement_amount: type === "expense" && form.is_family_expense
+        is_family_expense: hasFamilyPlan && type === "expense" && form.is_family_expense,
+        reimbursement_amount: hasFamilyPlan && type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
           : undefined,
       };
@@ -283,7 +305,7 @@ export default function QuickAddInline({
             <option value="">— выбрать —</option>
             <AccountOptions groups={accountGroups} />
           </select>
-          <input
+          <AmountInput
             type="number"
             placeholder="Сумма"
             min="0.01"
@@ -291,21 +313,24 @@ export default function QuickAddInline({
             value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
             required
-            style={{ fontWeight: 600, fontSize: 16, textAlign: "right" }}
+            inputStyle={{ fontWeight: 600, fontSize: 16, textAlign: "right", width: "100%" }}
           />
-          <select
+          <CurrencyField
+            currencies={accountCurrencies}
             value={form.currency}
             onChange={e => setForm({ ...form, currency: e.target.value })}
-          >
-            {(accountCurrencies.length > 0 ? accountCurrencies : COMMON_CURRENCIES).map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+            fallback={COMMON_CURRENCIES}
+          />
         </div>
 
         {/* Row 2: категория или отдельная сумма зачисления для перевода */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 110px 90px", gap: 10, alignItems: "center", marginBottom: 10 }}>
-          <label style={lbl}>{type === "transfer" ? "На счёт" : "Категория"}</label>
+          <label style={lbl}>
+            {type === "transfer" ? "На счёт" : "Категория"}
+            {type === "transfer" && form.to_account_id && (
+              <button type="button" className="transfer-swap-button" onClick={swapTransferAccounts} title="Поменять счета местами" aria-label="Поменять счета отправки и получения местами">⇅</button>
+            )}
+          </label>
           {type === "transfer" ? (
             <select
               value={form.to_account_id}
@@ -324,25 +349,26 @@ export default function QuickAddInline({
           )}
           {type === "transfer" ? (
             <>
-              <input
-                type="number"
-                inputMode="decimal"
-                placeholder={quoteLoading ? "Считаем…" : "Зачислить"}
-                min="0.01"
-                step="0.01"
-                value={form.to_amount}
-                onChange={e => setForm({ ...form, to_amount: e.target.value })}
-                required
-                style={{ fontWeight: 600, fontSize: 16, textAlign: "right" }}
-              />
-              <select
+              {sameTransferCurrency ? (
+                <span className="same-transfer-amount">Та же сумма</span>
+              ) : (
+                <AmountInput
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={quoteLoading ? "Считаем…" : "Зачислить"}
+                  min="0.01"
+                  step="0.01"
+                  value={form.to_amount}
+                  onChange={e => setForm({ ...form, to_amount: e.target.value })}
+                  required
+                  inputStyle={{ fontWeight: 600, fontSize: 16, textAlign: "right", width: "100%" }}
+                />
+              )}
+              <CurrencyField
+                currencies={targetCurrencies}
                 value={form.to_currency}
                 onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
-              >
-                {targetCurrencies.map(currency => (
-                  <option key={currency} value={currency}>{currency}</option>
-                ))}
-              </select>
+              />
             </>
           ) : (
             <input
@@ -359,7 +385,7 @@ export default function QuickAddInline({
             <span>
               {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate > 0
                 ? `Курс: 1 ${form.currency} = ${displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} ${form.to_currency}`
-                : "Сумма списания и зачисления указываются отдельно"}
+                : "Зачислится та же сумма"}
               {quoteLoading ? " · обновляем курс…" : ""}
             </span>
             <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} />
@@ -377,7 +403,7 @@ export default function QuickAddInline({
           />
         </div>
 
-        {type === "expense" && (
+        {hasFamilyPlan && type === "expense" && (
           <div className="family-expense-fields">
             <label>
               <input
@@ -454,6 +480,8 @@ export default function QuickAddInline({
         .transfer-rate-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -2px 0 10px 78px; color: #7a8590; font-size: 12px; }
         .transfer-rate-row input { width: 200px; }
         .family-expense-fields { margin: 0 0 12px 78px; padding: 10px 12px; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 8px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .same-transfer-amount { align-self: stretch; display: flex; align-items: center; justify-content: flex-end; color: #7a8590; font-size: 12px; }
+        label:has(.transfer-swap-button) { display: flex; align-items: center; gap: 6px; }
         .family-expense-fields label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #515c68; }
         .family-expense-fields input[type="checkbox"] { width: 18px; height: 18px; }
         .family-expense-fields input[type="number"] { width: 120px; }

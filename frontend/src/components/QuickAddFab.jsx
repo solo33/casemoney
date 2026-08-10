@@ -10,6 +10,9 @@ import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
+import { useUser } from "../contexts/UserContext";
+import AmountInput from "./AmountInput";
+import CurrencyField from "./CurrencyField";
 
 // Глобальное событие — страницы перезагружают данные после добавления
 export const TX_ADDED_EVENT = "casemoney:tx-added";
@@ -22,6 +25,8 @@ const TYPE_OPTIONS = [
 ];
 
 export default function QuickAddFab() {
+  const { user } = useUser();
+  const hasFamilyPlan = user?.plan === "family";
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [accounts, setAccounts] = useState([]);
@@ -161,6 +166,9 @@ export default function QuickAddFab() {
   const targetCurrencies = sortCurrenciesRubFirst(
     (selectedTargetAccount?.balances || []).map(balance => balance.currency)
   );
+  const sameTransferCurrency = form.type === "transfer"
+    && Boolean(form.currency)
+    && form.currency === form.to_currency;
 
   useEffect(() => {
     if (form.type !== "transfer" || !selectedTargetAccount) return;
@@ -176,7 +184,7 @@ export default function QuickAddFab() {
       : { ...current, to_amount: toAmount });
   }, []);
   const { quote, loading: quoteLoading } = useTransferQuote({
-    enabled: form.type === "transfer",
+    enabled: form.type === "transfer" && !sameTransferCurrency,
     amount: form.amount,
     fromCurrency: form.currency,
     toCurrency: form.to_currency,
@@ -185,6 +193,20 @@ export default function QuickAddFab() {
   const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) >= 0
     ? Number(form.to_amount) / Number(form.amount)
     : quote?.rate;
+
+  const swapTransferAccounts = () => {
+    if (!form.account_id || !form.to_account_id) return;
+    const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
+    setForm(current => ({
+      ...current,
+      account_id: current.to_account_id,
+      currency: current.to_currency,
+      amount: creditedAmount || "",
+      to_account_id: current.account_id,
+      to_currency: current.currency,
+      to_amount: current.amount || "",
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -203,7 +225,7 @@ export default function QuickAddFab() {
         setError("Счёт-источник и получатель совпадают"); return;
       }
       if (!form.to_currency) { setError("Выберите валюту счёта-получателя"); return; }
-      if (!form.to_amount || parseFloat(form.to_amount) <= 0) {
+      if (!sameTransferCurrency && (!form.to_amount || parseFloat(form.to_amount) <= 0)) {
         setError("Введите сумму зачисления"); return;
       }
     }
@@ -218,11 +240,11 @@ export default function QuickAddFab() {
         account_id: parseInt(form.account_id),
         category_id: form.type === "transfer" || !form.category_id ? undefined : parseInt(form.category_id),
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : undefined,
-        to_amount: form.type === "transfer" ? parseFloat(form.to_amount) : undefined,
+        to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : undefined,
         to_currency: form.type === "transfer" ? form.to_currency : undefined,
         date: form.date ? new Date(`${form.date}T12:00:00`).toISOString() : undefined,
-        is_family_expense: form.type === "expense" && form.is_family_expense,
-        reimbursement_amount: form.type === "expense" && form.is_family_expense
+        is_family_expense: hasFamilyPlan && form.type === "expense" && form.is_family_expense,
+        reimbursement_amount: hasFamilyPlan && form.type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
           : undefined,
       };
@@ -347,32 +369,28 @@ export default function QuickAddFab() {
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <label style={{ flex: 1 }}>
                   <span style={{ fontSize: 12, color: "#7a8590" }}>Сумма</span>
-                  <input
+                  <AmountInput
                     type="number" inputMode="decimal" min="0.01" step="0.01"
                     placeholder="0"
                     value={form.amount}
                     onChange={e => setForm({ ...form, amount: e.target.value })}
                     autoFocus required
-                    style={{
+                    inputStyle={{
                       width: "100%", fontSize: 24, fontWeight: 600,
                       padding: "10px 12px", marginTop: 4,
                     }}
                   />
                 </label>
-                <label style={{ width: 110 }}>
+                <label style={{ width: accountCurrencies.length > 1 ? 110 : "auto" }}>
                   <span style={{ fontSize: 12, color: "#7a8590" }}>Валюта</span>
-                  <select
+                  <div style={{ marginTop: 4 }}>
+                  <CurrencyField
+                    currencies={accountCurrencies}
                     value={form.currency}
                     onChange={e => setForm({ ...form, currency: e.target.value })}
-                    style={{ width: "100%", marginTop: 4, fontSize: 16, padding: "10px 12px" }}
-                  >
-                    {accountCurrencies.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                    {accountCurrencies.length === 0 && COMMON_CURRENCIES.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
+                    fallback={COMMON_CURRENCIES}
+                  />
+                  </div>
                 </label>
               </div>
 
@@ -404,7 +422,10 @@ export default function QuickAddFab() {
               {/* Категория или счёт-получатель (для перевода) */}
               {form.type === "transfer" ? (
                 <label style={{ display: "block", marginBottom: 12 }}>
-                  <span style={{ fontSize: 12, color: "#7a8590" }}>На счёт</span>
+                  <span style={{ fontSize: 12, color: "#7a8590", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    На счёт
+                    {form.to_account_id && <button type="button" className="transfer-swap-button" onClick={swapTransferAccounts} aria-label="Поменять счета отправки и получения местами" title="Поменять счета местами">⇅</button>}
+                  </span>
                   <select
                     value={form.to_account_id}
                     onChange={e => setForm({ ...form, to_account_id: e.target.value, to_currency: "", to_amount: "" })}
@@ -415,31 +436,31 @@ export default function QuickAddFab() {
                     <AccountOptions groups={accountGroups} excludeId={form.account_id} />
                   </select>
                   <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0.01"
-                      step="0.01"
-                      value={form.to_amount}
-                      onChange={e => setForm({ ...form, to_amount: e.target.value })}
-                      placeholder={quoteLoading ? "Считаем…" : "Сумма зачисления"}
-                      required
-                      style={{ flex: 1, minWidth: 0 }}
-                    />
-                    <select
+                    {sameTransferCurrency ? (
+                      <span style={{ flex: 1, alignSelf: "center", color: "#7a8590", fontSize: 13 }}>Зачислится та же сумма</span>
+                    ) : (
+                      <AmountInput
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={form.to_amount}
+                        onChange={e => setForm({ ...form, to_amount: e.target.value })}
+                        placeholder={quoteLoading ? "Считаем…" : "Сумма зачисления"}
+                        required
+                        inputStyle={{ width: "100%" }}
+                      />
+                    )}
+                    <CurrencyField
+                      currencies={targetCurrencies}
                       value={form.to_currency}
                       onChange={e => setForm({ ...form, to_currency: e.target.value, to_amount: "" })}
-                      style={{ width: 104 }}
-                    >
-                      {targetCurrencies.map(currency => (
-                        <option key={currency} value={currency}>{currency}</option>
-                      ))}
-                    </select>
+                    />
                   </div>
                   <small style={{ display: "block", marginTop: 6, color: "#7a8590" }}>
                     {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate > 0
                       ? `1 ${form.currency} = ${displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} ${form.to_currency}`
-                      : "Сумма зачисления может отличаться от суммы списания"}
+                      : "Зачислится та же сумма"}
                     {quoteLoading ? " · обновляем курс…" : ""}
                   </small>
                 </label>
@@ -478,7 +499,7 @@ export default function QuickAddFab() {
                 />
               </label>
 
-              {form.type === "expense" && (
+              {hasFamilyPlan && form.type === "expense" && (
                 <div style={{
                   padding: 12,
                   marginBottom: 14,

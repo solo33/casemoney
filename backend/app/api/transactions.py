@@ -17,6 +17,7 @@ from app.models.account_balance import AccountBalance
 from app.models.category import Category
 from app.models.transaction_history import TransactionHistory
 from app.models.family import FamilyMember
+from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
@@ -192,6 +193,12 @@ def _family_fields(
 ) -> tuple[Optional[int], bool, float]:
     if not is_family_expense:
         return None, False, 0
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or user.plan != "family":
+        raise HTTPException(
+            status_code=403,
+            detail="Семейные расходы доступны только на тарифе Family",
+        )
     if tx_type != TransactionType.expense:
         raise HTTPException(
             status_code=400,

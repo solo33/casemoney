@@ -4,6 +4,7 @@ export const register = (data) => client.post("/api/auth/register", data);
 export const verifyCode = (email, code) =>
   client.post("/api/auth/verify-code", { email, code });
 export const login = (data) => client.post("/api/auth/login", data);
+export const demoLogin = () => client.post("/api/auth/demo");
 export const resendActivation = (email) =>
   client.post("/api/auth/resend-activation", { email });
 export const forgotPassword = (email) =>

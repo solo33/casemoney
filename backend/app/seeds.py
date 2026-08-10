@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -50,7 +51,13 @@ def seed_default_accounts(db: Session, user_id: int, currency: str = "RUB"):
 
 
 def seed_demo_user(db: Session):
-    """Создаёт демонстрационный аккаунт для главной страницы входа."""
+    """Создаёт/пересоздаёт статический демо-аккаунт test@test.com.
+
+    Только для локальной разработки — вызов гейтится переменной окружения
+    в app/main.py (см. SEED_STATIC_DEMO). На проде публичное демо теперь
+    выдаётся через отдельный, изолированный на сессию аккаунт — см.
+    create_ephemeral_demo_user().
+    """
     # Uvicorn runs the startup hook in every worker. On PostgreSQL, let only
     # one worker rebuild the demo data to avoid concurrent DELETE/INSERT races.
     if db.bind is not None and db.bind.dialect.name == "postgresql":
@@ -70,18 +77,55 @@ def seed_demo_user(db: Session):
     user.email_verified = True
     user.is_active = True
     user.main_currency = "RUB"
-
-    account_ids = [a.id for a in db.query(Account).filter(Account.user_id == user.id).all()]
-    if account_ids:
-        db.query(TransactionHistory).filter(TransactionHistory.user_id == user.id).delete(synchronize_session=False)
-        db.query(Transaction).filter(Transaction.user_id == user.id).delete(synchronize_session=False)
-        db.query(AccountBalance).filter(AccountBalance.account_id.in_(account_ids)).delete(synchronize_session=False)
-        db.query(Account).filter(Account.user_id == user.id).delete(synchronize_session=False)
-    db.query(Category).filter(Category.user_id == user.id).delete(synchronize_session=False)
-    db.query(AccountGroup).filter(AccountGroup.user_id == user.id).delete(synchronize_session=False)
-    db.query(UserCurrency).filter(UserCurrency.user_id == user.id).delete(synchronize_session=False)
     db.flush()
 
+    _wipe_user_data(db, user.id)
+    _build_demo_dataset(db, user)
+    db.commit()
+
+
+def create_ephemeral_demo_user(db: Session) -> User:
+    """Создаёт изолированный одноразовый демо-аккаунт (кнопка «Заполнить
+    демо-вход» на публичном логине). Каждый посетитель получает свою
+    песочницу — никто не видит и не может изменить данные другого. Аккаунт
+    удаляется фоновым воркером через DEMO_ACCOUNT_TTL после создания —
+    см. app/services/demo_cleanup.py.
+    """
+    token = uuid.uuid4().hex[:12]
+    user = User(
+        email=f"demo-{token}@demo.casemoney.local",
+        username="Гость",
+        hashed_password=hash_password(uuid.uuid4().hex),  # логин только по токену, не по паролю
+        email_verified=True,
+        is_active=True,
+        main_currency="RUB",
+        is_demo=True,
+    )
+    db.add(user)
+    db.flush()
+    _build_demo_dataset(db, user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def _wipe_user_data(db: Session, user_id: int) -> None:
+    account_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
+    if account_ids:
+        db.query(TransactionHistory).filter(TransactionHistory.user_id == user_id).delete(synchronize_session=False)
+        db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
+        db.query(AccountBalance).filter(AccountBalance.account_id.in_(account_ids)).delete(synchronize_session=False)
+        db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
+    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
+    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
+    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
+    db.flush()
+
+
+def _build_demo_dataset(db: Session, user: User) -> None:
+    """Наполняет пустой аккаунт каноничным демо-набором: категории, группы
+    счетов, счета, транзакции. Предполагает, что для user.id ещё нет данных
+    (для test@test.com это гарантирует _wipe_user_data)."""
     income_names = [
         "Зарплата", "Аванс", "Премия", "Фриланс", "Консультации",
         "Проценты по вкладу", "Кэшбэк", "Возврат", "Подарки", "Продажа вещей",
@@ -186,5 +230,4 @@ def seed_demo_user(db: Session):
     ])
     for row in demo_rows:
         add_tx(*row)
-
-    db.commit()
+    db.flush()

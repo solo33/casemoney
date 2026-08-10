@@ -14,6 +14,9 @@ import {
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
+import AmountInput from "../components/AmountInput";
+import CurrencyField from "../components/CurrencyField";
+import useTransferQuote from "../hooks/useTransferQuote";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -66,6 +69,7 @@ export default function Transactions() {
   const [newTx, setNewTx] = useState({
     amount: "", type: "expense", currency: "",
     description: "", account_id: "", category_id: "", to_account_id: "",
+    to_amount: "", to_currency: "",
     date: isoToday(),
   });
 
@@ -151,6 +155,51 @@ export default function Transactions() {
   const newTxCurrencies = sortCurrenciesRubFirst(
     (selectedAccount?.balances || []).map(b => b.currency)
   );
+  const selectedTargetAccount = useMemo(
+    () => accounts.find(a => String(a.id) === String(newTx.to_account_id)),
+    [accounts, newTx.to_account_id]
+  );
+  const newTxTargetCurrencies = sortCurrenciesRubFirst(
+    (selectedTargetAccount?.balances || []).map(b => b.currency)
+  );
+  const sameNewTransferCurrency = newTx.type === "transfer"
+    && Boolean(newTx.currency)
+    && newTx.currency === newTx.to_currency;
+
+  useEffect(() => {
+    if (newTx.type !== "transfer" || !selectedTargetAccount) return;
+    if (!newTxTargetCurrencies.includes(newTx.to_currency)) {
+      setNewTx(current => ({ ...current, to_currency: newTxTargetCurrencies[0] || "", to_amount: "" }));
+    }
+  }, [newTx.type, selectedTargetAccount, newTxTargetCurrencies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyNewTransferQuote = useCallback(toAmount => {
+    setNewTx(current => current.to_amount === toAmount ? current : { ...current, to_amount: toAmount });
+  }, []);
+  const { loading: newQuoteLoading } = useTransferQuote({
+    enabled: newTx.type === "transfer" && !sameNewTransferCurrency,
+    amount: newTx.amount,
+    fromCurrency: newTx.currency,
+    toCurrency: newTx.to_currency,
+    onQuote: applyNewTransferQuote,
+  });
+  const newDisplayedRate = Number(newTx.amount) > 0 && Number(newTx.to_amount) > 0
+    ? Number(newTx.to_amount) / Number(newTx.amount)
+    : null;
+
+  const swapNewTransferAccounts = () => {
+    if (!newTx.account_id || !newTx.to_account_id) return;
+    const creditedAmount = sameNewTransferCurrency ? newTx.amount : newTx.to_amount;
+    setNewTx(current => ({
+      ...current,
+      account_id: current.to_account_id,
+      currency: current.to_currency,
+      amount: creditedAmount || "",
+      to_account_id: current.account_id,
+      to_currency: current.currency,
+      to_amount: current.amount || "",
+    }));
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -161,6 +210,10 @@ export default function Transactions() {
         if (String(newTx.to_account_id) === String(newTx.account_id)) {
           setError("Счёт-источник и получатель совпадают"); return;
         }
+        if (!newTx.to_currency) { setError("Выберите валюту счёта-получателя"); return; }
+        if (!sameNewTransferCurrency && !(parseFloat(newTx.to_amount) > 0)) {
+          setError("Введите сумму зачисления"); return;
+        }
       }
       const payload = {
         amount: parseFloat(newTx.amount),
@@ -170,6 +223,8 @@ export default function Transactions() {
         account_id: parseInt(newTx.account_id),
         category_id: newTx.type === "transfer" || !newTx.category_id ? undefined : parseInt(newTx.category_id),
         to_account_id: newTx.type === "transfer" ? parseInt(newTx.to_account_id) : undefined,
+        to_amount: newTx.type === "transfer" ? parseFloat(sameNewTransferCurrency ? newTx.amount : newTx.to_amount) : undefined,
+        to_currency: newTx.type === "transfer" ? newTx.to_currency : undefined,
       };
       if (newTx.date) payload.date = new Date(newTx.date).toISOString();
       const requestKey = idempotencyKeyFor(createRequestRef, payload);
@@ -275,26 +330,30 @@ export default function Transactions() {
             <option value="income">Доход</option>
             <option value="transfer">Перевод</option>
           </select>
-          <input
+          <AmountInput
             type="number" placeholder="Сумма" min="0.01" step="0.01"
             value={newTx.amount}
             onChange={e => setNewTx({ ...newTx, amount: e.target.value })}
-            required style={{ width: 110 }}
+            required inputStyle={{ width: 110 }}
           />
-          <select value={newTx.currency} onChange={e => setNewTx({ ...newTx, currency: e.target.value })} style={{ width: 90 }}>
-            {(newTxCurrencies.length ? newTxCurrencies : COMMON_CURRENCIES).map(c =>
-              <option key={c} value={c}>{c}</option>
-            )}
-          </select>
+          <CurrencyField currencies={newTxCurrencies} fallback={COMMON_CURRENCIES} value={newTx.currency} onChange={e => setNewTx({ ...newTx, currency: e.target.value })} />
           <select value={newTx.account_id} onChange={e => setNewTx({ ...newTx, account_id: e.target.value })} required>
             <option value="">— Счёт —</option>
             <AccountOptions groups={accountGroups} />
           </select>
           {newTx.type === "transfer" ? (
-            <select value={newTx.to_account_id} onChange={e => setNewTx({ ...newTx, to_account_id: e.target.value })} required>
-              <option value="">— На счёт —</option>
-              <AccountOptions groups={accountGroups} excludeId={newTx.account_id} />
-            </select>
+            <>
+              <button type="button" className="transfer-swap-button" onClick={swapNewTransferAccounts} disabled={!newTx.to_account_id} aria-label="Поменять счета отправки и получения местами" title="Поменять счета местами">⇄</button>
+              <select value={newTx.to_account_id} onChange={e => setNewTx({ ...newTx, to_account_id: e.target.value, to_currency: "", to_amount: "" })} required>
+                <option value="">— На счёт —</option>
+                <AccountOptions groups={accountGroups} excludeId={newTx.account_id} />
+              </select>
+              {!sameNewTransferCurrency && (
+                <AmountInput type="number" inputMode="decimal" min="0.01" step="0.01" value={newTx.to_amount} onChange={e => setNewTx({ ...newTx, to_amount: e.target.value })} placeholder={newQuoteLoading ? "Считаем…" : "Зачислить"} required inputStyle={{ width: 110 }} />
+              )}
+              <CurrencyField currencies={newTxTargetCurrencies} value={newTx.to_currency} onChange={e => setNewTx({ ...newTx, to_currency: e.target.value, to_amount: "" })} />
+              {newTx.currency && newTx.to_currency && newTx.currency !== newTx.to_currency && newDisplayedRate && <small>1 {newTx.currency} = {newDisplayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} {newTx.to_currency}</small>}
+            </>
           ) : (
             <CategoryPicker
               categories={filteredCategoriesForCreate}
@@ -548,6 +607,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
     account_id: String(tx.account_id),
     category_id: tx.category_id ? String(tx.category_id) : "",
     to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
+    to_amount: tx.to_amount != null ? String(tx.to_amount) : "",
+    to_currency: tx.to_currency || "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
   });
@@ -558,6 +619,16 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
   const accCurrencies = sortCurrenciesRubFirst(
     (acc?.balances || []).map(b => b.currency)
   );
+  const targetAccount = accounts.find(a => String(a.id) === form.to_account_id);
+  const targetCurrencies = sortCurrenciesRubFirst(
+    (targetAccount?.balances || []).map(b => b.currency)
+  );
+  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) > 0
+    ? Number(form.to_amount) / Number(form.amount)
+    : null;
+  const sameTransferCurrency = form.type === "transfer"
+    && Boolean(form.currency)
+    && form.currency === form.to_currency;
   const cats = form.type === "transfer" ? [] : categories.filter(c => c.type === form.type);
 
   const save = async () => {
@@ -566,6 +637,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
       if (String(form.to_account_id) === String(form.account_id)) {
         setErr("Счёт-источник и получатель совпадают"); return;
       }
+      if (!form.to_currency) { setErr("Выберите валюту счёта-получателя"); return; }
+      if (!sameTransferCurrency && !(parseFloat(form.to_amount) > 0)) { setErr("Введите сумму зачисления"); return; }
     }
     setSaving(true);
     setErr(null);
@@ -577,6 +650,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
         account_id: parseInt(form.account_id),
         category_id: form.type === "transfer" || !form.category_id ? null : parseInt(form.category_id),
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
+        to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : null,
+        to_currency: form.type === "transfer" ? form.to_currency : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       };
@@ -600,28 +675,62 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
             <option value="income">Доход</option>
             <option value="transfer">Перевод</option>
           </select>
-          <input
+          <AmountInput
             type="number" step="0.01" value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
-            style={{ width: 110, textAlign: "right" }}
+            inputStyle={{ width: 110, textAlign: "right" }}
           />
-          <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} style={{ width: 80 }}>
-            {(accCurrencies.length ? accCurrencies : [form.currency]).map(c =>
-              <option key={c} value={c}>{c}</option>
-            )}
-          </select>
-          <select value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })}>
+          <CurrencyField currencies={accCurrencies.length ? accCurrencies : [form.currency]} value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} />
+          <select value={form.account_id} onChange={e => {
+            const account = accounts.find(item => String(item.id) === e.target.value);
+            const currencies = sortCurrenciesRubFirst((account?.balances || []).map(b => b.currency));
+            setForm({ ...form, account_id: e.target.value, currency: currencies[0] || form.currency });
+          }}>
             <AccountOptions groups={accountGroups} includeIds={[form.account_id]} />
           </select>
           {form.type === "transfer" ? (
-            <select value={form.to_account_id} onChange={e => setForm({ ...form, to_account_id: e.target.value })} required>
-              <option value="">— На счёт —</option>
-              <AccountOptions
-                groups={accountGroups}
-                excludeId={form.account_id}
-                includeIds={[form.to_account_id]}
+            <>
+              <button type="button" className="transfer-swap-button" disabled={!form.to_account_id} onClick={() => {
+                const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
+                setForm(current => ({ ...current, account_id: current.to_account_id, currency: current.to_currency, amount: creditedAmount || "", to_account_id: current.account_id, to_currency: current.currency, to_amount: current.amount || "" }));
+              }} aria-label="Поменять счета отправки и получения местами" title="Поменять счета местами">⇄</button>
+              <select value={form.to_account_id} onChange={e => {
+                const account = accounts.find(item => String(item.id) === e.target.value);
+                const currencies = sortCurrenciesRubFirst((account?.balances || []).map(b => b.currency));
+                setForm({
+                  ...form,
+                  to_account_id: e.target.value,
+                  to_currency: currencies[0] || "",
+                  to_amount: "",
+                });
+              }} required>
+                <option value="">— На счёт —</option>
+                <AccountOptions
+                  groups={accountGroups}
+                  excludeId={form.account_id}
+                  includeIds={[form.to_account_id]}
+                />
+              </select>
+              {!sameTransferCurrency && <AmountInput
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={form.to_amount}
+                onChange={e => setForm({ ...form, to_amount: e.target.value })}
+                placeholder="Зачислено"
+                inputStyle={{ width: 110, textAlign: "right" }}
+              />}
+              <CurrencyField
+                currencies={targetCurrencies.length ? targetCurrencies : [form.to_currency].filter(Boolean)}
+                value={form.to_currency}
+                onChange={e => setForm({ ...form, to_currency: e.target.value })}
               />
-            </select>
+              {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate && (
+                <span style={{ color: "#7a8590", fontSize: 12 }}>
+                  1 {form.currency} = {displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} {form.to_currency}
+                </span>
+              )}
+            </>
           ) : (
             <CategoryPicker
               categories={cats}

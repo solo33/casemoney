@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/bump-build.mjs && vite build",
-    "build:verify": "vite build",
+    "build": "node scripts/bump-build.mjs && vite build && node scripts/generate-seo-pages.mjs",
+    "build:verify": "vite build && node scripts/generate-seo-pages.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "icons": "node scripts/generate-icons.mjs",

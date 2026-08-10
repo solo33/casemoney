@@ -3,8 +3,10 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol } from "../utils/money";
 import PwaInstallLink from "./PwaInstallLink";
+import NotificationBell from "./NotificationBell";
 
 const BASE_LINKS = [
+  { to: "/credits", label: "Обязательства", familyOnly: true },
   { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
   { to: "/transactions", label: "Записи" },
@@ -26,6 +28,7 @@ const RECORD_LINKS = [
 ];
 
 const MOBILE_MORE_LINKS = [
+  { to: "/credits", label: "Обязательства и депозиты", familyOnly: true },
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/goals", label: "Цели" },
   { to: "/import", label: "Импорт" },
@@ -50,10 +53,18 @@ export default function Nav() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
-  const links = BASE_LINKS;
+  const hasFamilyPlan = user?.plan === "family";
+  const links = BASE_LINKS.filter(link => !link.familyOnly || hasFamilyPlan);
+  const visibleSettingsLinks = SETTINGS_LINKS.filter(
+    link => link.to !== "/settings/family" || hasFamilyPlan
+  );
+  const mobileMoreLinks = MOBILE_MORE_LINKS.filter(link => (
+    (!link.familyOnly || hasFamilyPlan)
+    && (link.to !== "/settings/family" || hasFamilyPlan)
+  ));
   const settingsLinks = user?.is_admin
-    ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
-    : SETTINGS_LINKS;
+    ? [...visibleSettingsLinks, { to: "/admin", label: "Админка" }]
+    : visibleSettingsLinks;
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -200,6 +211,8 @@ export default function Nav() {
           </div>
         </div>
 
+        <NotificationBell />
+
         {/* Current account */}
         <NavLink
           to="/settings/personal"
@@ -285,7 +298,7 @@ export default function Nav() {
             </>
           ) : (
             <>
-              {MOBILE_MORE_LINKS.map(l => (
+              {mobileMoreLinks.map(l => (
                 <NavLink
                   key={l.to}
                   to={l.to}
