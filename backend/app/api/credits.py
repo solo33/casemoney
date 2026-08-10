@@ -108,6 +108,7 @@ def _calculate_deposit_income(credit: CreditObligation) -> Optional[float]:
 def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True) -> CreditResponse:
     source = _own_account(db, credit.user_id, credit.source_account_id)
     linked = _own_account(db, credit.user_id, credit.linked_account_id)
+    funds_account = _own_account(db, credit.user_id, credit.funds_account_id)
     category = _own_category(db, credit.user_id, credit.category_id)
     current_balance = credit.current_balance
     if credit.kind == "credit_card" and linked:
@@ -147,6 +148,10 @@ def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True
         source_account_name=source.name if source else None,
         linked_account_id=credit.linked_account_id,
         linked_account_name=linked.name if linked else None,
+        funds_received=credit.funds_received,
+        funds_account_id=credit.funds_account_id,
+        funds_account_name=funds_account.name if funds_account else None,
+        funding_transaction_id=credit.funding_transaction_id,
         category_id=credit.category_id,
         category_name=category.name if category else None,
         status=credit.status,
@@ -198,6 +203,7 @@ def create_credit(
 ):
     _own_account(db, user_id, data.source_account_id)
     _own_account(db, user_id, data.linked_account_id)
+    funds_account = _own_account(db, user_id, data.funds_account_id)
     category = _own_category(db, user_id, data.category_id)
     _validate_cashflow_category(category, data.kind)
     credit = CreditObligation(
@@ -222,6 +228,8 @@ def create_credit(
         reminder_days_before=data.reminder_days_before,
         source_account_id=data.source_account_id,
         linked_account_id=data.linked_account_id,
+        funds_received=data.funds_received,
+        funds_account_id=data.funds_account_id,
         category_id=data.category_id,
         notes=data.notes,
     )
@@ -229,6 +237,24 @@ def create_credit(
         credit.interest_payout_frequency = credit.interest_payout_frequency or "monthly"
         credit.monthly_payment = _calculate_deposit_income(credit)
     db.add(credit)
+    db.flush()
+    if data.funds_received:
+        amount = float(data.original_amount or data.current_balance or 0)
+        transaction = Transaction(
+            amount=amount,
+            currency=credit.currency,
+            type=TransactionType.income,
+            description=f"Получение кредита: {credit.name}",
+            date=datetime.combine(data.opened_at or date.today(), time.min, tzinfo=timezone.utc),
+            account_id=funds_account.id,
+            user_id=user_id,
+            is_financing=True,
+        )
+        db.add(transaction)
+        db.flush()
+        _apply_tx_effect(db, transaction)
+        _write_history(db, user_id, transaction, "created")
+        credit.funding_transaction_id = transaction.id
     db.commit()
     db.refresh(credit)
     return _serialize(db, credit)

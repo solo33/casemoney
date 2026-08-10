@@ -36,6 +36,10 @@ class CreditObligation(Base):
     reminder_days_before = Column(Integer, nullable=False, default=3)
     source_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     linked_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    # Optional initial loan disbursement, separate from the payment account.
+    funds_received = Column(Boolean, nullable=False, default=False)
+    funds_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    funding_transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(16), nullable=False, default="active")
     notes = Column(Text, nullable=True)

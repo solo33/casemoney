@@ -51,5 +51,7 @@ class Transaction(Base):
     family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
     is_family_expense = Column(Boolean, nullable=False, default=False)
     reimbursement_amount = Column(Float, nullable=False, default=0)
+    # Changes a balance but must not be counted as earned income in reports.
+    is_financing = Column(Boolean, nullable=False, default=False)
 
     account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")

@@ -55,6 +55,60 @@ def test_mortgage_payment_creates_expense_and_history(client):
     assert len(details["payments"]) == 1
 
 
+def test_loan_disbursement_increases_account_without_becoming_income(client):
+    auth = register_and_login(client, "loan-disbursement@test.com")
+    enable_family("loan-disbursement@test.com")
+    account = make_account(client, auth, balance=1_000)
+
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Кредит наличными",
+            "kind": "loan",
+            "currency": "RUB",
+            "original_amount": 50_000,
+            "current_balance": 50_000,
+            "funds_received": True,
+            "funds_account_id": account["id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    credit = created.json()
+    assert credit["funds_received"] is True
+    assert credit["funds_account_id"] == account["id"]
+    assert credit["funding_transaction_id"] is not None
+    assert account_balance(client, auth, account["id"]) == 51_000
+
+    tx = client.get("/api/transactions/", headers=auth).json()["items"][0]
+    assert tx["type"] == "income"
+    assert tx["amount"] == 50_000
+
+    summary = client.get("/api/reports/summary", headers=auth).json()
+    assert summary["total_income"] == 0
+
+
+def test_mortgage_without_disbursement_does_not_change_account(client):
+    auth = register_and_login(client, "mortgage-no-cash@test.com")
+    enable_family("mortgage-no-cash@test.com")
+    account = make_account(client, auth, balance=1_000)
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Ипотека",
+            "kind": "mortgage",
+            "currency": "RUB",
+            "original_amount": 5_000_000,
+            "current_balance": 5_000_000,
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["funds_received"] is False
+    assert account_balance(client, auth, account["id"]) == 1_000
+    assert client.get("/api/transactions/", headers=auth).json()["items"] == []
+
+
 def test_credit_card_payment_is_transfer_not_second_expense(client):
     auth = register_and_login(client, "credit-card@test.com")
     enable_family("credit-card@test.com")

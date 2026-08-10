@@ -210,6 +210,8 @@ def get_summary(
     total_expense = 0.0
     cat_totals: dict[Optional[int], float] = {}
     for t in transactions:
+        if t.is_financing:
+            continue
         amount_main = _to_main(db, user_id, t.amount, t.currency, main)
         if t.type == TransactionType.income:
             total_income += amount_main
@@ -321,6 +323,8 @@ def get_annual(
     inc_buckets: dict[Optional[int], list[float]] = {}
     exp_buckets: dict[Optional[int], list[float]] = {}
     for t in transactions:
+        if t.is_financing:
+            continue
         if t.type not in (TransactionType.income, TransactionType.expense):
             continue
         m_idx = t.date.month - 1
@@ -609,6 +613,8 @@ def get_monthly_trend(
             y += 1
 
     for t in transactions:
+        if t.is_financing:
+            continue
         key = f"{t.date.year:04d}-{t.date.month:02d}"
         if key not in points_map:
             continue
@@ -678,6 +684,7 @@ def get_yoy(
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.type == tx_type,
+        Transaction.is_financing.is_(False),
     )
 
     acc_ids = _parse_ids(account_ids)

@@ -30,6 +30,8 @@ class CreditCreate(BaseModel):
     reminder_days_before: int = Field(3, ge=0, le=30)
     source_account_id: Optional[int] = None
     linked_account_id: Optional[int] = None
+    funds_received: bool = False
+    funds_account_id: Optional[int] = None
     category_id: Optional[int] = None
     notes: Optional[str] = Field(None, max_length=2000)
 
@@ -43,6 +45,13 @@ class CreditCreate(BaseModel):
             raise ValueError("Для кредитной карты выберите её счёт")
         if self.current_balance is None:
             self.current_balance = self.original_amount
+        if self.funds_received:
+            if self.kind in {"deposit", "credit_card"} or self.direction != "owe":
+                raise ValueError("Зачисление доступно только для обязательства, по которому вы должны")
+            if not self.funds_account_id:
+                raise ValueError("Выберите счёт, на который поступили деньги")
+            if not (self.original_amount or self.current_balance):
+                raise ValueError("Укажите сумму кредита")
         return self
 
 
@@ -114,6 +123,10 @@ class CreditResponse(BaseModel):
     source_account_name: Optional[str]
     linked_account_id: Optional[int]
     linked_account_name: Optional[str]
+    funds_received: bool
+    funds_account_id: Optional[int]
+    funds_account_name: Optional[str]
+    funding_transaction_id: Optional[int]
     category_id: Optional[int]
     category_name: Optional[str]
     status: str

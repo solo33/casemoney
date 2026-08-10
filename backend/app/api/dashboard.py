@@ -138,7 +138,7 @@ def get_dashboard(
 
     month_income = sum(
         _to_main(db, user_id, t.amount, t.currency, main)
-        for t in month_transactions if t.type == TransactionType.income
+        for t in month_transactions if t.type == TransactionType.income and not t.is_financing
     )
     month_expense = sum(
         _to_main(db, user_id, t.amount, t.currency, main)
