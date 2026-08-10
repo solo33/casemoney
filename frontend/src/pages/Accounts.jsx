@@ -34,7 +34,7 @@ const UNGROUPED_KEY = "__ungrouped__";
 
 export default function Accounts() {
   const navigate = useNavigate();
-  const { mainCurrency } = useUser();
+  const { mainCurrency, user } = useUser();
   const [groups, setGroups] = useState([]);  // grouped response
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -327,6 +327,16 @@ export default function Accounts() {
           />
           <button type="submit">+ Группа</button>
         </form>
+
+        {user?.plan === "family" && (
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => navigate("/credits")}
+          >
+            Обязательства и депозиты
+          </button>
+        )}
 
         <button onClick={() => setShowNewAccount(s => !s)} type="button">
           {showNewAccount ? "Отмена" : "+ Счёт"}

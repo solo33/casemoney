@@ -6,7 +6,6 @@ import PwaInstallLink from "./PwaInstallLink";
 import NotificationBell from "./NotificationBell";
 
 const BASE_LINKS = [
-  { to: "/credits", label: "Обязательства", familyOnly: true },
   { to: "/home", label: "Главная" },
   { to: "/accounts", label: "Счета" },
   { to: "/transactions", label: "Записи" },
