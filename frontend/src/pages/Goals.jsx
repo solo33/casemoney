@@ -16,7 +16,7 @@ export default function Goals() {
   const blank = {
     name: "", icon: "🎯", target_amount: "",
     currency: mainCurrency, current_amount: 0,
-    account_id: "", due_date: "",
+    account_id: "", due_date: "", sort_order: 0,
   };
   const [form, setForm] = useState(blank);
 
@@ -57,6 +57,7 @@ export default function Goals() {
       current_amount: g.account_id ? 0 : g.current_amount,
       account_id: g.account_id ? String(g.account_id) : "",
       due_date: g.due_date || "",
+      sort_order: g.sort_order || 0,
     });
     setEditId(g.id);
     setAdding(false);
@@ -80,6 +81,7 @@ export default function Goals() {
         current_amount: parseFloat(form.current_amount) || 0,
         account_id: form.account_id ? parseInt(form.account_id) : null,
         due_date: form.due_date || null,
+        sort_order: Number(form.sort_order) || 0,
       };
       if (editId) {
         await api.patch(`/api/goals/${editId}`, payload);
@@ -177,6 +179,11 @@ function GoalCard({ g, onEdit, onDelete }) {
               до {new Date(g.due_date).toLocaleDateString("ru-RU")}
             </div>
           )}
+          {g.monthly_contribution != null && (
+            <div style={{ fontSize: 12, color: "#a06b18" }}>
+              нужно откладывать {formatMoney(g.monthly_contribution)} {sym} в месяц
+            </div>
+          )}
         </div>
         <button className="btn-ghost" onClick={onEdit} style={{ padding: "4px 10px", fontSize: 13 }}>
           ✎
@@ -207,7 +214,7 @@ function GoalCard({ g, onEdit, onDelete }) {
           {formatMoney(g.current_amount)} {sym}
         </span>
         <span style={{ color: "#a6afb8", fontSize: 13 }}>
-          из {formatMoney(g.target_amount)} {sym}
+          из {formatMoney(g.target_amount)} {sym} · осталось {formatMoney(g.remaining_amount)} {sym}
         </span>
         <span style={{
           color: reached ? "#167a4a" : "#173a54",
@@ -294,6 +301,12 @@ function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }) {
           value={form.due_date}
           onChange={e => setForm({ ...form, due_date: e.target.value })}
         />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <label style={lbl}>Приоритет</label>
+        <input type="number" min="0" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: e.target.value })} style={{ width: 90 }} />
+        <span style={{ fontSize: 12, color: "#a6afb8" }}>Меньшее число — выше в списке и в распределении средств.</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

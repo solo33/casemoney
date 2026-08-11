@@ -37,6 +37,8 @@ class GoalResponse(BaseModel):
     account_name: Optional[str]
     due_date: Optional[date]
     sort_order: int
+    remaining_amount: float
+    monthly_contribution: Optional[float]
 
     class Config:
         from_attributes = True

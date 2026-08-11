@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import date
 
 from app.database import get_db
 from app.models.goal import Goal
@@ -50,6 +51,12 @@ def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
     if goal.target_amount > 0:
         pct = round(max(0, min(100, current / goal.target_amount * 100)), 1)
 
+    remaining = round(max(0, goal.target_amount - current), 2)
+    monthly_contribution = None
+    if goal.due_date and goal.due_date > date.today() and remaining:
+        months = max(1, (goal.due_date.year - date.today().year) * 12 + goal.due_date.month - date.today().month)
+        monthly_contribution = round(remaining / months, 2)
+
     return GoalResponse(
         id=goal.id,
         name=goal.name,
@@ -62,6 +69,8 @@ def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
         account_name=account_name,
         due_date=goal.due_date,
         sort_order=goal.sort_order,
+        remaining_amount=remaining,
+        monthly_contribution=monthly_contribution,
     )
 
 
