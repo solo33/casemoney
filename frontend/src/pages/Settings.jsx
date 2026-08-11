@@ -34,16 +34,6 @@ export default function Settings() {
     }
   };
 
-  const toggleShoppingButton = async (enabled) => {
-    try {
-      await api.put("/api/me/", { show_shopping_button_mobile: enabled });
-      await refresh();
-      flash(enabled ? "Кнопка списка покупок показана на мобильных устройствах" : "Кнопка списка покупок скрыта на мобильных устройствах");
-    } catch (e) {
-      flash(e.response?.data?.detail || "Не удалось сохранить настройку", true);
-    }
-  };
-
   const changePassword = async (e) => {
     e.preventDefault();
     if (pwdForm.new_password !== pwdForm.repeat) {
@@ -137,17 +127,6 @@ export default function Settings() {
             <button type="submit">Сохранить</button>
           </div>
         </form>
-      </Section>
-
-      <Section title="Мобильное приложение">
-        <label className="settings-checkbox-row">
-          <input
-            type="checkbox"
-            checked={user.show_shopping_button_mobile !== false}
-            onChange={e => toggleShoppingButton(e.target.checked)}
-          />
-          <span><strong>Показывать кнопку «Покупки»</strong><small>Быстрый переход к спискам покупок внизу экрана на телефоне.</small></span>
-        </label>
       </Section>
 
       {/* Смена пароля */}

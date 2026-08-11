@@ -548,6 +548,12 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   width: 100%;
 }
 
+/* Date and plan are one compact control in the desktop quick-entry form. */
+.qai-date-plan { display: flex; align-items: center; gap: 10px; }
+.qai-date-plan .qai-date { flex: 1; min-width: 0; }
+.qai-plan-toggle { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #515c68; font-size: 13px; }
+.qai-plan-toggle input { width: 18px; height: 18px; min-height: 18px !important; margin: 0; }
+
 @media (max-width: 640px) {
   h1 { font-size: 28px; }
   h2 { font-size: 22px; }
@@ -870,12 +876,26 @@ hr {
 
 @media (max-width: 767px) {
   body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
-  .page { padding: 16px 12px 94px; }
+  .page { padding: 16px 12px 150px; }
   .page > h1:first-child { font-size: 25px !important; margin-bottom: 10px !important; }
 
   button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   input, select, textarea { font-size: 16px !important; }
   .page button:not(.btn-link), .page select, .page input { min-height: 44px; }
+
+  .history-list { margin-bottom: 58px; }
+  .history-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "changed amount" "operation amount" "date amount";
+    gap: 4px 12px !important;
+    align-items: start !important;
+    padding: 13px 14px !important;
+  }
+  .history-changed { grid-area: changed; min-width: 0 !important; font-size: 12px; }
+  .history-date { grid-area: date; min-width: 0 !important; font-size: 12px; }
+  .history-operation { grid-area: operation; min-width: 0 !important; line-height: 1.35; overflow-wrap: anywhere; }
+  .history-amount { grid-area: amount; align-self: center; text-align: right; font-size: 14px; }
   .register-secondary-links a:nth-child(1), .register-secondary-links a:nth-child(3) { display: none; }
 
   .analysis-nav {

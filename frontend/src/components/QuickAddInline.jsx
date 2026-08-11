@@ -40,6 +40,7 @@ export default function QuickAddInline({
   // Дата может управляться родителем (синхронизация с лентой за день)
   const dateVal = date !== undefined ? date : internalDate;
   const setDateVal = onDateChange || setInternalDate;
+  const showPlanToggle = hasFamilyPlan && Boolean(dateVal) && dateVal > isoToday();
   const [form, setForm] = useState({
     amount: "",
     account_id: "",
@@ -385,12 +386,23 @@ export default function QuickAddInline({
               />
             </>
           ) : (
-            <input
-              type="date"
-              value={dateVal}
-              onChange={e => setDateVal(e.target.value)}
-              className="qai-date"
-            />
+            <div className="qai-date-plan">
+              <input
+                type="date"
+                value={dateVal}
+                onChange={e => {
+                  setDateVal(e.target.value);
+                  if (e.target.value <= isoToday()) setForm(current => ({ ...current, is_planned: false }));
+                }}
+                className="qai-date"
+              />
+              {showPlanToggle && (
+                <label className="qai-plan-toggle" title="Будущая запись не меняет остаток до наступления даты">
+                  <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} />
+                  План
+                </label>
+              )}
+            </div>
           )}
         </div>
 
@@ -460,13 +472,6 @@ export default function QuickAddInline({
         )}
 
         {/* Errors + submit */}
-        {hasFamilyPlan && (
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12, color: "#515c68", fontSize: 13 }}>
-            <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} />
-            Планируемая запись — остаток пока не меняется
-          </label>
-        )}
-
         {error && (
           <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>{error}</span>

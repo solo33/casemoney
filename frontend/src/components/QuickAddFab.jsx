@@ -18,6 +18,11 @@ import CurrencyField from "./CurrencyField";
 export const TX_ADDED_EVENT = "casemoney:tx-added";
 export const QUICK_ADD_OPEN_EVENT = "casemoney:quick-add-open";
 
+function isoToday() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 const TYPE_OPTIONS = [
   { value: "expense", label: "↘ Расход", color: "#c0432b" },
   { value: "transfer", label: "⇄ Перевод", color: "#2f6296" },
@@ -290,9 +295,9 @@ export default function QuickAddFab() {
         className="fab-add-btn"
         style={{
           position: "fixed",
-          right: 16,
-          bottom: "calc(76px + env(safe-area-inset-bottom, 0px))",
-          width: 56, height: 56, borderRadius: "50%",
+          right: 14,
+          bottom: "calc(78px + env(safe-area-inset-bottom, 0px))",
+          width: 52, height: 52, borderRadius: "50%",
           background: "#173a54", color: "#fff", border: "none",
           fontSize: 28, lineHeight: 1, cursor: "pointer",
           boxShadow: "0 6px 16px rgba(23, 58, 84, 0.4)",
@@ -499,13 +504,25 @@ export default function QuickAddFab() {
 
               <label style={{ display: "block", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: "#7a8590" }}>Дата</span>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={e => setForm({ ...form, date: e.target.value })}
-                  required
-                  style={{ width: "100%", marginTop: 4 }}
-                />
+                <div className="quick-add-date-plan">
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={e => setForm({
+                      ...form,
+                      date: e.target.value,
+                      is_planned: e.target.value > isoToday() ? form.is_planned : false,
+                    })}
+                    required
+                    style={{ width: "100%", marginTop: 4 }}
+                  />
+                  {hasFamilyPlan && form.date > isoToday() && (
+                    <label title="Будущая запись не меняет остаток до наступления даты">
+                      <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} />
+                      План
+                    </label>
+                  )}
+                </div>
               </label>
 
               <label style={{ display: "block", marginBottom: 16 }}>
@@ -561,13 +578,6 @@ export default function QuickAddFab() {
                 </div>
               )}
 
-              {hasFamilyPlan && (
-                <label style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14, fontSize: 14, color: "#515c68" }}>
-                  <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} style={{ width: 20, height: 20 }} />
-                  Планируемая запись — остаток пока не меняется
-                </label>
-              )}
-
               {error && (
                 <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 12 }}>
                   <span>{error}</span>
@@ -608,6 +618,10 @@ export default function QuickAddFab() {
             @media (max-width: 767px) {
               .quick-add-sheet { top: calc(58px + env(safe-area-inset-top, 0px)); max-height: none !important; border-radius: 18px 18px 0 0 !important; padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important; }
               .quick-add-sheet input, .quick-add-sheet select { min-height: 46px; }
+              .quick-add-date-plan { display: flex; align-items: end; gap: 10px; }
+              .quick-add-date-plan > input { flex: 1; }
+              .quick-add-date-plan > label { display: inline-flex !important; align-items: center; gap: 6px; min-height: 46px; margin: 4px 0 0; white-space: nowrap; color: #515c68; font-size: 14px; }
+              .quick-add-date-plan > label input { width: 18px; height: 18px; min-height: 18px !important; }
             }
           `}</style>
         </>

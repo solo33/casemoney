@@ -340,7 +340,7 @@ export default function Home() {
           .home-aside { order: -1; }
         }
         @media (max-width: 767px) {
-          .home-layout { padding: 12px 12px 86px !important; gap: 12px !important; }
+          .home-layout { padding: 12px 12px 154px !important; gap: 12px !important; }
           .home-inline-add { display: none !important; }
           .home-aside, .home-main { display: contents !important; }
           .home-balance-card { order: 1; }

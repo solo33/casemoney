@@ -112,7 +112,7 @@ export default function History() {
       )}
 
       {items.length > 0 && (
-        <div style={{
+        <div className="history-list" style={{
           background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
           overflow: "hidden",
         }}>
@@ -144,19 +144,19 @@ function Row({ h, first }) {
     : <>{formatMoney(h.amount)} {h.currency}</>;
 
   return (
-    <div style={{
+    <div className="history-row" style={{
       display: "flex", alignItems: "center", gap: 12,
       padding: "9px 16px",
       borderTop: first ? "none" : "1px solid #ece6d8",
       fontSize: 13.5,
     }}>
-      <span style={{ color: "#7a8590", whiteSpace: "nowrap", minWidth: 110 }}>
+      <span className="history-changed" style={{ color: "#7a8590", whiteSpace: "nowrap", minWidth: 110 }}>
         {changedAtLabel(h.changed_at)}
       </span>
-      <span style={{ color: "#a6afb8", whiteSpace: "nowrap", minWidth: 86 }}>
+      <span className="history-date" style={{ color: "#a6afb8", whiteSpace: "nowrap", minWidth: 86 }}>
         {opDateLabel(h.op_date)}
       </span>
-      <span style={{ flex: 1, minWidth: 0, color: "#1b2531" }}>
+      <span className="history-operation" style={{ flex: 1, minWidth: 0, color: "#1b2531" }}>
         <span style={{ color: "#173a54" }}>{h.account_name || "—"}</span>
         <span style={{ color: "#a6afb8", margin: "0 6px" }}>{arrow}</span>
         <span>{h.category_name || (h.type === "transfer" ? "Перевод" : "Без категории")}</span>
@@ -164,7 +164,7 @@ function Row({ h, first }) {
           <span style={{ color: "#a6afb8", marginLeft: 8, fontSize: 12.5 }}>{h.description}</span>
         )}
       </span>
-      <span style={{
+      <span className="history-amount" style={{
         whiteSpace: "nowrap", fontWeight: 600, color,
         textDecoration: deleted ? "line-through" : "none",
         fontVariantNumeric: "tabular-nums",

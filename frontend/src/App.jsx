@@ -2,7 +2,6 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
-import MobileShoppingButton from './components/MobileShoppingButton'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import DemoSessionBanner from './components/DemoSessionBanner'
 import CookieBanner from './components/CookieBanner'
@@ -64,7 +63,6 @@ function ProtectedRoute({ children }) {
       <EmailVerifyBanner />
       {children}
       <QuickAddFab />
-      <MobileShoppingButton />
       <MobilePwaInstallPrompt />
       <OfflineSyncStatus />
     </UserProvider>
