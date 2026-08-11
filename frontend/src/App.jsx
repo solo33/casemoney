@@ -47,6 +47,7 @@ const Family = lazy(() => import('./pages/Family'))
 const Credits = lazy(() => import('./pages/Credits'))
 const Billing = lazy(() => import('./pages/Billing'))
 const Shopping = lazy(() => import('./pages/Shopping'))
+const Planning = lazy(() => import('./pages/Planning'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -172,6 +173,15 @@ export default function App() {
         />
 
         {/* старый /dashboard теперь редиректит на /reports */}
+        <Route
+          path="/planning"
+          element={
+            <ProtectedRoute>
+              <FamilyPlanRoute><Planning /></FamilyPlanRoute>
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="/dashboard" element={<Navigate to="/reports" replace />} />
 
         <Route

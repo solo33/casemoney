@@ -20,6 +20,8 @@ const MOBILE_PRIMARY_LINKS = [
   { to: "/accounts", label: "Счета", icon: "▣" },
 ];
 
+const FAMILY_PLAN_LINK = { to: "/planning", label: "План денег", familyOnly: true };
+
 const RECORD_LINKS = [
   { to: "/transactions", label: "Все записи" },
   { to: "/import", label: "Импорт" },
@@ -56,13 +58,13 @@ export default function Nav() {
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const hasFamilyPlan = user?.plan === "family";
-  const links = BASE_LINKS.filter(link => (
+  const links = [...BASE_LINKS, FAMILY_PLAN_LINK].filter(link => (
     (!link.familyOnly && link.to !== "/goals") || hasFamilyPlan
   ));
   const visibleSettingsLinks = SETTINGS_LINKS.filter(
     link => link.to !== "/settings/family" || hasFamilyPlan
   );
-  const mobileMoreLinks = MOBILE_MORE_LINKS.filter(link => (
+  const mobileMoreLinks = [...MOBILE_MORE_LINKS, FAMILY_PLAN_LINK].filter(link => (
     (!link.familyOnly || hasFamilyPlan)
     && (link.to !== "/goals" || hasFamilyPlan)
     && (link.to !== "/settings/family" || hasFamilyPlan)

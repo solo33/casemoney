@@ -295,6 +295,7 @@ def get_transactions(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     q: Optional[str] = Query(None, description="Поиск в описании"),
+    is_planned: Optional[bool] = Query(None, description="Planned or actual operations"),
     limit: int = Query(50, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -337,6 +338,9 @@ def get_transactions(
     if q:
         like = f"%{q.lower()}%"
         query = query.filter(func.lower(Transaction.description).like(like))
+
+    if is_planned is not None:
+        query = query.filter(Transaction.is_planned.is_(is_planned))
 
     total = query.count()
     items = (
