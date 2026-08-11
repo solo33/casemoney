@@ -34,6 +34,7 @@ from app.models.notification import Notification  # noqa: F401
 from app.models.credit import CreditObligation, CreditPayment  # noqa: F401
 from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401
+from app.models.transaction_template import TransactionTemplate  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -54,6 +55,7 @@ from app.api.notifications import router as notifications_router
 from app.api.credits import router as credits_router
 from app.api.billing import router as billing_router
 from app.api.shopping import router as shopping_router
+from app.api.transaction_templates import router as transaction_templates_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -121,6 +123,7 @@ app.include_router(notifications_router)
 app.include_router(credits_router)
 app.include_router(billing_router)
 app.include_router(shopping_router)
+app.include_router(transaction_templates_router)
 
 
 @app.on_event("startup")

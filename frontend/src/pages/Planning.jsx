@@ -9,6 +9,7 @@ export default function Planning() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [form, setForm] = useState(blankForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -16,13 +17,14 @@ export default function Planning() {
 
   const load = useCallback(async () => {
     try {
-      const [transactionsResponse, accountsResponse, categoriesResponse] = await Promise.all([
+      const [transactionsResponse, accountsResponse, categoriesResponse, templatesResponse] = await Promise.all([
         api.get("/api/transactions/", { params: { is_planned: true, limit: 500 } }),
-        api.get("/api/accounts/"), api.get("/api/categories/"),
+        api.get("/api/accounts/"), api.get("/api/categories/"), api.get("/api/transaction-templates/"),
       ]);
       setTransactions(transactionsResponse.data.items || []);
       setAccounts(accountsResponse.data || []);
       setCategories(categoriesResponse.data || []);
+      setTemplates(templatesResponse.data || []);
       setForm(current => current.account_id ? current : { ...current, account_id: String(accountsResponse.data?.[0]?.id || "") });
     } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось загрузить планирование."); }
     finally { setLoading(false); }
@@ -65,6 +67,21 @@ export default function Planning() {
     try { await api.delete(`/api/transactions/${transaction.id}`); setTransactions(current => current.filter(item => item.id !== transaction.id)); }
     catch { setError("Не удалось удалить плановую запись."); }
   };
+  const saveTemplate = async () => {
+    if (!form.amount || !form.account_id) { setError("Сначала заполните операцию, которую нужно сохранить как шаблон."); return; }
+    const name = window.prompt("Название шаблона", form.description || (form.type === "income" ? "Регулярный доход" : "Регулярный расход"));
+    if (!name?.trim()) return;
+    try {
+      const response = await api.post("/api/transaction-templates/", { ...form, name: name.trim(), amount: Number(form.amount), account_id: Number(form.account_id), category_id: form.category_id ? Number(form.category_id) : null });
+      setTemplates(current => [...current, response.data].sort((a, b) => a.name.localeCompare(b.name, "ru")));
+    } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось сохранить шаблон."); }
+  };
+  const applyTemplate = template => setForm({ type: template.type, amount: String(template.amount), currency: template.currency, account_id: String(template.account_id || ""), category_id: String(template.category_id || ""), description: template.description || "", date: today() });
+  const removeTemplate = async template => {
+    if (!window.confirm(`Удалить шаблон «${template.name}»?`)) return;
+    try { await api.delete(`/api/transaction-templates/${template.id}`); setTemplates(current => current.filter(item => item.id !== template.id)); }
+    catch { setError("Не удалось удалить шаблон."); }
+  };
 
   if (loading) return <div className="page">Загружаем планирование…</div>;
   return <main className="page planning-page">
@@ -81,8 +98,9 @@ export default function Planning() {
       <select value={form.category_id} onChange={event => change("category_id", event.target.value)}><option value="">Без категории</option>{categories.map(category => <option key={category.id} value={category.id}>{category.parent_id ? "↳ " : ""}{category.name}</option>)}</select>
       <input type="date" required value={form.date} onChange={event => change("date", event.target.value)} />
       <input className="planning-description" value={form.description} placeholder="Комментарий" onChange={event => change("description", event.target.value)} />
-      <button type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Запланировать"}</button>
+      <button type="button" className="btn-secondary" onClick={saveTemplate}>В шаблоны</button><button type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Запланировать"}</button>
     </form></section>
+    <section className="planning-templates-card"><h2>Шаблоны операций</h2><p>Сохраните регулярный платёж один раз, затем подставляйте его в план за один клик.</p>{templates.length === 0 ? <span className="empty-state">Шаблонов пока нет.</span> : <div className="planning-templates">{templates.map(template => <div key={template.id}><button type="button" onClick={() => applyTemplate(template)}><strong>{template.name}</strong><span>{template.type === "income" ? "Доход" : "Расход"} · {formatMoney(template.amount)} {template.currency}</span></button><button className="btn-ghost danger" type="button" onClick={() => removeTemplate(template)}>×</button></div>)}</div>}</section>
     <section className="planning-list-card"><h2>Будущие операции ({transactions.length})</h2>
       {transactions.length === 0 ? <p className="empty-state">Добавьте предстоящий платёж, доход или напоминание о расходе.</p> : transactions.map(transaction => <article className="planning-row" key={transaction.id}>
         <time>{new Date(transaction.date).toLocaleDateString("ru-RU")}</time><div><strong>{transaction.description || (transaction.type === "income" ? "Плановый доход" : "Плановый расход")}</strong><span>{transaction.type === "income" ? "Доход" : "Расход"}</span></div><b className={transaction.type === "income" ? "income" : "expense"}>{transaction.type === "income" ? "+" : "−"}{formatMoney(transaction.amount)} {transaction.currency}</b><div className="planning-actions"><button className="btn-secondary" type="button" onClick={() => makeActual(transaction)}>Учесть</button><button className="btn-ghost danger" type="button" onClick={() => remove(transaction)}>Удалить</button></div>

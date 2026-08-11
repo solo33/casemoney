@@ -1,3 +1,3 @@
 export const APP_VERSION = "1.1.0";
-export const APP_BUILD = 149;
+export const APP_BUILD = 150;
 export const APP_FULL_VERSION = `${APP_VERSION}-${APP_BUILD}`;
