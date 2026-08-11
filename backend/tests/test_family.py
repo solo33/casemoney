@@ -57,6 +57,10 @@ def test_family_expense_is_shared_without_exposing_personal_transactions(client)
     )
     assert invited.status_code == 201, invited.text
     invitation_id = invited.json()["id"]
+    notifications = client.get("/api/notifications/", headers=member).json()
+    assert notifications["unread_count"] == 1
+    assert notifications["items"][0]["title"] == "Приглашение в семейное пространство"
+    assert notifications["items"][0]["link"] == "/settings/family"
     accepted = client.post(
         f"/api/family/invitations/{invitation_id}/accept",
         headers=member,

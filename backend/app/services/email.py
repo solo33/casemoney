@@ -177,7 +177,10 @@ def send_email(to: str, subject: str, text: str, html: str | None = None) -> boo
             print("-" * 60)
             print("(html также доступен)")
         print("=" * 60 + "\n")
-        return True
+        # Локальная разработка может прочитать письмо в логах, но доставка
+        # пользователю фактически не состоялась. Возвращаем False, чтобы UI
+        # не показывал ложное «письмо отправлено».
+        return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject

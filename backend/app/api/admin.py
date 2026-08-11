@@ -7,7 +7,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -27,7 +27,7 @@ from app.schemas.notification import AdminNotificationCreate
 from app.services.auth import decode_token, hash_password
 from app.services.user_cleanup import delete_user_completely
 from app.services import app_config as app_config_svc
-from app.services.email import is_smtp_configured
+from app.services.email import is_smtp_configured, send_email
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 security = HTTPBearer()
@@ -137,6 +137,7 @@ def get_user(
 def update_user(
     user_id: int,
     data: AdminUserUpdate,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_admin_user_id),
 ):
@@ -152,6 +153,7 @@ def update_user(
         if admins_left == 0:
             raise HTTPException(status_code=400, detail="Нельзя снять admin с последнего администратора")
 
+    family_activated = update.get("plan") == "family" and u.plan != "family"
     if "plan" in update:
         u.plan_source = "admin"
         u.plan_expires_at = None
@@ -162,8 +164,23 @@ def update_user(
             subscription.cancel_at_period_end = True
     for k, v in update.items():
         setattr(u, k, v)
+    if family_activated:
+        db.add(Notification(
+            user_id=u.id,
+            title="Тариф Family активирован",
+            message="Для вашего аккаунта подключён Family. Теперь доступны семейное пространство, обязательства, депозиты и расширенные возможности.",
+            link="/billing",
+        ))
     db.commit()
     db.refresh(u)
+    if family_activated:
+        background.add_task(
+            send_email,
+            u.email,
+            "CaseMoney — тариф Family активирован",
+            "Для вашего аккаунта подключён тариф Family. Войдите в CaseMoney, чтобы настроить семейное пространство, обязательства и депозиты.",
+            "<p>Для вашего аккаунта подключён тариф <strong>Family</strong>.</p><p>Войдите в CaseMoney, чтобы настроить семейное пространство, обязательства и депозиты.</p>",
+        )
     return _summary(db, u)
 
 

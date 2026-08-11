@@ -12,6 +12,8 @@ from app.database import get_db
 from app.models.user import User
 from app.models.user_currency import UserCurrency
 from app.models.pending_registration import PendingRegistration
+from app.models.family import Family, FamilyMember
+from app.models.notification import Notification
 from app.schemas.user import UserRegister, UserLogin, Token
 from app.services.auth import (
     hash_password, verify_password, create_access_token,
@@ -116,6 +118,31 @@ def _create_user(
     return user
 
 
+def _create_pending_family_invitation_notifications(db: Session, user: User) -> None:
+    """Expose invitations made before account registration in the app UI."""
+    invitations = db.query(FamilyMember).filter(
+        FamilyMember.status == "pending",
+        func.lower(FamilyMember.email) == user.email.lower(),
+    ).all()
+    if not invitations:
+        return
+    family_names = dict(
+        db.query(Family.id, Family.name).filter(
+            Family.id.in_([invitation.family_id for invitation in invitations])
+        ).all()
+    )
+    db.add_all([
+        Notification(
+            user_id=user.id,
+            title="Приглашение в семейное пространство",
+            message=f"Вас пригласили в семейное пространство «{family_names.get(invitation.family_id, 'CaseMoney Family')}». Примите приглашение, чтобы участвовать в общих финансах.",
+            link="/settings/family",
+        )
+        for invitation in invitations
+    ])
+    db.commit()
+
+
 def _as_utc(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
@@ -182,6 +209,7 @@ def register(
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+    _create_pending_family_invitation_notifications(db, user)
     background.add_task(
         _notify_registration,
         user.email,

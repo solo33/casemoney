@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.account import Account
 from app.models.category import Category
 from app.models.family import Family, FamilyMember, FamilySettlement
+from app.models.notification import Notification
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
@@ -199,11 +200,18 @@ def invite_member(
         invited_by_user_id=user_id,
     )
     db.add(invitation)
-    db.commit()
-    db.refresh(invitation)
     family_name = db.query(Family.name).filter(
         Family.id == membership.family_id
     ).scalar()
+    if user:
+        db.add(Notification(
+            user_id=user.id,
+            title="Приглашение в семейное пространство",
+            message=f"Вас пригласили в семейное пространство «{family_name}». Примите приглашение, чтобы участвовать в общих финансах.",
+            link="/settings/family",
+        ))
+    db.commit()
+    db.refresh(invitation)
     invite_url = f"{app_url()}/settings/family"
     safe_family_name = html.escape(family_name)
     safe_email = html.escape(email)
