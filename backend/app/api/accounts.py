@@ -161,6 +161,7 @@ def create_account(
         group_id=data.group_id,
         include_in_balance=data.include_in_balance,
         show_for_entries=show_for_entries,
+        note=data.note,
         user_id=user_id,
     )
     db.add(account)

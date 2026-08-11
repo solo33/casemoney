@@ -58,6 +58,7 @@ from app.api.billing import router as billing_router
 from app.api.shopping import router as shopping_router
 from app.api.transaction_templates import router as transaction_templates_router
 from app.api.recurring_transactions import router as recurring_transactions_router
+from app.api.chat import router as chat_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -128,6 +129,7 @@ app.include_router(billing_router)
 app.include_router(shopping_router)
 app.include_router(transaction_templates_router)
 app.include_router(recurring_transactions_router)
+app.include_router(chat_router)
 
 
 @app.on_event("startup")

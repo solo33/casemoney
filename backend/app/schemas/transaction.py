@@ -15,6 +15,8 @@ class TransactionCreate(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
+    fee_amount: Optional[float] = Field(None, ge=0)
+    fee_category_id: Optional[int] = None
     is_family_expense: bool = False
     reimbursement_amount: Optional[float] = Field(None, ge=0)
     is_planned: bool = False
@@ -31,6 +33,8 @@ class TransactionUpdate(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = Field(None, min_length=2, max_length=10)
+    fee_amount: Optional[float] = Field(None, ge=0)
+    fee_category_id: Optional[int] = None
     is_family_expense: Optional[bool] = None
     reimbursement_amount: Optional[float] = Field(None, ge=0)
     is_planned: Optional[bool] = None
@@ -49,6 +53,8 @@ class TransactionResponse(BaseModel):
     to_account_id: Optional[int] = None
     to_amount: Optional[float] = None
     to_currency: Optional[str] = None
+    fee_amount: Optional[float] = None
+    fee_category_id: Optional[int] = None
     family_id: Optional[int] = None
     is_family_expense: bool = False
     reimbursement_amount: float = 0

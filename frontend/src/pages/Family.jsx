@@ -5,8 +5,11 @@ import { formatMoney } from "../utils/money";
 
 
 export default function Family() {
+  const now = new Date();
   const [state, setState] = useState({ family: null, pending_invitations: [] });
   const [report, setReport] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsPeriod, setAnalyticsPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [familyName, setFamilyName] = useState("Наша семья");
   const [inviteEmail, setInviteEmail] = useState("");
   const [settlement, setSettlement] = useState({
@@ -26,17 +29,22 @@ export default function Family() {
       const familyResponse = await api.get("/api/family/");
       setState(familyResponse.data);
       if (familyResponse.data.family) {
-        const reportResponse = await api.get("/api/family/report");
+        const [reportResponse, analyticsResponse] = await Promise.all([
+          api.get("/api/family/report"),
+          api.get("/api/family/analytics", { params: analyticsPeriod }),
+        ]);
         setReport(reportResponse.data);
+        setAnalytics(analyticsResponse.data);
       } else {
         setReport(null);
+        setAnalytics(null);
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось загрузить семейные финансы");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [analyticsPeriod, setAnalytics, setError, setLoading, setReport, setState]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,6 +150,41 @@ export default function Family() {
               </article>
             )}
           </div>
+
+          <section className="family-card family-analytics">
+            <div className="family-analytics-heading">
+              <div>
+                <p className="family-eyebrow">Family</p>
+                <h2>План и факт общих расходов</h2>
+              </div>
+              <input
+                type="month"
+                value={`${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}`}
+                onChange={event => {
+                  const [year, month] = event.target.value.split("-").map(Number);
+                  if (year && month) setAnalyticsPeriod({ year, month });
+                }}
+                aria-label="Месяц семейного отчёта"
+              />
+            </div>
+            <div className="family-analytics-stats">
+              <article><span>Факт</span><strong>{formatMoney(analytics?.actual_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+              <article><span>Запланировано</span><strong>{formatMoney(analytics?.planned_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+              <article className="family-stat-accent"><span>Прогноз на месяц</span><strong>{formatMoney(analytics?.projected_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+            </div>
+            <div className="family-analytics-columns">
+              <div>
+                <h3>Вклад участников</h3>
+                {(analytics?.members || []).map(item => <div className="family-analytics-row" key={item.user_id}><span>{item.name}</span><strong>{formatMoney(item.actual)} {analytics.currency}</strong></div>)}
+              </div>
+              <div>
+                <h3>Категории общих расходов</h3>
+                {(analytics?.categories || []).slice(0, 5).map(item => <div className="family-analytics-row" key={item.name}><span>{item.name}</span><strong>{formatMoney(item.actual)} {analytics.currency}</strong></div>)}
+                {!analytics?.categories?.length && <p className="family-analytics-empty">В этом периоде пока нет общих расходов.</p>}
+              </div>
+            </div>
+            {analytics?.skipped_currencies?.length > 0 && <p className="family-analytics-note">Не удалось пересчитать: {analytics.skipped_currencies.join(", ")}. Используйте доступный курс в настройках валют.</p>}
+          </section>
 
           <div className="family-columns">
             <section className="family-card">
@@ -281,6 +324,18 @@ export default function Family() {
         .family-stat span { color: #7a8590; font-size: 12px; }
         .family-stat strong { color: #173a54; font-size: 21px; }
         .family-stat-accent { border-color: #d8b96f; background: #fff9e9; }
+        .family-analytics-heading { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+        .family-eyebrow { color: #9c6f1d !important; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 800; margin: 0 0 4px !important; }
+        .family-analytics-heading input { width: auto; }
+        .family-analytics-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
+        .family-analytics-stats span { color: #7a8590; font-size: 12px; }
+        .family-analytics-stats strong { color: #173a54; font-size: 18px; }
+        .family-analytics-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
+        .family-analytics-columns h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
+        .family-analytics-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eee8dc; color: #596572; font-size: 13px; }
+        .family-analytics-row strong { color: #173a54; white-space: nowrap; }
+        .family-analytics-empty, .family-analytics-note { color: #7a8590 !important; font-size: 13px; }
         .family-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .family-card { padding: 18px; margin-bottom: 14px; }
         .family-card h2 { margin: 0 0 10px; font-size: 19px; }
@@ -295,6 +350,7 @@ export default function Family() {
         .family-expenses article > div:last-child { text-align: right; }
         @media (max-width: 720px) {
           .family-columns { grid-template-columns: 1fr; }
+          .family-analytics-stats, .family-analytics-columns { grid-template-columns: 1fr; }
           .family-expenses article { align-items: flex-start; }
           .family-heading { align-items: flex-start; }
         }

@@ -14,6 +14,8 @@ class Category(Base):
     icon = Column(String, nullable=True)         # emoji или название иконки
     is_default = Column(Boolean, default=False)  # системные категории
     sort_order = Column(Integer, nullable=False, default=0)
+    # Скрытая категория остаётся в истории и отчётах, но не предлагается при вводе.
+    is_hidden = Column(Boolean, nullable=False, default=False)
 
     # Иерархия (макс. 2 уровня). NULL = корневая категория.
     # Ограничение глубины проверяется на уровне API (FIN-48).

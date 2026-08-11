@@ -49,6 +49,7 @@ export default function Accounts() {
     group_id: "",
     include_in_balance: true,
     show_for_entries: true,
+    note: "",
   });
   const [expanded, setExpanded] = useState(new Set());        // account ids with expanded balances
   const [addingCurrencyTo, setAddingCurrencyTo] = useState(null);  // account.id
@@ -146,6 +147,7 @@ export default function Accounts() {
         initial_currency: "RUB", initial_balance: 0, group_id: "",
         include_in_balance: true,
         show_for_entries: true,
+        note: "",
       });
       fetchGroups();
     } catch (e) {
@@ -204,6 +206,17 @@ export default function Accounts() {
     } catch (e) {
       updateLocalValue(acc.show_for_entries);
       setError(e.response?.data?.detail || "Не удалось обновить видимость счёта");
+    }
+  };
+
+  const handleEditNote = async (acc) => {
+    const note = window.prompt("Комментарий к счёту", acc.note || "");
+    if (note === null || note === (acc.note || "")) return;
+    try {
+      await api.put(`/api/accounts/${acc.id}`, { note: note.trim() || null });
+      await fetchGroups();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось сохранить комментарий");
     }
   };
 
@@ -403,6 +416,12 @@ export default function Accounts() {
             onChange={e => setNewAccount({ ...newAccount, icon: e.target.value })}
             style={{ width: 70 }}
           />
+          <input
+            placeholder="Комментарий к счёту"
+            value={newAccount.note}
+            onChange={e => setNewAccount({ ...newAccount, note: e.target.value })}
+            style={{ minWidth: 220 }}
+          />
           <label style={{
             display: "flex", alignItems: "center", gap: 6,
             fontSize: 13, color: "#515c68", cursor: "pointer",
@@ -455,6 +474,7 @@ export default function Accounts() {
               onDeleteAccount={handleDeleteAccount}
               onToggleInclude={handleToggleInclude}
               onToggleShowForEntries={handleToggleShowForEntries}
+              onEditNote={handleEditNote}
               addingCurrencyTo={addingCurrencyTo}
               setAddingCurrencyTo={setAddingCurrencyTo}
               currencyForm={currencyForm}
@@ -506,7 +526,7 @@ export default function Accounts() {
 function GroupBucket({
   bucket, mainCurrency, expanded, onToggleExpand,
   collapsedGroups, onToggleGroup,
-  onDeleteGroup, onDeleteAccount, onToggleInclude, onToggleShowForEntries,
+  onDeleteGroup, onDeleteAccount, onToggleInclude, onToggleShowForEntries, onEditNote,
   addingCurrencyTo, setAddingCurrencyTo, currencyForm, setCurrencyForm,
   onAddCurrency, onAdjustBalance, onDeleteCurrency, onCurrencyClick,
   activeDrag,
@@ -586,6 +606,7 @@ function GroupBucket({
                 onDelete={onDeleteAccount}
                 onToggleInclude={onToggleInclude}
                 onToggleShowForEntries={onToggleShowForEntries}
+                onEditNote={onEditNote}
                 isAddingCurrency={addingCurrencyTo === acc.id}
                 setAddingCurrency={(v) => setAddingCurrencyTo(v ? acc.id : null)}
                 currencyForm={currencyForm}
@@ -606,7 +627,7 @@ function GroupBucket({
 function AccountRow({
   acc, groupKey, mainCurrency,
   isExpanded, onToggleExpand,
-  onDelete, onToggleInclude, onToggleShowForEntries,
+  onDelete, onToggleInclude, onToggleShowForEntries, onEditNote,
   isAddingCurrency, setAddingCurrency,
   currencyForm, setCurrencyForm,
   onAddCurrency, onAdjustBalance, onDeleteCurrency, onCurrencyClick,
@@ -700,7 +721,16 @@ function AccountRow({
             style={{ padding: "3px 8px", fontSize: 12 }}
             title={acc.show_for_entries ? "Скрыть в формах записей" : "Показывать в формах записей"}
           >
-            {acc.show_for_entries ? "✓ для записей" : "○ для записей"}
+          {acc.show_for_entries ? "✓ для записей" : "○ для записей"}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEditNote(acc)}
+            className="btn-ghost"
+            style={{ padding: "3px 8px", fontSize: 12 }}
+            title={acc.note || "Добавить комментарий к счёту"}
+          >
+            {acc.note ? "✎ комментарий" : "+ комментарий"}
           </button>
           <button
             type="button"

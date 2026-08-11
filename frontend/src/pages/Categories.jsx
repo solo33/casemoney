@@ -91,7 +91,7 @@ export default function Categories() {
 
   const startEdit = (cat) => {
     setEditingId(cat.id);
-    setEditForm({ name: cat.name, icon: cat.icon || "", color: cat.color || "#173a54" });
+    setEditForm({ name: cat.name, icon: cat.icon || "", color: cat.color || "#173a54", is_hidden: Boolean(cat.is_hidden) });
     setAddingTo(null);
   };
 
@@ -105,6 +105,7 @@ export default function Categories() {
         name: editForm.name,
         color: editForm.color,
         icon: editForm.icon || null,
+        is_hidden: Boolean(editForm.is_hidden),
       };
       await api.put(`/api/categories/${cat.id}`, payload);
       setEditingId(null);
@@ -367,6 +368,10 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
             onChange={e => setEditForm({ ...editForm, color: e.target.value })}
             style={{ width: 40, padding: 2, cursor: "pointer" }}
           />
+          <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }}>
+            <input type="checkbox" checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
+            Скрыть при вводе
+          </label>
           <button type="submit" style={{ fontSize: 13, padding: "6px 14px" }}>Сохранить</button>
           <button type="button" onClick={cancelEdit} className="btn-ghost" style={{ fontSize: 13, padding: "6px 12px" }}>Отмена</button>
         </form>
@@ -534,6 +539,10 @@ function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdi
           onChange={e => setEditForm({ ...editForm, color: e.target.value })}
           style={{ width: 34, padding: 2, cursor: "pointer" }}
         />
+        <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }}>
+          <input type="checkbox" checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
+          Скрыть
+        </label>
         <button type="submit" style={{ fontSize: 13, padding: "5px 12px" }}>OK</button>
         <button type="button" onClick={cancelEdit} className="btn-ghost" style={{ fontSize: 13, padding: "5px 10px" }}>Отмена</button>
       </form>

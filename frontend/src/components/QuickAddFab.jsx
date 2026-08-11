@@ -41,6 +41,8 @@ export default function QuickAddFab() {
     to_account_id: "",  // счёт-получатель для перевода
     to_amount: "",
     to_currency: "",
+    fee_amount: "",
+    fee_category_id: "",
     description: "",
     date: new Date().toISOString().slice(0, 10),
     is_family_expense: false,
@@ -229,6 +231,7 @@ export default function QuickAddFab() {
       if (!sameTransferCurrency && (!form.to_amount || parseFloat(form.to_amount) <= 0)) {
         setError("Введите сумму зачисления"); return;
       }
+      if (Number(form.fee_amount) > 0 && !form.fee_category_id) { setError("Выберите категорию комиссии"); return; }
     }
 
     setSubmitting(true);
@@ -243,6 +246,8 @@ export default function QuickAddFab() {
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : undefined,
         to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : undefined,
         to_currency: form.type === "transfer" ? form.to_currency : undefined,
+        fee_amount: form.type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : undefined,
+        fee_category_id: form.type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : undefined,
         date: form.date ? new Date(`${form.date}T12:00:00`).toISOString() : undefined,
         is_family_expense: hasFamilyPlan && form.type === "expense" && form.is_family_expense,
         reimbursement_amount: hasFamilyPlan && form.type === "expense" && form.is_family_expense
@@ -258,6 +263,8 @@ export default function QuickAddFab() {
         ...f,
         amount: "",
         to_amount: "",
+        fee_amount: "",
+        fee_category_id: "",
         description: "",
         category_id: "",
         is_family_expense: false,
@@ -478,6 +485,15 @@ export default function QuickAddFab() {
                     style={{ width: "100%", marginTop: 4 }}
                     placeholder="— Без категории —"
                   />
+                </label>
+              )}
+              {form.type === "transfer" && (
+                <label style={{ display: "block", marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, color: "#7a8590" }}>Комиссия и категория</span>
+                  <div style={{ display: "grid", gridTemplateColumns: "110px minmax(0, 1fr)", gap: 8, marginTop: 4 }}>
+                    <AmountInput type="number" min="0" step="0.01" value={form.fee_amount} onChange={e => setForm({ ...form, fee_amount: e.target.value })} placeholder="0" />
+                    <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={form.fee_category_id} onChange={value => setForm({ ...form, fee_category_id: value })} placeholder="Категория комиссии" />
+                  </div>
                 </label>
               )}
 

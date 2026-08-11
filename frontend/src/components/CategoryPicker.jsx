@@ -22,23 +22,28 @@ export default function CategoryPicker({
   className = "",
 }) {
   const [open, setOpen] = useState(false);
+  // Hidden items remain selectable when editing an older operation that already
+  // uses one, but are not offered for new input.
+  const visibleCategories = useMemo(() => categories.filter(category => (
+    !category.is_hidden || String(category.id) === String(value)
+  )), [categories, value]);
   const selected = categories.find(category => String(category.id) === String(value));
 
   const groups = useMemo(() => {
     const childrenByParent = new Map();
-    categories.forEach(category => {
+    visibleCategories.forEach(category => {
       if (category.parent_id == null) return;
       const children = childrenByParent.get(category.parent_id) || [];
       children.push(category);
       childrenByParent.set(category.parent_id, children);
     });
-    const roots = categories.filter(category => category.parent_id == null).sort(compareByName);
+    const roots = visibleCategories.filter(category => category.parent_id == null).sort(compareByName);
     const rootIds = new Set(roots.map(category => category.id));
-    const orphans = categories
+    const orphans = visibleCategories
       .filter(category => category.parent_id != null && !rootIds.has(category.parent_id))
       .sort(compareByName);
     return { roots, childrenByParent, orphans };
-  }, [categories]);
+  }, [visibleCategories]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -60,7 +65,7 @@ export default function CategoryPicker({
         onChange={event => onChange(event.target.value)}
       >
         <option value="">{placeholder}</option>
-        <CategoryOptions categories={categories} />
+        <CategoryOptions categories={visibleCategories} />
       </select>
 
       <button

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -28,6 +28,9 @@ class Account(Base):
     # Показывать ли счёт в формах создания записей. Настройка независима от
     # общего баланса, но для новых счетов по умолчанию повторяет его значение.
     show_for_entries = Column(Boolean, nullable=False, default=True)
+
+    # Свободная заметка: например последние цифры карты или назначение счёта.
+    note = Column(Text, nullable=True)
 
     transactions = relationship(
         "Transaction",

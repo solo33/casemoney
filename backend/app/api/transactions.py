@@ -123,6 +123,65 @@ def _ensure_own_category(db: Session, user_id: int, category_id: int) -> None:
         raise HTTPException(status_code=404, detail="Category not found")
 
 
+def _ensure_expense_category(db: Session, user_id: int, category_id: int) -> None:
+    category = db.query(Category).filter(
+        Category.id == category_id, Category.user_id == user_id
+    ).first()
+    if not category or category.type != "expense":
+        raise HTTPException(status_code=400, detail="Для комиссии выберите категорию расхода")
+
+
+def _sync_transfer_fee(
+    db: Session,
+    transfer: Transaction,
+    *,
+    fee_amount: Optional[float],
+    fee_category_id: Optional[int],
+) -> None:
+    """Create/update the expense row that represents a bank transfer fee."""
+    fees = db.query(Transaction).filter(
+        Transaction.linked_transfer_id == transfer.id,
+        Transaction.user_id == transfer.user_id,
+    ).all()
+    fee = fees[0] if fees else None
+    active = fee_amount is not None and float(fee_amount) > 0
+    if active and not fee_category_id:
+        raise HTTPException(status_code=400, detail="Укажите категорию комиссии")
+    if active:
+        _ensure_expense_category(db, transfer.user_id, fee_category_id)
+    transfer.fee_amount = round(float(fee_amount), 2) if active else None
+    transfer.fee_category_id = fee_category_id if active else None
+    if fee:
+        _apply_tx_effect(db, fee, reverse=True)
+        if not active:
+            _write_history(db, transfer.user_id, fee, "deleted")
+            db.delete(fee)
+            return
+        fee.amount = round(float(fee_amount), 2)
+        fee.currency = transfer.currency
+        fee.category_id = fee_category_id
+        fee.description = f"Комиссия перевода: {transfer.description or 'без описания'}"
+        fee.date = transfer.date
+        fee.account_id = transfer.account_id
+        fee.is_planned = transfer.is_planned
+        _apply_tx_effect(db, fee)
+        _write_history(db, transfer.user_id, fee, "edited")
+        return
+    if active:
+        fee = Transaction(
+            amount=round(float(fee_amount), 2), currency=transfer.currency,
+            type=TransactionType.expense,
+            description=f"Комиссия перевода: {transfer.description or 'без описания'}",
+            date=transfer.date, account_id=transfer.account_id,
+            category_id=fee_category_id, user_id=transfer.user_id,
+            linked_transfer_id=transfer.id, is_planned=transfer.is_planned,
+        )
+        db.add(fee)
+        db.flush()
+        _apply_tx_effect(db, fee)
+        _write_history(db, transfer.user_id, fee, "created")
+
+
 def _account_name(db: Session, account_id: int) -> str:
     a = db.query(Account).filter(Account.id == account_id).first()
     return a.name if a else "—"
@@ -431,6 +490,12 @@ def create_transaction(
         db.flush()
         _apply_tx_effect(db, transaction, reverse=False)
         _write_history(db, user_id, transaction, "created")
+        if tx_type == TransactionType.transfer:
+            _sync_transfer_fee(
+                db, transaction,
+                fee_amount=data.fee_amount,
+                fee_category_id=data.fee_category_id,
+            )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -461,6 +526,11 @@ def update_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     update = data.model_dump(exclude_unset=True)
+    fee_amount_supplied = "fee_amount" in update
+    fee_category_supplied = "fee_category_id" in update
+    fee_supplied = fee_amount_supplied or fee_category_supplied
+    requested_fee_amount = update.pop("fee_amount", None)
+    requested_fee_category = update.pop("fee_category_id", None)
 
     if update.get("is_planned"):
         ensure_family_plan(db, user_id)
@@ -519,6 +589,31 @@ def update_transaction(
     # Применяем новый эффект
     _apply_tx_effect(db, tx, reverse=False)
 
+    if tx.type == TransactionType.transfer:
+        existing_fee = db.query(Transaction).filter(
+            Transaction.linked_transfer_id == tx.id,
+            Transaction.user_id == user_id,
+        ).first()
+        _sync_transfer_fee(
+            db,
+            tx,
+            fee_amount=requested_fee_amount if fee_amount_supplied else (existing_fee.amount if existing_fee else None),
+            fee_category_id=requested_fee_category if fee_category_supplied else (existing_fee.category_id if existing_fee else None),
+        )
+    else:
+        # A transfer changed into an income/expense must not leave its fee in
+        # the balance as a separate orphan operation.
+        linked_fees = db.query(Transaction).filter(
+            Transaction.linked_transfer_id == tx.id,
+            Transaction.user_id == user_id,
+        ).all()
+        for fee in linked_fees:
+            _apply_tx_effect(db, fee, reverse=True)
+            _write_history(db, user_id, fee, "deleted")
+            db.delete(fee)
+        tx.fee_amount = None
+        tx.fee_category_id = None
+
     db.flush()
     _write_history(db, user_id, tx, "edited", prev_amount=prev_amount, prev_currency=prev_currency)
     db.commit()
@@ -538,6 +633,14 @@ def delete_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
+    linked_fees = db.query(Transaction).filter(
+        Transaction.linked_transfer_id == tx.id,
+        Transaction.user_id == user_id,
+    ).all()
+    for fee in linked_fees:
+        _apply_tx_effect(db, fee, reverse=True)
+        _write_history(db, user_id, fee, "deleted")
+        db.delete(fee)
     _apply_tx_effect(db, tx, reverse=True)
     _write_history(db, user_id, tx, "deleted")
     db.delete(tx)

@@ -134,6 +134,7 @@ def get_categories_tree(
             color=cat.color,
             icon=cat.icon,
             is_default=cat.is_default,
+            is_hidden=cat.is_hidden,
             parent_id=cat.parent_id,
             sort_order=cat.sort_order,
             children=[to_node(k) for k in kids_sorted],

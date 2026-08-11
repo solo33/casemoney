@@ -18,6 +18,8 @@ from app.models.user import User
 from app.services.auth import decode_token
 from app.services.email import app_url, send_email
 from app.services.plans import ensure_family_plan
+from app.services import accounts as accounts_svc
+from app.services import exchange as exchange_svc
 
 security = HTTPBearer()
 
@@ -345,6 +347,87 @@ def family_report(
             for (recipient_id, currency), amount in sorted(outstanding.items())
             if abs(amount) >= 0.005
         ],
+    }
+
+
+@router.get("/analytics")
+def family_analytics(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    """Monthly Family plan/fact report without exposing private account balances."""
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=422, detail="Месяц должен быть от 1 до 12")
+
+    membership = require_membership(db, user_id)
+    start = datetime(year, month, 1, tzinfo=timezone.utc)
+    end = datetime(year + (month == 12), 1 if month == 12 else month + 1, 1, tzinfo=timezone.utc)
+    main_currency = accounts_svc.get_user_main_currency(db, user_id)
+
+    members = db.query(FamilyMember).filter(
+        FamilyMember.family_id == membership.family_id,
+        FamilyMember.status == "active",
+    ).all()
+    users = {
+        item.id: item
+        for item in db.query(User).filter(User.id.in_([member.user_id for member in members])).all()
+    }
+    transactions = db.query(Transaction).filter(
+        Transaction.family_id == membership.family_id,
+        Transaction.is_family_expense.is_(True),
+        Transaction.type == TransactionType.expense,
+        Transaction.date >= start,
+        Transaction.date < end,
+    ).all()
+    category_names = dict(db.query(Category.id, Category.name).all())
+
+    actual_total = 0.0
+    planned_total = 0.0
+    per_member: dict[int, float] = {}
+    per_category: dict[str, float] = {}
+    skipped_currencies: set[str] = set()
+
+    for item in transactions:
+        try:
+            amount = exchange_svc.convert_for_user(
+                db, item.user_id, item.amount, item.currency, main_currency,
+            )
+        except exchange_svc.ExchangeError:
+            skipped_currencies.add(item.currency)
+            continue
+        if item.is_planned:
+            planned_total += amount
+            continue
+        actual_total += amount
+        per_member[item.user_id] = per_member.get(item.user_id, 0.0) + amount
+        name = category_names.get(item.category_id, "Без категории")
+        per_category[name] = per_category.get(name, 0.0) + amount
+
+    member_rows = [
+        {
+            "user_id": member.user_id,
+            "name": _user_label(users.get(member.user_id), member.email),
+            "actual": round(per_member.get(member.user_id, 0.0), 2),
+        }
+        for member in members
+    ]
+    category_rows = [
+        {"name": name, "actual": round(amount, 2)}
+        for name, amount in sorted(per_category.items(), key=lambda pair: pair[1], reverse=True)
+    ]
+    return {
+        "year": year,
+        "month": month,
+        "currency": main_currency,
+        "actual_total": round(actual_total, 2),
+        "planned_total": round(planned_total, 2),
+        "remaining_plan": round(planned_total, 2),
+        "projected_total": round(actual_total + planned_total, 2),
+        "members": member_rows,
+        "categories": category_rows,
+        "skipped_currencies": sorted(skipped_currencies),
     }
 
 

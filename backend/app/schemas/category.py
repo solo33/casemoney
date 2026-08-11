@@ -1,5 +1,7 @@
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel
-from typing import Literal, Optional, List
+
 
 CategoryType = Literal["income", "expense"]
 
@@ -17,7 +19,8 @@ class CategoryUpdate(BaseModel):
     type: Optional[CategoryType] = None
     color: Optional[str] = None
     icon: Optional[str] = None
-    parent_id: Optional[int] = None  # передать null чтобы сделать корневой
+    is_hidden: Optional[bool] = None
+    parent_id: Optional[int] = None
 
 
 class CategoryResponse(BaseModel):
@@ -28,6 +31,7 @@ class CategoryResponse(BaseModel):
     color: str
     icon: Optional[str]
     is_default: bool
+    is_hidden: bool
     parent_id: Optional[int]
     sort_order: int
 
@@ -42,6 +46,7 @@ class CategoryTreeNode(BaseModel):
     color: str
     icon: Optional[str]
     is_default: bool
+    is_hidden: bool
     parent_id: Optional[int]
     sort_order: int
     children: List["CategoryTreeNode"] = []

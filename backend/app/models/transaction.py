@@ -46,6 +46,15 @@ class Transaction(Base):
     to_amount = Column(Float, nullable=True)
     to_currency = Column(String(10), nullable=True)
 
+    # Commission input stays with the transfer; the ledger also contains a
+    # linked expense row so that reports include it by category.
+    fee_amount = Column(Float, nullable=True)
+    fee_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+
+    # Комиссия перевода хранится отдельной расходной записью, связанной с переводом.
+    # Поле на расходной записи, чтобы при удалении/редактировании перевода найти её.
+    linked_transfer_id = Column(Integer, ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True, index=True)
+
     # Семейная операция видна участникам семьи в отдельном отчёте. Она всё
     # равно принадлежит владельцу счёта и не открывает семье его прочие данные.
     family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)

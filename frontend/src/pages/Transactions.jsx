@@ -69,7 +69,7 @@ export default function Transactions() {
   const [newTx, setNewTx] = useState({
     amount: "", type: "expense", currency: "",
     description: "", account_id: "", category_id: "", to_account_id: "",
-    to_amount: "", to_currency: "",
+    to_amount: "", to_currency: "", fee_amount: "", fee_category_id: "",
     date: isoToday(),
   });
 
@@ -225,12 +225,14 @@ export default function Transactions() {
         to_account_id: newTx.type === "transfer" ? parseInt(newTx.to_account_id) : undefined,
         to_amount: newTx.type === "transfer" ? parseFloat(sameNewTransferCurrency ? newTx.amount : newTx.to_amount) : undefined,
         to_currency: newTx.type === "transfer" ? newTx.to_currency : undefined,
+        fee_amount: newTx.type === "transfer" && Number(newTx.fee_amount) > 0 ? parseFloat(newTx.fee_amount) : undefined,
+        fee_category_id: newTx.type === "transfer" && newTx.fee_category_id ? parseInt(newTx.fee_category_id) : undefined,
       };
       if (newTx.date) payload.date = new Date(newTx.date).toISOString();
       const requestKey = idempotencyKeyFor(createRequestRef, payload);
       const result = await submitOrQueueTransaction(payload, requestKey);
       clearIdempotencyKey(createRequestRef);
-      setNewTx(t => ({ ...t, amount: "", description: "", category_id: "" }));
+      setNewTx(t => ({ ...t, amount: "", description: "", category_id: "", fee_amount: "", fee_category_id: "" }));
       setEditing(null);
       setPage(0);
       if (!result.queued) {
@@ -353,6 +355,8 @@ export default function Transactions() {
               )}
               <CurrencyField currencies={newTxTargetCurrencies} value={newTx.to_currency} onChange={e => setNewTx({ ...newTx, to_currency: e.target.value, to_amount: "" })} />
               {newTx.currency && newTx.to_currency && newTx.currency !== newTx.to_currency && newDisplayedRate && <small>1 {newTx.currency} = {newDisplayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} {newTx.to_currency}</small>}
+              <AmountInput type="number" inputMode="decimal" min="0" step="0.01" value={newTx.fee_amount} onChange={e => setNewTx({ ...newTx, fee_amount: e.target.value })} placeholder="Комиссия" inputStyle={{ width: 110 }} />
+              <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={newTx.fee_category_id} onChange={fee_category_id => setNewTx({ ...newTx, fee_category_id })} placeholder="Категория комиссии" style={{ minWidth: 180 }} />
             </>
           ) : (
             <CategoryPicker
@@ -609,6 +613,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
     to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
     to_amount: tx.to_amount != null ? String(tx.to_amount) : "",
     to_currency: tx.to_currency || "",
+    fee_amount: tx.fee_amount != null ? String(tx.fee_amount) : "",
+    fee_category_id: tx.fee_category_id ? String(tx.fee_category_id) : "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
   });
@@ -652,6 +658,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
         to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : null,
         to_currency: form.type === "transfer" ? form.to_currency : null,
+        fee_amount: form.type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : null,
+        fee_category_id: form.type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       };
@@ -730,6 +738,8 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
                   1 {form.currency} = {displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} {form.to_currency}
                 </span>
               )}
+              <AmountInput type="number" step="0.01" min="0" value={form.fee_amount} onChange={e => setForm({ ...form, fee_amount: e.target.value })} placeholder="Комиссия" inputStyle={{ width: 110, textAlign: "right" }} />
+              <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={form.fee_category_id} onChange={fee_category_id => setForm({ ...form, fee_category_id })} placeholder="Категория комиссии" style={{ minWidth: 180 }} />
             </>
           ) : (
             <CategoryPicker

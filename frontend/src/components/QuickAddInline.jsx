@@ -48,6 +48,8 @@ export default function QuickAddInline({
     to_account_id: "",
     to_amount: "",
     to_currency: "",
+    fee_amount: "",
+    fee_category_id: "",
     description: "",
     is_family_expense: false,
     reimbursement_amount: "",
@@ -212,6 +214,9 @@ export default function QuickAddInline({
       if (!sameTransferCurrency && (!form.to_amount || parseFloat(form.to_amount) <= 0)) {
         setError("Введите сумму зачисления"); return;
       }
+      if (Number(form.fee_amount) > 0 && !form.fee_category_id) {
+        setError("Выберите категорию комиссии"); return;
+      }
     }
 
     setSubmitting(true);
@@ -226,6 +231,8 @@ export default function QuickAddInline({
         to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
         to_amount: type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : undefined,
         to_currency: type === "transfer" ? form.to_currency : undefined,
+        fee_amount: type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : undefined,
+        fee_category_id: type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : undefined,
         is_family_expense: hasFamilyPlan && type === "expense" && form.is_family_expense,
         reimbursement_amount: hasFamilyPlan && type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
@@ -242,6 +249,8 @@ export default function QuickAddInline({
         ...f,
         amount: "",
         to_amount: "",
+        fee_amount: "",
+        fee_category_id: "",
         description: "",
         category_id: "",
         is_family_expense: false,
@@ -394,6 +403,16 @@ export default function QuickAddInline({
               {quoteLoading ? " · обновляем курс…" : ""}
             </span>
             <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} />
+          </div>
+        )}
+        {type === "transfer" && (
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 170px", gap: 8, alignItems: "end", marginBottom: 10 }}>
+            <label style={lbl}>Комиссия
+              <AmountInput type="number" min="0" step="0.01" value={form.fee_amount} onChange={e => setForm({ ...form, fee_amount: e.target.value })} placeholder="0" />
+            </label>
+            <label style={lbl}>Категория комиссии
+              <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={form.fee_category_id} onChange={value => setForm({ ...form, fee_category_id: value })} placeholder="Выберите" />
+            </label>
           </div>
         )}
 
