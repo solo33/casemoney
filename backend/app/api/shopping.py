@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.category import Category
 from app.models.shopping import ShoppingItem, ShoppingList
+from app.models.family import FamilyMember
 from app.models.transaction import Transaction
 from app.schemas.shopping import (
     ShoppingItemCreate, ShoppingItemResponse, ShoppingItemUpdate,
@@ -40,9 +41,15 @@ def _default_list(db: Session, user_id: int) -> ShoppingList:
     return current
 
 
+def _family_id(db: Session, user_id: int):
+    member = db.query(FamilyMember).filter(FamilyMember.user_id == user_id, FamilyMember.status == "active").first()
+    return member.family_id if member else None
+
+
 def _get_list(db: Session, user_id: int, list_id: int) -> ShoppingList:
+    family_id = _family_id(db, user_id)
     result = db.query(ShoppingList).filter(
-        ShoppingList.id == list_id, ShoppingList.user_id == user_id
+        ShoppingList.id == list_id, (ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else -1)
     ).first()
     if not result:
         raise HTTPException(status_code=404, detail="Список покупок не найден")
@@ -78,7 +85,8 @@ def _validate_transaction(db: Session, user_id: int, transaction_id: Optional[in
 @router.get("/lists", response_model=List[ShoppingListResponse])
 def list_lists(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     _default_list(db, user_id)
-    return db.query(ShoppingList).filter(ShoppingList.user_id == user_id).order_by(
+    family_id = _family_id(db, user_id)
+    return db.query(ShoppingList).filter((ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else -1)).order_by(
         ShoppingList.is_default.desc(), ShoppingList.name.asc()
     ).all()
 
@@ -86,7 +94,10 @@ def list_lists(db: Session = Depends(get_db), user_id: int = Depends(get_current
 @router.post("/lists", response_model=ShoppingListResponse, status_code=201)
 def create_list(data: ShoppingListCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     _default_list(db, user_id)
-    result = ShoppingList(user_id=user_id, name=data.name.strip(), is_default=False)
+    family_id = _family_id(db, user_id)
+    if data.is_shared and not family_id:
+        raise HTTPException(status_code=400, detail="Сначала создайте семейное пространство")
+    result = ShoppingList(user_id=user_id, name=data.name.strip(), is_default=False, family_id=family_id if data.is_shared else None)
     db.add(result)
     db.commit()
     db.refresh(result)

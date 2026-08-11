@@ -13,6 +13,7 @@ export default function Shopping() {
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(blankItem);
   const [newList, setNewList] = useState("");
+  const [shareNewList, setShareNewList] = useState(false);
   const [expenseFor, setExpenseFor] = useState(null);
   const [expense, setExpense] = useState({ amount: "", account_id: "", category_id: "", date: new Date().toISOString().slice(0, 10) });
   const [error, setError] = useState("");
@@ -73,8 +74,8 @@ export default function Shopping() {
     event.preventDefault();
     if (!newList.trim()) return;
     try {
-      const response = await api.post("/api/shopping/lists", { name: newList.trim() });
-      setLists(current => [...current, response.data]); setListId(String(response.data.id)); setNewList("");
+      const response = await api.post("/api/shopping/lists", { name: newList.trim(), is_shared: shareNewList });
+      setLists(current => [...current, response.data]); setListId(String(response.data.id)); setNewList(""); setShareNewList(false);
     } catch { setError("Не удалось создать список"); }
   };
 
@@ -123,7 +124,7 @@ export default function Shopping() {
     {error && <div className="form-error">{error}</div>}
     <section className="shopping-toolbar">
       <label>Список<select value={listId} onChange={e => setListId(e.target.value)}>{lists.map(list => <option key={list.id} value={list.id}>{list.name}{list.is_default ? " — основной" : ""}</option>)}</select></label>
-      <form onSubmit={createList} className="shopping-new-list"><input value={newList} placeholder="Новый список: Дача" onChange={e => setNewList(e.target.value)} /><button type="submit" className="btn-secondary">Создать список</button></form>
+      <form onSubmit={createList} className="shopping-new-list"><input value={newList} placeholder="Новый список: Дача" onChange={e => setNewList(e.target.value)} /><label className="shopping-share"><input type="checkbox" checked={shareNewList} onChange={e => setShareNewList(e.target.checked)} /> Семейный</label><button type="submit" className="btn-secondary">Создать список</button></form>
     </section>
     <section className="shopping-add-card">
       <h2>Быстро добавить</h2>

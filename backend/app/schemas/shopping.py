@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ShoppingListCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
+    is_shared: bool = False
 
 
 class ShoppingListUpdate(BaseModel):
@@ -17,6 +18,8 @@ class ShoppingListResponse(BaseModel):
     id: int
     name: str
     is_default: bool
+    family_id: Optional[int] = None
+    is_shared: bool = False
     created_at: datetime
     updated_at: datetime
 

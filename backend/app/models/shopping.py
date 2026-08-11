@@ -12,10 +12,15 @@ class ShoppingList(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(120), nullable=False)
     is_default = Column(Boolean, nullable=False, default=False)
+    family_id = Column(Integer, ForeignKey("families.id", ondelete="CASCADE"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     items = relationship("ShoppingItem", back_populates="shopping_list", cascade="all, delete-orphan")
+
+    @property
+    def is_shared(self):
+        return self.family_id is not None
 
 
 class ShoppingItem(Base):
