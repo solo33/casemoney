@@ -12,6 +12,7 @@ class GoalCreate(BaseModel):
     account_id: Optional[int] = None    # если задан — прогресс live из баланса счёта
     due_date: Optional[date] = None
     sort_order: int = 0
+    is_shared: bool = False
 
 
 class GoalUpdate(BaseModel):
@@ -39,6 +40,10 @@ class GoalResponse(BaseModel):
     sort_order: int
     remaining_amount: float
     monthly_contribution: Optional[float]
+    family_id: Optional[int]
+    is_shared: bool
+    contributions_total: float
+    contributions: list[dict]
 
     class Config:
         from_attributes = True

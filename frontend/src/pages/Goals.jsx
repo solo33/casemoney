@@ -16,7 +16,7 @@ export default function Goals() {
   const blank = {
     name: "", icon: "🎯", target_amount: "",
     currency: mainCurrency, current_amount: 0,
-    account_id: "", due_date: "", sort_order: 0,
+    account_id: "", due_date: "", sort_order: 0, is_shared: false,
   };
   const [form, setForm] = useState(blank);
 
@@ -57,7 +57,7 @@ export default function Goals() {
       current_amount: g.account_id ? 0 : g.current_amount,
       account_id: g.account_id ? String(g.account_id) : "",
       due_date: g.due_date || "",
-      sort_order: g.sort_order || 0,
+      sort_order: g.sort_order || 0, is_shared: g.is_shared,
     });
     setEditId(g.id);
     setAdding(false);
@@ -82,6 +82,7 @@ export default function Goals() {
         account_id: form.account_id ? parseInt(form.account_id) : null,
         due_date: form.due_date || null,
         sort_order: Number(form.sort_order) || 0,
+        is_shared: form.is_shared,
       };
       if (editId) {
         await api.patch(`/api/goals/${editId}`, payload);
@@ -155,6 +156,12 @@ function GoalCard({ g, onEdit, onDelete }) {
   const sym = currencySymbol(g.currency);
   const pct = g.progress_percent;
   const reached = pct >= 100;
+  const addContribution = async () => {
+    const raw = window.prompt("Сумма взноса", "");
+    if (!raw) return;
+    try { await api.post(`/api/goals/${g.id}/contributions`, { amount: Number(raw.replace(",", ".")) }); window.location.reload(); }
+    catch { window.alert("Не удалось добавить взнос."); }
+  };
   return (
     <div style={{
       background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
@@ -168,6 +175,7 @@ function GoalCard({ g, onEdit, onDelete }) {
             color: "#1b2531",
           }}>
             {g.name}
+            {g.is_shared && <span style={{ marginLeft: 8, fontSize: 12, color: "#a06b18" }}>Общая цель</span>}
           </div>
           {g.account_name && (
             <div style={{ fontSize: 12, color: "#a6afb8" }}>
@@ -223,6 +231,7 @@ function GoalCard({ g, onEdit, onDelete }) {
           {reached ? "✓ 100%" : `${pct}%`}
         </span>
       </div>
+      {g.is_shared && <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><button type="button" className="btn-secondary" onClick={addContribution}>+ Мой взнос</button><span style={{ fontSize: 12, color: "#a6afb8" }}>Взносы: {formatMoney(g.contributions_total)} {sym}</span>{g.contributions.map(item => <span key={item.id} style={{ fontSize: 12, color: "#515c68" }}>{item.name}: {formatMoney(item.amount)} {sym}</span>)}</div>}
     </div>
   );
 }
@@ -302,12 +311,13 @@ function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }) {
           onChange={e => setForm({ ...form, due_date: e.target.value })}
         />
       </div>
-
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <label style={lbl}>Приоритет</label>
         <input type="number" min="0" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: e.target.value })} style={{ width: 90 }} />
         <span style={{ fontSize: 12, color: "#a6afb8" }}>Меньшее число — выше в списке и в распределении средств.</span>
       </div>
+
+      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}><input type="checkbox" checked={form.is_shared} onChange={e => setForm({ ...form, is_shared: e.target.checked })} /> Общая цель семьи</label>
 
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
         <button type="button" className="btn-ghost" onClick={onCancel}>Отмена</button>

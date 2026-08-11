@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 
 from app.database import get_db
-from app.models.goal import Goal
+from app.models.goal import Goal, GoalContribution
 from app.models.account import Account
+from app.models.family import FamilyMember
+from app.models.user import User
 from app.schemas.goal import GoalCreate, GoalUpdate, GoalResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
@@ -24,6 +27,10 @@ def get_current_user_id(
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     return int(payload["sub"])
+
+
+def _membership(db: Session, user_id: int):
+    return db.query(FamilyMember).filter(FamilyMember.user_id == user_id, FamilyMember.status == "active").first()
 
 
 def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
@@ -47,6 +54,10 @@ def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
                     pass
             current = round(total, 2)
 
+    rows = db.query(GoalContribution, User).join(User, User.id == GoalContribution.user_id).filter(GoalContribution.goal_id == goal.id).all()
+    contributions = [{"id": item.id, "user_id": item.user_id, "name": user.username or user.email, "amount": item.amount, "date": item.created_at.isoformat()} for item, user in rows]
+    contribution_total = round(sum(item[0].amount for item in rows), 2)
+    current += contribution_total
     pct = 0.0
     if goal.target_amount > 0:
         pct = round(max(0, min(100, current / goal.target_amount * 100)), 1)
@@ -71,6 +82,10 @@ def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
         sort_order=goal.sort_order,
         remaining_amount=remaining,
         monthly_contribution=monthly_contribution,
+        family_id=goal.family_id,
+        is_shared=goal.family_id is not None,
+        contributions_total=contribution_total,
+        contributions=contributions,
     )
 
 
@@ -82,7 +97,7 @@ def list_goals(
     ensure_family_plan(db, user_id)
     goals = (
         db.query(Goal)
-        .filter(Goal.user_id == user_id)
+        .filter((Goal.user_id == user_id) | (Goal.family_id == _membership(db, user_id).family_id if _membership(db, user_id) else -1))
         .order_by(Goal.sort_order, Goal.id)
         .all()
     )
@@ -107,6 +122,9 @@ def create_goal(
 ):
     ensure_family_plan(db, user_id)
     _validate_account(db, user_id, data.account_id)
+    membership = _membership(db, user_id)
+    if data.is_shared and not membership:
+        raise HTTPException(status_code=400, detail="Сначала создайте семейное пространство")
     goal = Goal(
         user_id=user_id,
         name=data.name,
@@ -117,6 +135,7 @@ def create_goal(
         account_id=data.account_id,
         due_date=data.due_date,
         sort_order=data.sort_order,
+        family_id=membership.family_id if data.is_shared else None,
     )
     db.add(goal)
     db.commit()
@@ -161,3 +180,19 @@ def delete_goal(
         raise HTTPException(status_code=404, detail="Goal not found")
     db.delete(goal)
     db.commit()
+
+
+class ContributionCreate(BaseModel):
+    amount: float = Field(gt=0)
+
+
+@router.post("/{goal_id}/contributions", response_model=GoalResponse)
+def add_contribution(goal_id: int, data: ContributionCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    ensure_family_plan(db, user_id)
+    goal = db.query(Goal).filter(Goal.id == goal_id).first()
+    membership = _membership(db, user_id)
+    if not goal or not membership or goal.family_id != membership.family_id:
+        raise HTTPException(status_code=404, detail="Общая цель не найдена")
+    db.add(GoalContribution(goal_id=goal.id, user_id=user_id, amount=data.amount))
+    db.commit()
+    return _serialize(db, user_id, goal)

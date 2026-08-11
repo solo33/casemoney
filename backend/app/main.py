@@ -22,7 +22,7 @@ from app.models.account_balance import AccountBalance  # noqa: F401
 from app.models.transaction import Transaction  # noqa: F401
 from app.models.exchange_rate import ExchangeRate  # noqa: F401
 from app.models.user_currency import UserCurrency  # noqa: F401
-from app.models.goal import Goal  # noqa: F401
+from app.models.goal import Goal, GoalContribution  # noqa: F401
 from app.models.app_config import AppConfig  # noqa: F401
 from app.models.transaction_history import TransactionHistory  # noqa: F401
 from app.models.bank_import_mapping import (  # noqa: F401
