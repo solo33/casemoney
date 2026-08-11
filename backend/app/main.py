@@ -35,6 +35,7 @@ from app.models.credit import CreditObligation, CreditPayment  # noqa: F401
 from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401
 from app.models.transaction_template import TransactionTemplate  # noqa: F401
+from app.models.recurring_transaction import RecurringTransaction  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -56,11 +57,13 @@ from app.api.credits import router as credits_router
 from app.api.billing import router as billing_router
 from app.api.shopping import router as shopping_router
 from app.api.transaction_templates import router as transaction_templates_router
+from app.api.recurring_transactions import router as recurring_transactions_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
 from app.services.billing import process_subscription_renewals
 from app.services.demo_cleanup import cleanup_expired_demo_users
+from app.services.recurring_transactions import process_recurring_transactions
 
 log = logging.getLogger("casemoney.credit_reminders")
 
@@ -124,6 +127,7 @@ app.include_router(credits_router)
 app.include_router(billing_router)
 app.include_router(shopping_router)
 app.include_router(transaction_templates_router)
+app.include_router(recurring_transactions_router)
 
 
 @app.on_event("startup")
@@ -220,6 +224,24 @@ async def _billing_loop() -> None:
         await asyncio.sleep(interval)
 
 
+async def _recurring_transaction_loop() -> None:
+    interval = max(300, int(os.getenv("RECURRING_TRANSACTION_INTERVAL_SECONDS", "3600")))
+    while True:
+        db = SessionLocal()
+        try:
+            generated = await asyncio.to_thread(process_recurring_transactions, db)
+            if generated:
+                log.info("Generated recurring planned operations: %s", generated)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            db.rollback()
+            log.exception("Recurring transaction worker failed")
+        finally:
+            db.close()
+        await asyncio.sleep(interval)
+
+
 async def _demo_cleanup_loop() -> None:
     interval = max(60, int(os.getenv("DEMO_CLEANUP_INTERVAL_SECONDS", "1800")))
     while True:
@@ -251,6 +273,9 @@ async def start_credit_reminder_worker():
     billing_enabled = os.getenv("BILLING_WORKER_ENABLED", default_enabled).lower() not in ("0", "false", "off")
     if billing_enabled:
         app.state.billing_task = asyncio.create_task(_billing_loop())
+    recurring_enabled = os.getenv("RECURRING_TRANSACTION_WORKER_ENABLED", default_enabled).lower() not in ("0", "false", "off")
+    if recurring_enabled:
+        app.state.recurring_transaction_task = asyncio.create_task(_recurring_transaction_loop())
     # Очистка демо-аккаунтов нужна везде, где ими вообще пользуются
     # (включая локальную разработку) — не привязываем к _ratelimit_enabled.
     demo_cleanup_enabled = os.getenv("DEMO_CLEANUP_WORKER_ENABLED", "1").lower() not in ("0", "false", "off")
@@ -272,6 +297,13 @@ async def stop_credit_reminder_worker():
         billing_task.cancel()
         try:
             await billing_task
+        except asyncio.CancelledError:
+            pass
+    recurring_task = getattr(app.state, "recurring_transaction_task", None)
+    if recurring_task:
+        recurring_task.cancel()
+        try:
+            await recurring_task
         except asyncio.CancelledError:
             pass
     demo_cleanup_task = getattr(app.state, "demo_cleanup_task", None)

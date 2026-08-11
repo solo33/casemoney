@@ -1345,6 +1345,12 @@ hr {
 .planning-row time, .planning-row span { color: var(--muted); font-size: 13px; }
 .planning-row div:nth-child(2) { display: grid; gap: 3px; }
 .planning-actions { display: flex; gap: 6px; }
+.recurring-list { display: grid; }
+.recurring-list > div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 11px 0; border-top: 1px solid #eee7d9; }
+.recurring-list > div:first-child { border-top: 0; }
+.recurring-list > div > div:first-child { display: grid; gap: 3px; }
+.recurring-list span { color: var(--muted); font-size: 13px; }
+.recurring-list .is-inactive { opacity: .58; }
 .danger { color: #c0432b !important; }
 @media (max-width: 700px) {
   .planning-form { grid-template-columns: 1fr 1fr; }
@@ -1353,6 +1359,7 @@ hr {
   .planning-row { grid-template-columns: 76px 1fr; gap: 6px 10px; }
   .planning-row > b { text-align: left; }
   .planning-actions { grid-column: 1 / -1; }
+  .recurring-list > div { display: grid; gap: 8px; }
 }
 .shopping-item-actions button { font-size: 12px; padding: 6px 9px; }
 .btn-icon-danger { border: 1px solid #f0d4cb; background: transparent; color: #c0432b; border-radius: 6px; }
