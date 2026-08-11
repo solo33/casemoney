@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Nav from './components/Nav'
 import QuickAddFab from './components/QuickAddFab'
+import MobileShoppingButton from './components/MobileShoppingButton'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import DemoSessionBanner from './components/DemoSessionBanner'
 import CookieBanner from './components/CookieBanner'
@@ -45,6 +46,7 @@ const About = lazy(() => import('./pages/About'))
 const Family = lazy(() => import('./pages/Family'))
 const Credits = lazy(() => import('./pages/Credits'))
 const Billing = lazy(() => import('./pages/Billing'))
+const Shopping = lazy(() => import('./pages/Shopping'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -59,6 +61,7 @@ function ProtectedRoute({ children }) {
       <EmailVerifyBanner />
       {children}
       <QuickAddFab />
+      <MobileShoppingButton />
       <MobilePwaInstallPrompt />
       <OfflineSyncStatus />
     </UserProvider>
@@ -136,7 +139,7 @@ export default function App() {
           path="/reports/balances"
           element={
             <ProtectedRoute>
-              <AnnualBalances />
+              <FamilyPlanRoute><AnnualBalances /></FamilyPlanRoute>
             </ProtectedRoute>
           }
         />
@@ -145,7 +148,7 @@ export default function App() {
           path="/reports/yoy"
           element={
             <ProtectedRoute>
-              <YoyReport />
+              <FamilyPlanRoute><YoyReport /></FamilyPlanRoute>
             </ProtectedRoute>
           }
         />
@@ -154,7 +157,16 @@ export default function App() {
           path="/goals"
           element={
             <ProtectedRoute>
-              <Goals />
+              <FamilyPlanRoute><Goals /></FamilyPlanRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/shopping"
+          element={
+            <ProtectedRoute>
+              <Shopping />
             </ProtectedRoute>
           }
         />

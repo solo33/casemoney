@@ -16,6 +16,7 @@ from app.models.account_group import AccountGroup
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 security = HTTPBearer()
@@ -186,21 +187,26 @@ def get_summary(
     breakdown_type: Literal["expense", "income"] = Query(
         "expense", description="По какому типу строить разбивку по категориям"
     ),
+    include_planned: bool = Query(False),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    if include_planned:
+        ensure_family_plan(db, user_id)
     main = accounts_svc.get_user_main_currency(db, user_id)
     df, dt, label = resolve_period(period, year, month, quarter, date_from, date_to)
 
-    transactions = (
+    transactions_query = (
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
             func.date(Transaction.date) >= df,
             func.date(Transaction.date) <= dt,
         )
-        .all()
     )
+    if not include_planned:
+        transactions_query = transactions_query.filter(Transaction.is_planned.is_(False))
+    transactions = transactions_query.all()
 
     breakdown_enum = (
         TransactionType.income if breakdown_type == "income" else TransactionType.expense
@@ -444,6 +450,7 @@ def get_annual_balances(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    ensure_family_plan(db, user_id)
     """Остаток каждого счёта на конец каждого месяца года, в основной валюте.
 
     На баланс влияют только доходы (+) и расходы (−); переводы — ноль.
@@ -563,6 +570,7 @@ def get_annual_balances(
 @router.get("/monthly-trend", response_model=MonthlyTrendResponse)
 def get_monthly_trend(
     months: int = Query(6, ge=1, le=24),
+    include_planned: bool = Query(False),
     end_date: Optional[date] = Query(
         None,
         description="Последний месяц графика; по умолчанию текущий месяц",
@@ -570,6 +578,8 @@ def get_monthly_trend(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    if include_planned:
+        ensure_family_plan(db, user_id)
     main = accounts_svc.get_user_main_currency(db, user_id)
     # График должен следовать за выбранным на сводке периодом, а не всегда
     # заканчиваться текущим месяцем. Внутри месяца считаем полный календарный
@@ -584,14 +594,16 @@ def get_monthly_trend(
     start_date = date(start_year, start_month, 1)
 
     # Загружаем сырые транзакции (нельзя SUM в SQL — валюты разные)
-    transactions = (
+    transactions_query = (
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
             func.date(Transaction.date) >= start_date,
         )
-        .all()
     )
+    if not include_planned:
+        transactions_query = transactions_query.filter(Transaction.is_planned.is_(False))
+    transactions = transactions_query.all()
 
     # Заполняем все месяцы нулями
     points_map: dict[str, dict] = {}
@@ -678,6 +690,7 @@ def get_yoy(
     Фильтры по счетам и категориям опциональны; для категорий автоматически
     включаются подкатегории выбранных.
     """
+    ensure_family_plan(db, user_id)
     main = accounts_svc.get_user_main_currency(db, user_id)
     tx_type = TransactionType[type]
 

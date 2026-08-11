@@ -10,6 +10,7 @@ from app.schemas.goal import GoalCreate, GoalUpdate, GoalResponse
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
 security = HTTPBearer()
@@ -69,6 +70,7 @@ def list_goals(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    ensure_family_plan(db, user_id)
     goals = (
         db.query(Goal)
         .filter(Goal.user_id == user_id)
@@ -94,6 +96,7 @@ def create_goal(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    ensure_family_plan(db, user_id)
     _validate_account(db, user_id, data.account_id)
     goal = Goal(
         user_id=user_id,
@@ -119,6 +122,7 @@ def update_goal(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
@@ -142,6 +146,7 @@ def delete_goal(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")

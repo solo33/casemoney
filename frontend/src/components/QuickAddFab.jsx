@@ -45,6 +45,7 @@ export default function QuickAddFab() {
     date: new Date().toISOString().slice(0, 10),
     is_family_expense: false,
     reimbursement_amount: "",
+    is_planned: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -247,6 +248,7 @@ export default function QuickAddFab() {
         reimbursement_amount: hasFamilyPlan && form.type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
           : undefined,
+        is_planned: hasFamilyPlan && form.is_planned,
       };
       const requestKey = idempotencyKeyFor(requestRef, payload);
       const result = await submitOrQueueTransaction(payload, requestKey);
@@ -260,6 +262,7 @@ export default function QuickAddFab() {
         category_id: "",
         is_family_expense: false,
         reimbursement_amount: "",
+        is_planned: false,
       }));
       setSavedLocally(result.queued);
       if (!result.queued) close();
@@ -539,6 +542,13 @@ export default function QuickAddFab() {
                     </label>
                   )}
                 </div>
+              )}
+
+              {hasFamilyPlan && (
+                <label style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14, fontSize: 14, color: "#515c68" }}>
+                  <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} style={{ width: 20, height: 20 }} />
+                  Планируемая запись — остаток пока не меняется
+                </label>
               )}
 
               {error && (

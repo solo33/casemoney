@@ -46,6 +46,9 @@ def test_brevo_api_is_preferred_over_smtp(monkeypatch):
     monkeypatch.setenv("BREVO_SENDER_EMAIL", "sender@example.com")
     monkeypatch.setenv("BREVO_SENDER_NAME", "CaseMoney")
     monkeypatch.delenv("SMTP_HOST", raising=False)
+    monkeypatch.delenv("POSTBOX_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("POSTBOX_SECRET_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("POSTBOX_FROM_EMAIL", raising=False)
     captured = {}
 
     def fake_post(url, **kwargs):

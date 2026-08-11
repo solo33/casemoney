@@ -27,6 +27,7 @@ const RECORD_LINKS = [
 ];
 
 const MOBILE_MORE_LINKS = [
+  { to: "/shopping", label: "Списки покупок" },
   { to: "/credits", label: "Обязательства и депозиты", familyOnly: true },
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/goals", label: "Цели" },
@@ -41,6 +42,7 @@ const SETTINGS_LINKS = [
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/family", label: "Семейные финансы" },
+  { to: "/shopping", label: "Списки покупок" },
   { to: "/articles", label: "Статьи" },
   { to: "/help", label: "Помощь" },
   { to: "/about", label: "О программе" },
@@ -54,12 +56,15 @@ export default function Nav() {
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const hasFamilyPlan = user?.plan === "family";
-  const links = BASE_LINKS.filter(link => !link.familyOnly || hasFamilyPlan);
+  const links = BASE_LINKS.filter(link => (
+    (!link.familyOnly && link.to !== "/goals") || hasFamilyPlan
+  ));
   const visibleSettingsLinks = SETTINGS_LINKS.filter(
     link => link.to !== "/settings/family" || hasFamilyPlan
   );
   const mobileMoreLinks = MOBILE_MORE_LINKS.filter(link => (
     (!link.familyOnly || hasFamilyPlan)
+    && (link.to !== "/goals" || hasFamilyPlan)
     && (link.to !== "/settings/family" || hasFamilyPlan)
   ));
   const settingsLinks = user?.is_admin

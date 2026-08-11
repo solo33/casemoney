@@ -12,6 +12,7 @@ from app.models.transaction import Transaction
 from app.models.category import Category
 from app.models.account_group import AccountGroup
 from app.models.user_currency import UserCurrency
+from app.models.shopping import ShoppingList
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.services.auth import decode_token, hash_password, normalize_email, verify_password
 from app.services import limits as limits_svc
@@ -126,6 +127,7 @@ def reset_account(
     db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
     db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
     db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
+    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
     db.commit()
 
 
@@ -154,5 +156,6 @@ def delete_account(
     db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
     db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
     db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
+    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
     db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
     db.commit()

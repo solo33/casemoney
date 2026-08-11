@@ -16,6 +16,7 @@ class User(Base):
     plan_source = Column(String(16), nullable=False, default="default")  # default, admin, billing
     plan_expires_at = Column(DateTime(timezone=True), nullable=True)
     family_upgrade_enabled = Column(Boolean, nullable=False, default=False)
+    show_shopping_button_mobile = Column(Boolean, nullable=False, default=True)
     is_admin = Column(Boolean, nullable=False, default=False)
     email_verified = Column(Boolean, nullable=False, default=False)
     verification_email_sent_at = Column(DateTime(timezone=True), nullable=True)

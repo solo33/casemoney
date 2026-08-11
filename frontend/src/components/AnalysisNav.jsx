@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useUser } from "../contexts/UserContext";
 
 // Субнавигация раздела «Анализ»: сводка + годовые отчёты в одном месте.
 const TABS = [
@@ -9,12 +10,14 @@ const TABS = [
 ];
 
 export default function AnalysisNav() {
+  const { user } = useUser();
+  const tabs = TABS.filter(tab => !["/reports/balances", "/reports/yoy"].includes(tab.to) || user?.plan === "family");
   return (
     <div className="analysis-nav" style={{
       display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16,
       borderBottom: "1px solid #e4ddcd", paddingBottom: 10,
     }}>
-      {TABS.map(t => (
+      {tabs.map(t => (
         <NavLink
           key={t.to}
           to={t.to}

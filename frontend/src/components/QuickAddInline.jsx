@@ -51,6 +51,7 @@ export default function QuickAddInline({
     description: "",
     is_family_expense: false,
     reimbursement_amount: "",
+    is_planned: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -229,6 +230,7 @@ export default function QuickAddInline({
         reimbursement_amount: hasFamilyPlan && type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
           : undefined,
+        is_planned: hasFamilyPlan && form.is_planned,
       };
       if (dateVal) payload.date = new Date(dateVal).toISOString();
       const requestKey = idempotencyKeyFor(requestRef, payload);
@@ -244,6 +246,7 @@ export default function QuickAddInline({
         category_id: "",
         is_family_expense: false,
         reimbursement_amount: "",
+        is_planned: false,
       }));
       setSavedLocally(result.queued);
       setSuccess(true);
@@ -438,6 +441,13 @@ export default function QuickAddInline({
         )}
 
         {/* Errors + submit */}
+        {hasFamilyPlan && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 12, color: "#515c68", fontSize: 13 }}>
+            <input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} />
+            Планируемая запись — остаток пока не меняется
+          </label>
+        )}
+
         {error && (
           <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span>{error}</span>

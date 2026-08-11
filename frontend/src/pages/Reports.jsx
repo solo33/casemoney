@@ -70,7 +70,7 @@ const PIE_PALETTE = [
 ];
 
 export default function Reports() {
-  const { mainCurrency } = useUser();
+  const { mainCurrency, user } = useUser();
   const navigate = useNavigate();
   const [gran, setGran] = useState("month");          // day | month | year
   const [anchor, setAnchor] = useState(new Date());   // опорная дата периода
@@ -78,6 +78,8 @@ export default function Reports() {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [breakdownType, setBreakdownType] = useState("expense");
   const [trendMonths, setTrendMonths] = useState(6);
+  const [includePlanned, setIncludePlanned] = useState(false);
+  const hasFamilyPlan = user?.plan === "family";
 
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
@@ -95,15 +97,15 @@ export default function Reports() {
   const fetchData = useCallback(() => {
     setLoading(true);
     setError(null);
-    const params = { ...buildPeriodParams(gran, anchor), breakdown_type: breakdownType };
+    const params = { ...buildPeriodParams(gran, anchor), breakdown_type: breakdownType, include_planned: includePlanned };
     Promise.all([
       api.get("/api/reports/summary", { params }),
-      api.get("/api/reports/monthly-trend", { params: { months: trendMonths, end_date: trendEndDate } }),
+      api.get("/api/reports/monthly-trend", { params: { months: trendMonths, end_date: trendEndDate, include_planned: includePlanned } }),
     ])
       .then(([s, t]) => { setSummary(s.data); setTrend(t.data); })
       .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
-  }, [gran, anchor, breakdownType, trendMonths, trendEndDate]);
+  }, [gran, anchor, breakdownType, trendMonths, trendEndDate, includePlanned]);
 
   // Значение для пикера (<input>) под текущую гранулярность
   const pickerValue = gran === "day"
@@ -198,6 +200,16 @@ export default function Reports() {
     <div className="page">
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
       <AnalysisNav />
+      {hasFamilyPlan && (
+        <label className="report-planned-toggle">
+          <input
+            type="checkbox"
+            checked={includePlanned}
+            onChange={event => setIncludePlanned(event.target.checked)}
+          />
+          Показать планируемые записи
+        </label>
+      )}
 
       {/* Период: гранулярность + один пикер + стрелки */}
       <div className="report-period-controls" style={{

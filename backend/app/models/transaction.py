@@ -53,5 +53,7 @@ class Transaction(Base):
     reimbursement_amount = Column(Float, nullable=False, default=0)
     # Changes a balance but must not be counted as earned income in reports.
     is_financing = Column(Boolean, nullable=False, default=False)
+    # A future/planned operation is visible in planning reports but does not affect an account balance yet.
+    is_planned = Column(Boolean, nullable=False, default=False)
 
     account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")

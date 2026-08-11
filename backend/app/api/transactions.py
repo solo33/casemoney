@@ -22,6 +22,7 @@ from app.schemas.transaction import TransactionCreate, TransactionUpdate, Transa
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
@@ -82,6 +83,8 @@ def _apply_tx_effect(db: Session, tx: Transaction, reverse: bool = False) -> Non
     expense → счёт −amount
     transfer→ счёт-источник −amount, счёт-получатель +to_amount (двусторонний перевод)
     """
+    if tx.is_planned:
+        return
     sign = -1 if reverse else 1
     if tx.type == TransactionType.income:
         bal = accounts_svc.get_or_create_balance(db, tx.account_id, tx.currency)
@@ -389,6 +392,9 @@ def create_transaction(
     if data.category_id is not None and tx_type != TransactionType.transfer:
         _ensure_own_category(db, user_id, data.category_id)
 
+    if data.is_planned:
+        ensure_family_plan(db, user_id)
+
     family_id, is_family_expense, reimbursement_amount = _family_fields(
         db,
         user_id,
@@ -414,6 +420,7 @@ def create_transaction(
         family_id=family_id,
         is_family_expense=is_family_expense,
         reimbursement_amount=reimbursement_amount,
+        is_planned=data.is_planned,
     )
     db.add(transaction)
     try:
@@ -450,6 +457,9 @@ def update_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     update = data.model_dump(exclude_unset=True)
+
+    if update.get("is_planned"):
+        ensure_family_plan(db, user_id)
 
     # Снимок до изменений (для журнала)
     prev_amount, prev_currency = tx.amount, tx.currency
