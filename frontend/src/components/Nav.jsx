@@ -33,9 +33,6 @@ const MOBILE_MORE_LINKS = [
   { to: "/import", label: "Импорт" },
   { to: "/history", label: "История изменений" },
   { to: "/settings/personal", label: "Настройки" },
-  { to: "/articles", label: "Статьи" },
-  { to: "/help", label: "Помощь" },
-  { to: "/about", label: "О программе" },
 ];
 
 // Раздел «Настройки» — выпадающее меню
@@ -284,7 +281,9 @@ export default function Nav() {
           {mobileMenu === "burger" ? (
             <>
               <PwaInstallLink className="nav-mobile-install" />
+              <NavLink to="/articles" style={mobileLinkStyle} onClick={() => setOpen(false)}>Статьи</NavLink>
               <NavLink to="/help" style={mobileLinkStyle} onClick={() => setOpen(false)}>Помощь</NavLink>
+              <NavLink to="/about" style={mobileLinkStyle} onClick={() => setOpen(false)}>О программе</NavLink>
               {user?.is_admin && (
                 <NavLink to="/admin" style={mobileLinkStyle} onClick={() => setOpen(false)}>Админка</NavLink>
               )}
