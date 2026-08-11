@@ -24,6 +24,7 @@ class UserResponse(BaseModel):
     plan_expires_at: Optional[datetime] = None
     family_upgrade_enabled: bool = False
     show_shopping_button_mobile: bool = True
+    onboarding_completed: bool = False
     is_admin: bool = False
     email_verified: bool = True
 
@@ -36,6 +37,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(None, min_length=1, max_length=64)
     show_shopping_button_mobile: Optional[bool] = None
+    onboarding_completed: Optional[bool] = None
 
 
 class PasswordChange(BaseModel):

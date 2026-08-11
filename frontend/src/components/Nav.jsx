@@ -160,7 +160,7 @@ export default function Nav() {
                 linkStyle={linkStyle}
               />
             ) : (
-              <NavLink key={l.to} to={l.to} style={linkStyle}>
+              <NavLink key={l.to} to={l.to} style={linkStyle} data-tour={l.to === "/accounts" ? "accounts" : l.to === "/reports" ? "reports" : undefined}>
                 {l.label}
               </NavLink>
             )

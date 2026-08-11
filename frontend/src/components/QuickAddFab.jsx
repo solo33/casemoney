@@ -279,6 +279,7 @@ export default function QuickAddFab() {
       <button
         onClick={() => setOpen(true)}
         aria-label="Добавить операцию"
+        data-tour="quick-add-mobile"
         className="fab-add-btn"
         style={{
           position: "fixed",

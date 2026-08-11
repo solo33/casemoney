@@ -306,7 +306,10 @@ export default function Home() {
   const hasTx = (dashboard?.recent_transactions?.length || 0) > 0
     || monthIncome > 0 || monthExpense > 0
     || (dashboard?.recently_changed?.length || 0) > 0;
-  const showOnboarding = !initialLoading && !accountsLoading && !onbDismissed && (!hasAccounts || !hasTx);
+  // The guided tour now handles first launch globally. Keep this compact card
+  // only as a fallback for an unfinished local setup.
+  const showOnboarding = !initialLoading && !accountsLoading && !onbDismissed
+    && localStorage.getItem("cm_inline_onb") === "show" && (!hasAccounts || !hasTx);
 
   // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
   const goToCategory = (catId) => {
@@ -371,7 +374,7 @@ export default function Home() {
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <CreditWidget />
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
-        <Card className="home-balance-card">
+        <Card className="home-balance-card" data-tour="balance">
           <h3 style={sectionTitle}>Баланс</h3>
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
             {balanceLoading || totalBalance == null ? (
@@ -454,12 +457,12 @@ export default function Home() {
       <main className="home-main" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Inline quick-add form — дата синхронизирована с лентой за день */}
         <div className="home-inline-add">
-          <QuickAddInline
+          <div data-tour="quick-add"><QuickAddInline
             date={selectedDate}
             onDateChange={setSelectedDate}
             accountGroups={accountOptions}
             categories={categories}
-          />
+          /></div>
         </div>
 
         {/* Записи: табы Сегодня / Последние изменённые */}
@@ -696,7 +699,7 @@ const sectionTitle = {
   letterSpacing: 0.5,
 };
 
-function Card({ children, style, noPadding, className = "" }) {
+function Card({ children, style, noPadding, className = "", ...props }) {
   return (
     <div className={className} style={{
       background: "#fffdf7",
@@ -704,7 +707,7 @@ function Card({ children, style, noPadding, className = "" }) {
       borderRadius: 10,
       padding: noPadding ? 0 : 16,
       ...style,
-    }}>
+    }} {...props}>
       {children}
     </div>
   );

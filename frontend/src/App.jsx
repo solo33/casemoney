@@ -6,10 +6,12 @@ import MobileShoppingButton from './components/MobileShoppingButton'
 import EmailVerifyBanner from './components/EmailVerifyBanner'
 import DemoSessionBanner from './components/DemoSessionBanner'
 import CookieBanner from './components/CookieBanner'
+import ChatWidget from './components/ChatWidget'
 import { GlobalNetworkProgress } from './components/BrandProgress'
 import MobilePwaInstallPrompt from './components/MobilePwaInstallPrompt'
 import OfflineSyncStatus from './components/OfflineSyncStatus'
 import YandexMetrikaRouteTracker from './components/YandexMetrikaRouteTracker'
+import GuidedTour from './components/GuidedTour'
 import Seo from './components/Seo'
 import { UserProvider, useUser } from './contexts/UserContext'
 
@@ -58,6 +60,7 @@ function ProtectedRoute({ children }) {
     <UserProvider>
       <Seo title="CaseMoney" description="Личный кабинет CaseMoney" path={window.location.pathname} noindex />
       <Nav />
+      <GuidedTour />
       <DemoSessionBanner />
       <EmailVerifyBanner />
       {children}
@@ -314,6 +317,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <CookieBanner />
+      <ChatWidget />
       <GlobalNetworkProgress />
     </BrowserRouter>
   )

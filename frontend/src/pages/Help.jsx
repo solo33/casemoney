@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import client from "../api/client";
 import { SUPPORT_EMAIL } from "../config/contacts";
 import PublicPage, { card, paragraph } from "../components/PublicPage";
+import { useUser } from "../contexts/UserContext";
+import { START_GUIDED_TOUR_EVENT } from "../components/GuidedTour";
 
 const helpSections = [
   {
@@ -191,6 +193,7 @@ function PlanComparison() {
 }
 
 export default function Help() {
+  const { user } = useUser();
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
@@ -220,6 +223,7 @@ export default function Help() {
           <a href="#support">Поддержка</a>
         </nav>
         <div className="help-content">
+          {user && <section style={card} className="help-section help-tour-card"><div><h2>Знакомство с CaseMoney</h2><p style={paragraph}>Пройдите короткое интерактивное обучение: оно покажет баланс, создание операций, счета и отчёты прямо в интерфейсе.</p></div><button type="button" onClick={() => window.dispatchEvent(new CustomEvent(START_GUIDED_TOUR_EVENT))}>Запустить обучение</button></section>}
           <PlanComparison />
           {helpSections.map(section => (
             <section key={section.id} id={section.id} style={card} className="help-section">
