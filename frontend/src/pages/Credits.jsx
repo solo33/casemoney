@@ -81,7 +81,7 @@ export default function Credits() {
   };
 
   return <main className="page credits-page">
-    <div className="credits-title-row"><div><h1>Обязательства и депозиты</h1><p>Будущие расходы и доходы, льготные периоды, займы и напоминания.</p></div><button onClick={openCreate}>+ Добавить</button></div>
+    <div className="credits-title-row"><div><h1>Кредиты, долги и вклады</h1><p>Будущие расходы и доходы, льготные периоды, займы и напоминания.</p></div><button onClick={openCreate}>+ Добавить</button></div>
     {error && <div className="credits-alert credits-error">{error}</div>}{message && <div className="credits-alert credits-success">{message}</div>}
     {showForm && <CreditForm form={form} setForm={setForm} editingId={editingId} busy={busy} accounts={accounts} categories={categories} currencies={currencies} onSubmit={submitCredit} onCancel={() => setShowForm(false)} />}
     {loading ? <p>Обновляем данные…</p> : active.length === 0 && !showForm ? <section className="credit-empty"><h2>Пока нет обязательств и депозитов</h2><p>Добавьте будущий платёж или доход — CaseMoney покажет ближайшую дату и напомнит о ней.</p><button onClick={openCreate}>Добавить первый</button></section> : <div className="credits-grid">{active.map(item => <CreditCard key={item.id} item={item} busy={busy} onPay={openPayment} onEdit={openEdit} onClose={() => setStatus(item, "closed")} onDelete={() => deleteCredit(item)} />)}</div>}

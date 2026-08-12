@@ -20,7 +20,8 @@ const MOBILE_PRIMARY_LINKS = [
   { to: "/accounts", label: "Счета", icon: "▣" },
 ];
 
-const FAMILY_PLAN_LINK = { to: "/planning", label: "План денег", familyOnly: true };
+const FAMILY_PLAN_LINK = { to: "/planning", label: "Планирование", familyOnly: true };
+const FAMILY_CREDITS_LINK = { to: "/credits", label: "Кредиты, долги и вклады", familyOnly: true };
 
 const RECORD_LINKS = [
   { to: "/transactions", label: "Все записи" },
@@ -30,7 +31,7 @@ const RECORD_LINKS = [
 
 const MOBILE_MORE_LINKS = [
   { to: "/shopping", label: "Списки покупок" },
-  { to: "/credits", label: "Обязательства и депозиты", familyOnly: true },
+  FAMILY_CREDITS_LINK,
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/goals", label: "Цели" },
   { to: "/import", label: "Импорт" },
@@ -58,7 +59,7 @@ export default function Nav() {
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const hasFamilyPlan = user?.plan === "family";
-  const links = [...BASE_LINKS, FAMILY_PLAN_LINK].filter(link => (
+  const links = [...BASE_LINKS, FAMILY_PLAN_LINK, FAMILY_CREDITS_LINK].filter(link => (
     (!link.familyOnly && link.to !== "/goals") || hasFamilyPlan
   ));
   const visibleSettingsLinks = SETTINGS_LINKS.filter(

@@ -548,9 +548,14 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
   width: 100%;
 }
 
+/* All settings sections share one desktop canvas so the page does not jump
+   sideways when the user switches between profile, categories, currencies,
+   billing, or Family settings. */
+.page:has(.settings-tabs) { max-width: 980px !important; }
+
 /* Date and plan are one compact control in the desktop quick-entry form. */
-.qai-date-plan { display: flex; align-items: center; gap: 10px; }
-.qai-date-plan .qai-date { flex: 1; min-width: 0; }
+.qai-date-plan { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; }
+.qai-date-plan .qai-date { flex: 1 1 auto; min-width: 154px; width: 100%; }
 .qai-plan-toggle { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #515c68; font-size: 13px; }
 .qai-plan-toggle input { width: 18px; height: 18px; min-height: 18px !important; margin: 0; }
 
@@ -565,6 +570,7 @@ a:hover { text-decoration: underline; text-underline-offset: 3px; }
      вправо вместо переноса/обрезки текста внутри строки. Снимаем этот
      пол везде на мобильном, чтобы переполнение оставалось локальным. */
   .page *, .home-layout, .home-layout * { min-width: 0; }
+  .qai-date-plan .qai-date { min-width: 156px; }
 }
 
 /* Полосу страницы не должно уводить вбок ни при каких обстоятельствах —

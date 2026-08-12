@@ -441,7 +441,7 @@ export default function QuickAddInline({
 
         {hasFamilyPlan && type === "expense" && (
           <div className="family-expense-fields">
-            <label>
+            <label className="family-expense-toggle">
               <input
                 type="checkbox"
                 checked={form.is_family_expense}
@@ -454,7 +454,7 @@ export default function QuickAddInline({
               Общая семейная покупка
             </label>
             {form.is_family_expense && (
-              <label>
+              <label className="family-reimbursement-field">
                 <span>К возмещению</span>
                 <input
                   type="number"
@@ -512,23 +512,27 @@ export default function QuickAddInline({
       </form>
 
       <style>{`
-        .qai-date { grid-column: 3 / span 2; }
+        .qai-date { grid-column: 3 / span 2; width: 100%; min-width: 154px; box-sizing: border-box; }
         .transfer-rate-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -2px 0 10px 78px; color: #7a8590; font-size: 12px; }
         .transfer-rate-row input { width: 200px; }
-        .family-expense-fields { margin: 0 0 12px 78px; padding: 10px 12px; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 8px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .family-expense-fields { margin: -2px 0 12px 78px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .same-transfer-amount { align-self: stretch; display: flex; align-items: center; justify-content: flex-end; color: #7a8590; font-size: 12px; }
         label:has(.transfer-swap-button) { display: flex; align-items: center; gap: 6px; }
         .family-expense-fields label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #515c68; }
-        .family-expense-fields input[type="checkbox"] { width: 18px; height: 18px; }
-        .family-expense-fields input[type="number"] { width: 120px; }
+        .family-expense-toggle { min-height: 38px; padding: 0 12px; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 7px; color: #725a20 !important; }
+        .family-expense-fields input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
+        .family-reimbursement-field { min-height: 38px; padding: 0 10px; border: 1px solid #e3dccd; border-radius: 7px; background: #fffdf8; }
+        .family-expense-fields input[type="number"] { width: 104px; min-height: 30px; padding: 4px 6px; border: 0; background: transparent; text-align: right; }
         @media (max-width: 600px) {
           form > div[style*="grid-template-columns"] {
             grid-template-columns: 1fr !important;
           }
-          .qai-date { grid-column: auto !important; }
+          .qai-date { grid-column: auto !important; width: 100%; min-width: 156px; }
           .transfer-rate-row { margin-left: 0; align-items: stretch; flex-direction: column; }
           .transfer-rate-row input { width: 100%; }
-          .family-expense-fields { margin-left: 0; align-items: stretch; flex-direction: column; }
+          .family-expense-fields { margin: -2px 0 12px; align-items: stretch; flex-direction: column; gap: 8px; }
+          .family-expense-toggle, .family-reimbursement-field { width: 100%; min-height: 42px; box-sizing: border-box; }
+          .family-reimbursement-field input[type="number"] { flex: 1; width: auto; }
         }
       `}</style>
     </div>

@@ -17,7 +17,7 @@ export default function SettingsTabs() {
   );
 
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+    <div className="settings-tabs" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
       {visibleTabs.map(tab => {
         const active = pathname === tab.to;
         return (
