@@ -190,15 +190,42 @@ export default function Family() {
             <section className="family-card">
               <h2>Участники</h2>
               <div className="family-members">
-                {state.family.members.map(member => (
-                  <div key={member.id}>
-                    <span>
-                      <strong>{member.name}</strong>
-                      <small>{member.email}</small>
-                    </span>
-                    <span>{member.status === "active" ? "Подключён" : "Приглашён"}</span>
-                  </div>
-                ))}
+                {state.family.members.map(member => {
+                  const isSelf = member.user_id === state.family.current_user_id;
+                  const isOwner = state.family.current_user_role === "owner";
+                  const canRemove = member.role !== "owner" && (isOwner || isSelf);
+                  return (
+                    <div key={member.id}>
+                      <span>
+                        <strong>{member.name}</strong>
+                        <small>{member.email}</small>
+                      </span>
+                      <span className="family-member-actions">
+                        {member.status === "active" ? "Подключён" : "Приглашён"}
+                        {canRemove && (
+                          <button
+                            type="button"
+                            className="family-member-remove"
+                            onClick={() => {
+                              const confirmMsg = isSelf
+                                ? "Выйти из семейного пространства?"
+                                : member.status === "active"
+                                  ? `Убрать «${member.name}» из семьи?`
+                                  : `Отменить приглашение для ${member.email}?`;
+                              if (!window.confirm(confirmMsg)) return;
+                              submit(async () => {
+                                await api.delete(`/api/family/members/${member.id}`);
+                                setMessage(isSelf ? "Вы вышли из семьи" : "Участник удалён");
+                              });
+                            }}
+                          >
+                            {isSelf ? "Выйти" : "Удалить"}
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
               {state.family.current_user_role === "owner" && (
                 <form onSubmit={event => {
@@ -342,10 +369,17 @@ export default function Family() {
         .family-card form { display: grid; gap: 9px; margin-top: 15px; }
         .family-card form button { justify-self: start; }
         .family-members > div, .family-expenses article {
-          display: flex; justify-content: space-between; gap: 15px; padding: 11px 0; border-bottom: 1px solid #eee8dc;
+          display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 11px 0; border-bottom: 1px solid #eee8dc;
         }
-        .family-members span:first-child, .family-expenses article > div { display: grid; gap: 3px; }
+        .family-members span:first-child, .family-expenses article > div { display: grid; gap: 3px; min-width: 0; }
+        .family-members span:first-child strong, .family-members span:first-child small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .family-members small, .family-expenses span { color: #7a8590; font-size: 12px; }
+        .family-member-actions { display: flex !important; align-items: center; gap: 10px; color: #7a8590; font-size: 13px; flex-shrink: 0; }
+        .family-member-remove {
+          background: transparent; border: 1px solid #e4ddcd; color: #a83220;
+          padding: 4px 10px; font-size: 12px; border-radius: 7px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+        }
+        .family-member-remove:hover { background: #fff0ec; border-color: #e2a99a; }
         .family-amount { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
         .family-expenses article > div:last-child { text-align: right; }
         @media (max-width: 720px) {

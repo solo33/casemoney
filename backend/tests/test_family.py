@@ -106,6 +106,86 @@ def test_family_expense_is_shared_without_exposing_personal_transactions(client)
     assert data["outstanding"][0]["amount"] == 800
 
 
+def test_owner_can_remove_pending_invitation(client):
+    owner = register_and_login(client, "owner-pending-remove@test.com")
+    enable_family_plan("owner-pending-remove@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Семья"})
+    invited = client.post(
+        "/api/family/invite",
+        headers=owner,
+        json={"email": "not-yet-registered@test.com"},
+    )
+    assert invited.status_code == 201, invited.text
+    member_id = invited.json()["id"]
+
+    removed = client.delete(f"/api/family/members/{member_id}", headers=owner)
+    assert removed.status_code == 204, removed.text
+
+    family = client.get("/api/family/", headers=owner).json()["family"]
+    assert [m["email"] for m in family["members"]] == ["owner-pending-remove@test.com"]
+
+    # Email свободен — можно пригласить снова
+    reinvited = client.post(
+        "/api/family/invite",
+        headers=owner,
+        json={"email": "not-yet-registered@test.com"},
+    )
+    assert reinvited.status_code == 201, reinvited.text
+
+
+def test_owner_can_remove_active_member(client):
+    owner = register_and_login(client, "owner-active-remove@test.com")
+    member = register_and_login(client, "member-active-remove@test.com")
+    enable_family_plan("owner-active-remove@test.com")
+    enable_family_plan("member-active-remove@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Семья"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "member-active-remove@test.com"}
+    ).json()
+    client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member)
+
+    removed = client.delete(f"/api/family/members/{invitation['id']}", headers=owner)
+    assert removed.status_code == 204, removed.text
+
+    # Удалённый участник больше не видит семейное пространство
+    after = client.get("/api/family/", headers=member).json()
+    assert after["family"] is None
+
+
+def test_member_can_leave_family_but_not_remove_others(client):
+    owner = register_and_login(client, "owner-leave@test.com")
+    member = register_and_login(client, "member-leave@test.com")
+    enable_family_plan("owner-leave@test.com")
+    enable_family_plan("member-leave@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Семья"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "member-leave@test.com"}
+    ).json()
+    client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member)
+
+    owner_member_id = next(
+        m["id"] for m in client.get("/api/family/", headers=owner).json()["family"]["members"]
+        if m["email"] == "owner-leave@test.com"
+    )
+    forbidden = client.delete(f"/api/family/members/{owner_member_id}", headers=member)
+    assert forbidden.status_code == 403
+
+    left = client.delete(f"/api/family/members/{invitation['id']}", headers=member)
+    assert left.status_code == 204, left.text
+    after = client.get("/api/family/", headers=member).json()
+    assert after["family"] is None
+
+
+def test_cannot_remove_owner(client):
+    owner = register_and_login(client, "owner-protected@test.com")
+    enable_family_plan("owner-protected@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Семья"})
+    owner_member_id = client.get("/api/family/", headers=owner).json()["family"]["members"][0]["id"]
+
+    response = client.delete(f"/api/family/members/{owner_member_id}", headers=owner)
+    assert response.status_code == 400
+
+
 def test_settlement_reduces_outstanding_without_creating_expense(client):
     owner = register_and_login(client, "payer@test.com")
     member = register_and_login(client, "recipient@test.com")

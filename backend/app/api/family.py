@@ -236,6 +236,32 @@ def invite_member(
     return {"id": invitation.id, "email": email, "status": "pending"}
 
 
+@router.delete("/members/{member_id}", status_code=204)
+def remove_member(
+    member_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    """Убрать участника из семьи — владельцем (в т.ч. пока приглашение ещё
+    не принято) или самим участником (выход из семьи)."""
+    membership = require_membership(db, user_id)
+    target = db.query(FamilyMember).filter(
+        FamilyMember.id == member_id,
+        FamilyMember.family_id == membership.family_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Участник не найден")
+
+    is_self = target.user_id == user_id
+    if not is_self and membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Удалять участников может только владелец")
+    if target.role == "owner":
+        raise HTTPException(status_code=400, detail="Нельзя удалить владельца семьи")
+
+    db.delete(target)
+    db.commit()
+
+
 @router.post("/invitations/{invitation_id}/accept")
 def accept_invitation(
     invitation_id: int,
