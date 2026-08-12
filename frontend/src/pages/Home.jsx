@@ -344,9 +344,10 @@ export default function Home() {
           .home-inline-add { display: none !important; }
           .home-aside, .home-main { display: contents !important; }
           .home-balance-card { order: 1; }
-          .home-records-card { order: 2; }
-          .home-breakdown-card { order: 3; }
-          .home-accounts-card { order: 4; }
+          .credit-widget { order: 2; }
+          .home-records-card { order: 3; }
+          .home-breakdown-card { order: 4; }
+          .home-accounts-card { order: 5; }
         }
       `}</style>
 
@@ -372,7 +373,6 @@ export default function Home() {
 
       {/* ============== LEFT SIDEBAR ============== */}
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <CreditWidget />
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
         <Card className="home-balance-card" data-tour="balance">
           <h3 style={sectionTitle}>Баланс</h3>
@@ -410,6 +410,8 @@ export default function Home() {
             </>
           )}
         </Card>
+
+        <CreditWidget />
 
         {/* Accounts grouped — только учитываемые в балансе */}
         <Card noPadding className="home-accounts-card">
