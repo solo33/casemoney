@@ -4,17 +4,38 @@ import CategoryPicker from "../components/CategoryPicker";
 import { formatMoneyWithCurrency } from "../utils/money";
 
 const KIND_LABELS = { mortgage: "Ипотека", loan: "Кредит", credit_card: "Кредитная карта", private_debt: "Частный заём", deposit: "Депозит" };
-const emptyForm = () => ({ name: "", kind: "mortgage", direction: "owe", currency: "RUB", counterparty: "", original_amount: "", current_balance: "", credit_limit: "", monthly_payment: "", annual_interest_rate: "", interest_payout_frequency: "monthly", capitalization: false, opened_at: "", due_day: "", statement_day: "", next_payment_date: "", end_date: "", reminder_days_before: "3", source_account_id: "", linked_account_id: "", funds_received: false, funds_account_id: "", category_id: "", notes: "" });
+const DEBT_KINDS = ["mortgage", "loan", "credit_card", "private_debt"];
+const DEPOSIT_KINDS = ["deposit"];
+const SCOPE = {
+  debt: {
+    kinds: DEBT_KINDS,
+    defaultKind: "mortgage",
+    title: "Кредиты и долги",
+    description: "Будущие платежи, льготные периоды, займы и напоминания.",
+    emptyTitle: "Пока нет кредитов и долгов",
+    emptyText: "Добавьте будущий платёж — CaseMoney покажет ближайшую дату и напомнит о ней.",
+  },
+  deposit: {
+    kinds: DEPOSIT_KINDS,
+    defaultKind: "deposit",
+    title: "Вклады",
+    description: "Депозиты, проценты и ожидаемые поступления.",
+    emptyTitle: "Пока нет вкладов",
+    emptyText: "Добавьте вклад — CaseMoney посчитает ожидаемый доход и напомнит о поступлении.",
+  },
+};
+const emptyForm = defaultKind => ({ name: "", kind: defaultKind, direction: defaultKind === "deposit" ? "receivable" : "owe", currency: "RUB", counterparty: "", original_amount: "", current_balance: "", credit_limit: "", monthly_payment: "", annual_interest_rate: "", interest_payout_frequency: "monthly", capitalization: false, opened_at: "", due_day: "", statement_day: "", next_payment_date: "", end_date: "", reminder_days_before: "3", source_account_id: "", linked_account_id: "", funds_received: false, funds_account_id: "", category_id: "", notes: "" });
 const optionalNumber = value => value === "" || value == null ? null : Number(value);
 const optionalId = value => value === "" || value == null ? null : Number(value);
 
-export default function Credits() {
+export default function Credits({ scope = "debt" }) {
+  const scopeConfig = SCOPE[scope];
   const [credits, setCredits] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => emptyForm(scopeConfig.defaultKind));
   const [paying, setPaying] = useState(null);
   const [payment, setPayment] = useState({ amount: "", account_id: "", notes: "" });
   const [loading, setLoading] = useState(true);
@@ -31,21 +52,22 @@ export default function Credits() {
       setCredits(creditResponse.data);
       setAccounts(accountResponse.data.flatMap(group => group.accounts || []));
       setCategories(categoryResponse.data);
-    } catch (err) { setError(err.response?.data?.detail || "Не удалось загрузить обязательства и депозиты"); }
+    } catch (err) { setError(err.response?.data?.detail || `Не удалось загрузить: ${scopeConfig.title.toLowerCase()}`); }
     finally { setLoading(false); }
-  }, []);
+  }, [scopeConfig.title]);
   useEffect(() => { load(); }, [load]);
 
-  const active = credits.filter(item => item.status === "active");
-  const closed = credits.filter(item => item.status === "closed");
+  const inScope = credits.filter(item => scopeConfig.kinds.includes(item.kind));
+  const active = inScope.filter(item => item.status === "active");
+  const closed = inScope.filter(item => item.status === "closed");
   const currencies = useMemo(() => {
     const values = new Set(["RUB"]);
     accounts.forEach(account => (account.balances || []).forEach(balance => values.add(balance.currency)));
     return [...values];
   }, [accounts]);
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm()); setShowForm(true); };
-  const openEdit = item => { setEditingId(item.id); setForm(Object.fromEntries(Object.keys(emptyForm()).map(key => [key, item[key] ?? ""]))); setShowForm(true); };
+  const openCreate = () => { setEditingId(null); setForm(emptyForm(scopeConfig.defaultKind)); setShowForm(true); };
+  const openEdit = item => { setEditingId(item.id); setForm(Object.fromEntries(Object.keys(emptyForm(scopeConfig.defaultKind)).map(key => [key, item[key] ?? ""]))); setShowForm(true); };
 
   const submitCredit = async event => {
     event.preventDefault(); setBusy(true); setError(""); setMessage("");
@@ -53,7 +75,7 @@ export default function Credits() {
     if (editingId) ["kind", "direction", "currency"].forEach(key => delete payload[key]);
     try {
       if (editingId) await api.patch(`/api/credits/${editingId}`, payload); else await api.post("/api/credits/", payload);
-      setMessage(editingId ? "Изменения сохранены" : "Обязательство добавлено"); setShowForm(false); await load();
+      setMessage(editingId ? "Изменения сохранены" : (scope === "deposit" ? "Вклад добавлен" : "Обязательство добавлено")); setShowForm(false); await load();
     } catch (err) { const detail = err.response?.data?.detail; setError(Array.isArray(detail) ? detail.map(item => item.msg).join("; ") : detail || "Не удалось сохранить"); }
     finally { setBusy(false); }
   };
@@ -73,31 +95,32 @@ export default function Credits() {
     const suffix = paymentCount
       ? ` Вместе с ним будут удалены ${paymentCount} связанных платеж${paymentCount === 1 ? "" : paymentCount < 5 ? "а" : "ей"} и соответствующие операции по счетам.`
       : "";
-    if (!confirm(`Удалить обязательство «${item.name}»?${suffix}\n\nВосстановить нельзя.`)) return;
+    const noun = scope === "deposit" ? "вклад" : "обязательство";
+    if (!confirm(`Удалить ${noun} «${item.name}»?${suffix}\n\nВосстановить нельзя.`)) return;
     setBusy(true); setError("");
-    try { await api.delete(`/api/credits/${item.id}`); setMessage("Обязательство и связанные платежи удалены"); await load(); }
-    catch (err) { setError(err.response?.data?.detail || "Не удалось удалить обязательство"); }
+    try { await api.delete(`/api/credits/${item.id}`); setMessage(scope === "deposit" ? "Вклад и связанные платежи удалены" : "Обязательство и связанные платежи удалены"); await load(); }
+    catch (err) { setError(err.response?.data?.detail || `Не удалось удалить ${noun}`); }
     finally { setBusy(false); }
   };
 
   return <main className="page credits-page">
-    <div className="credits-title-row"><div><h1>Кредиты, долги и вклады</h1><p>Будущие расходы и доходы, льготные периоды, займы и напоминания.</p></div><button onClick={openCreate}>+ Добавить</button></div>
+    <div className="credits-title-row"><div><h1>{scopeConfig.title}</h1><p>{scopeConfig.description}</p></div><button onClick={openCreate}>+ Добавить</button></div>
     {error && <div className="credits-alert credits-error">{error}</div>}{message && <div className="credits-alert credits-success">{message}</div>}
-    {showForm && <CreditForm form={form} setForm={setForm} editingId={editingId} busy={busy} accounts={accounts} categories={categories} currencies={currencies} onSubmit={submitCredit} onCancel={() => setShowForm(false)} />}
-    {loading ? <p>Обновляем данные…</p> : active.length === 0 && !showForm ? <section className="credit-empty"><h2>Пока нет обязательств и депозитов</h2><p>Добавьте будущий платёж или доход — CaseMoney покажет ближайшую дату и напомнит о ней.</p><button onClick={openCreate}>Добавить первый</button></section> : <div className="credits-grid">{active.map(item => <CreditCard key={item.id} item={item} busy={busy} onPay={openPayment} onEdit={openEdit} onClose={() => setStatus(item, "closed")} onDelete={() => deleteCredit(item)} />)}</div>}
-    {closed.length > 0 && <details className="closed-credits"><summary>Закрытые обязательства ({closed.length})</summary><div className="credits-grid">{closed.map(item => <CreditCard key={item.id} item={item} busy={busy} onEdit={openEdit} onRestore={() => setStatus(item, "active")} onDelete={() => deleteCredit(item)} />)}</div></details>}
+    {showForm && <CreditForm form={form} setForm={setForm} editingId={editingId} busy={busy} accounts={accounts} categories={categories} currencies={currencies} kindOptions={scopeConfig.kinds} onSubmit={submitCredit} onCancel={() => setShowForm(false)} />}
+    {loading ? <p>Обновляем данные…</p> : active.length === 0 && !showForm ? <section className="credit-empty"><h2>{scopeConfig.emptyTitle}</h2><p>{scopeConfig.emptyText}</p><button onClick={openCreate}>Добавить первый</button></section> : <div className="credits-grid">{active.map(item => <CreditCard key={item.id} item={item} busy={busy} onPay={openPayment} onEdit={openEdit} onClose={() => setStatus(item, "closed")} onDelete={() => deleteCredit(item)} />)}</div>}
+    {closed.length > 0 && <details className="closed-credits"><summary>Закрытые ({closed.length})</summary><div className="credits-grid">{closed.map(item => <CreditCard key={item.id} item={item} busy={busy} onEdit={openEdit} onRestore={() => setStatus(item, "active")} onDelete={() => deleteCredit(item)} />)}</div></details>}
     {paying && <PaymentModal item={paying} payment={payment} setPayment={setPayment} accounts={accounts} busy={busy} onSubmit={submitPayment} onCancel={() => setPaying(null)} />}
     <style>{creditStyles}</style>
   </main>;
 }
 
-function CreditForm({ form, setForm, editingId, busy, accounts, categories, currencies, onSubmit, onCancel }) {
+function CreditForm({ form, setForm, editingId, busy, accounts, categories, currencies, kindOptions, onSubmit, onCancel }) {
   const depositIncome = form.kind === "deposit" && form.annual_interest_rate && (form.current_balance || form.original_amount)
     ? Number(form.current_balance || form.original_amount) * Number(form.annual_interest_rate) / 100 / (form.interest_payout_frequency === "monthly" ? 12 : 1)
     : null;
-  return <section className="credit-form-card"><div className="credit-section-title"><h2>{editingId ? "Изменить обязательство" : "Новое обязательство"}</h2><button type="button" className="btn-ghost" onClick={onCancel}>×</button></div><form onSubmit={onSubmit} className="credit-form">
+  return <section className="credit-form-card"><div className="credit-section-title"><h2>{editingId ? "Изменить запись" : "Новая запись"}</h2><button type="button" className="btn-ghost" onClick={onCancel}>×</button></div><form onSubmit={onSubmit} className="credit-form">
     <Field label="Название"><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Например, ипотека" /></Field>
-    {!editingId && <Field label="Тип"><select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value, category_id: "", direction: e.target.value === "deposit" ? "receivable" : e.target.value === "private_debt" ? form.direction : "owe" })}>{Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>}
+    {!editingId && kindOptions.length > 1 && <Field label="Тип"><select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value, category_id: "", direction: e.target.value === "deposit" ? "receivable" : e.target.value === "private_debt" ? form.direction : "owe" })}>{kindOptions.map(value => <option key={value} value={value}>{KIND_LABELS[value]}</option>)}</select></Field>}
     {!editingId && form.kind === "private_debt" && <Field label="Направление"><select value={form.direction} onChange={e => setForm({ ...form, direction: e.target.value, funds_received: e.target.value === "receivable" ? false : form.funds_received, funds_account_id: e.target.value === "receivable" ? "" : form.funds_account_id })}><option value="owe">Я должен</option><option value="receivable">Мне должны</option></select></Field>}
     <Field label="Валюта"><select disabled={Boolean(editingId)} value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{currencies.map(item => <option key={item}>{item}</option>)}</select></Field>
     <Field label={form.kind === "deposit" ? "Банк" : "Кредитор или человек"}><input value={form.counterparty} onChange={e => setForm({ ...form, counterparty: e.target.value })} /></Field>

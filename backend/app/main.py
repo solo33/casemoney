@@ -36,6 +36,7 @@ from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401
 from app.models.transaction_template import TransactionTemplate  # noqa: F401
 from app.models.recurring_transaction import RecurringTransaction  # noqa: F401
+from app.models.budget import Budget  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
 from app.api.account_groups import router as account_groups_router
@@ -59,6 +60,7 @@ from app.api.shopping import router as shopping_router
 from app.api.transaction_templates import router as transaction_templates_router
 from app.api.recurring_transactions import router as recurring_transactions_router
 from app.api.chat import router as chat_router
+from app.api.budgets import router as budgets_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -130,6 +132,7 @@ app.include_router(shopping_router)
 app.include_router(transaction_templates_router)
 app.include_router(recurring_transactions_router)
 app.include_router(chat_router)
+app.include_router(budgets_router)
 
 
 @app.on_event("startup")

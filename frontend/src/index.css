@@ -1378,6 +1378,49 @@ hr {
 .recurring-list span { color: var(--muted); font-size: 13px; }
 .recurring-list .is-inactive { opacity: .58; }
 .danger { color: #c0432b !important; }
+.planning-modal-backdrop { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 16px; background: rgba(10,29,44,.58); }
+.planning-modal { width: min(420px, 100%); background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 14px; padding: 20px; box-shadow: 0 20px 50px rgba(10,29,44,.25); }
+.planning-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.planning-modal-head h2 { margin: 0; font-size: 20px; }
+.budget-page { max-width: 900px; }
+.budget-message { margin: 0 0 16px; padding: 11px 14px; border-radius: 8px; background: #edf8f1; color: #12683e; font-size: 13px; }
+.budget-totals-card { display: flex; gap: 24px; flex-wrap: wrap; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.budget-totals-card > div { display: grid; gap: 3px; }
+.budget-totals-card span { color: var(--muted); font-size: 12px; }
+.budget-totals-card strong { font-size: 18px; color: #173a54; }
+.budget-list-card, .budget-suggestions-card { background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.budget-list-card h2, .budget-suggestions-card h2 { margin: 0 0 6px; font-size: 18px; }
+.budget-suggestions-card > p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.budget-list { display: grid; gap: 16px; margin-top: 12px; }
+.budget-row { border-top: 1px solid #eee7d9; padding-top: 14px; }
+.budget-list > .budget-row:first-child { border-top: 0; padding-top: 0; }
+.budget-row-head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.budget-row-head span:last-child { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+.budget-bar { height: 8px; background: #f0ebdf; border-radius: 999px; overflow: hidden; }
+.budget-bar > div { height: 100%; background: #3d9a68; border-radius: 999px; }
+.budget-row.overspent .budget-bar > div { background: #c0432b; }
+.budget-row-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+.budget-row-foot > span { font-size: 12px; color: var(--muted); }
+.budget-row.overspent .budget-row-foot > span { color: #c0432b; font-weight: 600; }
+.budget-actions { display: flex; gap: 6px; }
+.budget-edit-form { display: flex; gap: 6px; align-items: center; }
+.budget-edit-form input { width: 110px; }
+.budget-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.budget-suggestion { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; border: 1px solid #e4ddcd; border-radius: 8px; background: #fffdf7; padding: 8px 12px; cursor: pointer; text-align: left; }
+.budget-suggestion:hover { border-color: #d9c79f; background: #f6f2e9; }
+.budget-suggestion span { font-size: 13px; color: var(--text); }
+.budget-suggestion strong { font-size: 14px; color: #173a54; }
+.budget-add-trigger { margin-bottom: 16px; }
+@media (max-width: 600px) {
+  .budget-totals-card { gap: 14px 24px; }
+  .budget-row-foot { flex-direction: column; align-items: flex-start; }
+  .budget-edit-form { width: 100%; }
+  .budget-edit-form input { flex: 1; width: auto; }
+}
+.planning-modal-form { display: grid; gap: 12px; margin-top: 15px; }
+.planning-modal-form label { display: grid; gap: 5px; }
+.planning-modal-form label > span { color: #6f7b86; font-size: 12px; }
+.planning-modal-actions { display: flex; gap: 9px; align-items: center; margin-top: 4px; }
 .guided-tour { position: fixed; inset: 0; z-index: 1200; background: rgba(9, 29, 44, .74); }
 .guided-tour-spotlight { position: fixed; z-index: 1201; border: 2px solid #d7ae57; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(9, 29, 44, .34), 0 0 26px rgba(215,174,87,.48); pointer-events: none; transition: all 180ms ease; }
 .guided-tour-card { position: fixed; z-index: 1202; width: min(390px, calc(100vw - 32px)); right: 28px; bottom: 28px; background: #fffdf7; border: 1px solid #e1d8c6; border-radius: 14px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.36); }

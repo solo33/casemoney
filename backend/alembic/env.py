@@ -34,15 +34,29 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.models.user import User
+from app.models.pending_registration import PendingRegistration
+from app.models.category import Category
 from app.models.account import Account
 from app.models.account_group import AccountGroup
 from app.models.account_balance import AccountBalance
-from app.models.category import Category
 from app.models.transaction import Transaction
 from app.models.exchange_rate import ExchangeRate
 from app.models.user_currency import UserCurrency
-from app.models.goal import Goal
+from app.models.goal import Goal, GoalContribution
 from app.models.app_config import AppConfig
+from app.models.transaction_history import TransactionHistory
+from app.models.bank_import_mapping import (
+    BankAccountMapping,
+    BankCategoryMapping,
+)
+from app.models.family import Family, FamilyMember, FamilySettlement
+from app.models.notification import Notification
+from app.models.credit import CreditObligation, CreditPayment
+from app.models.billing import Subscription, BillingPayment
+from app.models.shopping import ShoppingList, ShoppingItem
+from app.models.transaction_template import TransactionTemplate
+from app.models.recurring_transaction import RecurringTransaction
+from app.models.budget import Budget
 from app.database import Base
 
 target_metadata = Base.metadata

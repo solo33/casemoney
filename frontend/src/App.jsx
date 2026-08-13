@@ -48,6 +48,7 @@ const Credits = lazy(() => import('./pages/Credits'))
 const Billing = lazy(() => import('./pages/Billing'))
 const Shopping = lazy(() => import('./pages/Shopping'))
 const Planning = lazy(() => import('./pages/Planning'))
+const Budget = lazy(() => import('./pages/Budget'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -182,6 +183,15 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/budget"
+          element={
+            <ProtectedRoute>
+              <FamilyPlanRoute><Budget /></FamilyPlanRoute>
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="/dashboard" element={<Navigate to="/reports" replace />} />
 
         <Route
@@ -287,7 +297,16 @@ export default function App() {
           path="/credits"
           element={
             <ProtectedRoute>
-              <FamilyPlanRoute><Credits /></FamilyPlanRoute>
+              <FamilyPlanRoute><Credits scope="debt" /></FamilyPlanRoute>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/deposits"
+          element={
+            <ProtectedRoute>
+              <FamilyPlanRoute><Credits scope="deposit" /></FamilyPlanRoute>
             </ProtectedRoute>
           }
         />

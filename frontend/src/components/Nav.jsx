@@ -20,8 +20,12 @@ const MOBILE_PRIMARY_LINKS = [
   { to: "/accounts", label: "Счета", icon: "▣" },
 ];
 
-const FAMILY_PLAN_LINK = { to: "/planning", label: "Планирование", familyOnly: true };
-const FAMILY_CREDITS_LINK = { to: "/credits", label: "Кредиты, долги и вклады", familyOnly: true };
+const FAMILY_BUDGET_LINK = { to: "/budget", label: "Бюджет", familyOnly: true };
+const FAMILY_PLAN_LINK = { to: "/planning", label: "Расписание", familyOnly: true };
+const FAMILY_DEPOSITS_LINK = { to: "/deposits", label: "Вклады", familyOnly: true };
+const FAMILY_CREDITS_LINK = { to: "/credits", label: "Кредиты", familyOnly: true };
+// Планирование объединяет бюджет, разовые и повторяющиеся операции, вклады и кредиты.
+const SCHEDULE_LINKS = [FAMILY_BUDGET_LINK, FAMILY_PLAN_LINK, FAMILY_DEPOSITS_LINK, FAMILY_CREDITS_LINK];
 
 const RECORD_LINKS = [
   { to: "/transactions", label: "Все записи" },
@@ -29,8 +33,15 @@ const RECORD_LINKS = [
   { to: "/history", label: "История" },
 ];
 
+const HELP_LINKS = [
+  { to: "/help", label: "Помощь" },
+  { to: "/articles", label: "Статьи" },
+];
+
 const MOBILE_MORE_LINKS = [
   { to: "/shopping", label: "Списки покупок" },
+  FAMILY_BUDGET_LINK,
+  FAMILY_DEPOSITS_LINK,
   FAMILY_CREDITS_LINK,
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/goals", label: "Цели" },
@@ -46,8 +57,6 @@ const SETTINGS_LINKS = [
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/shopping", label: "Списки покупок" },
-  { to: "/articles", label: "Статьи" },
-  { to: "/help", label: "Помощь" },
   { to: "/about", label: "О программе" },
 ];
 
@@ -59,9 +68,7 @@ export default function Nav() {
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const hasFamilyPlan = user?.plan === "family";
-  const links = [...BASE_LINKS, FAMILY_PLAN_LINK, FAMILY_CREDITS_LINK].filter(link => (
-    (!link.familyOnly && link.to !== "/goals") || hasFamilyPlan
-  ));
+  const links = BASE_LINKS.filter(link => link.to !== "/goals" || hasFamilyPlan);
   const visibleSettingsLinks = SETTINGS_LINKS.filter(
     link => link.to !== "/settings/family" || hasFamilyPlan
   );
@@ -167,6 +174,10 @@ export default function Nav() {
             )
           ))}
 
+          {hasFamilyPlan && (
+            <DropdownNav label="Планирование" links={SCHEDULE_LINKS} linkStyle={linkStyle} />
+          )}
+
           {/* Настройки — выпадающее меню */}
           <div style={{ position: "relative" }}>
             <button
@@ -217,6 +228,10 @@ export default function Nav() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="nav-settings-desktop">
+          <DropdownNav label="?" links={HELP_LINKS} linkStyle={linkStyle} round />
         </div>
 
         <NotificationBell />
@@ -408,26 +423,32 @@ export default function Nav() {
   );
 }
 
-function DropdownNav({ label, links, linkStyle }) {
+function DropdownNav({ label, links, linkStyle, round = false }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        style={{
+        aria-label={round ? "Помощь" : undefined}
+        style={round ? {
+          width: 36, height: 36, padding: 0, border: "1px solid rgba(255,255,255,0.18)",
+          borderRadius: 999, background: "transparent", color: "#f4f1e8",
+          fontSize: 15, fontWeight: 700, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        } : {
           ...linkStyle({ isActive: false }),
           border: "none", cursor: "pointer",
           display: "flex", alignItems: "center", gap: 4,
         }}
       >
-        {label} <span style={{ fontSize: 10 }}>▾</span>
+        {round ? label : <>{label} <span style={{ fontSize: 10 }}>▾</span></>}
       </button>
       {open && (
         <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
           <div style={{
-            position: "absolute", top: "calc(100% + 6px)", left: 0,
+            position: "absolute", top: "calc(100% + 6px)", right: round ? 0 : "auto", left: round ? "auto" : 0,
             background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 8,
             boxShadow: "0 8px 20px rgba(15,30,45,0.18)", padding: 4, zIndex: 91,
             minWidth: 150,

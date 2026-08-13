@@ -9,8 +9,16 @@ from app.models.transaction import Transaction
 
 
 def _next_occurrence(value: date, frequency: str) -> date:
+    if frequency == "daily":
+        return value + timedelta(days=1)
     if frequency == "weekly":
         return value + timedelta(days=7)
+    if frequency == "biweekly":
+        return value + timedelta(days=14)
+    if frequency == "yearly":
+        year = value.year + 1
+        day = min(value.day, monthrange(year, value.month)[1])
+        return date(year, value.month, day)
     month = value.month + 1
     year = value.year
     if month == 13:

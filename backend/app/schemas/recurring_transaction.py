@@ -12,7 +12,7 @@ class RecurringTransactionCreate(BaseModel):
     account_id: Optional[int] = None
     category_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
-    frequency: str = Field("monthly", pattern="^(weekly|monthly)$")
+    frequency: str = Field("monthly", pattern="^(daily|weekly|biweekly|monthly|yearly)$")
     next_date: date
 
 
@@ -23,7 +23,7 @@ class RecurringTransactionUpdate(BaseModel):
     account_id: Optional[int] = None
     category_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
-    frequency: Optional[str] = Field(None, pattern="^(weekly|monthly)$")
+    frequency: Optional[str] = Field(None, pattern="^(daily|weekly|biweekly|monthly|yearly)$")
     next_date: Optional[date] = None
     is_active: Optional[bool] = None
 
