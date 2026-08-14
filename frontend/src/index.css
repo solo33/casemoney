@@ -1383,6 +1383,9 @@ hr {
 .planning-modal-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .planning-modal-head h2 { margin: 0; font-size: 20px; }
 .budget-page { max-width: 900px; }
+.budget-controls { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #e4ddcd; border-radius: 10px; background: #fffdf7; }
+.budget-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.budget-controls select, .budget-controls input { min-width: 150px; }
 .budget-message { margin: 0 0 16px; padding: 11px 14px; border-radius: 8px; background: #edf8f1; color: #12683e; font-size: 13px; }
 .budget-totals-card { display: flex; gap: 24px; flex-wrap: wrap; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
 .budget-totals-card > div { display: grid; gap: 3px; }
@@ -1401,6 +1404,7 @@ hr {
 .budget-row.overspent .budget-bar > div { background: #c0432b; }
 .budget-row-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
 .budget-row-foot > span { font-size: 12px; color: var(--muted); }
+.budget-row-meta { width: 100%; color: var(--muted); font-size: 12px; }
 .budget-row.overspent .budget-row-foot > span { color: #c0432b; font-weight: 600; }
 .budget-actions { display: flex; gap: 6px; }
 .budget-edit-form { display: flex; gap: 6px; align-items: center; }
@@ -1411,7 +1415,18 @@ hr {
 .budget-suggestion span { font-size: 13px; color: var(--text); }
 .budget-suggestion strong { font-size: 14px; color: #173a54; }
 .budget-add-trigger { margin-bottom: 16px; }
+.budget-checkbox { display: flex !important; gap: 8px; align-items: center; color: var(--text); font-size: 14px; }
+.budget-checkbox input { width: auto; }
+.dashboard-widget-settings { display: grid; gap: 8px; }
+.dashboard-widget-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #eee7d9; }
+.dashboard-widget-setting:first-child { border-top: 0; }
+.dashboard-widget-actions { display: flex; gap: 5px; flex-shrink: 0; }
 @media (max-width: 600px) {
+  .dashboard-widget-setting { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 600px) {
+  .budget-controls { display: grid; grid-template-columns: 1fr 1fr; }
+  .budget-controls select, .budget-controls input { min-width: 0; width: 100%; }
   .budget-totals-card { gap: 14px 24px; }
   .budget-row-foot { flex-direction: column; align-items: flex-start; }
   .budget-edit-form { width: 100%; }

@@ -111,3 +111,37 @@ def test_suggestions_use_past_six_months_average(client):
     })
     suggestions_after = client.get("/api/budgets/suggestions", headers=auth).json()
     assert all(s["category_id"] != category_id for s in suggestions_after)
+
+
+def test_budget_supports_quarter_and_carries_unused_limit(client):
+    auth = register_and_login(client, "owner-budget-rollover@test.com")
+    enable_family_plan("owner-budget-rollover@test.com")
+    account = make_account(client, auth, balance=100000)
+    category_id = next(
+        category["id"]
+        for category in client.get("/api/categories/", headers=auth).json()
+        if category["type"] == "expense"
+    )
+
+    april = "2026-04-01"
+    july = "2026-07-01"
+    first = client.post("/api/budgets/", headers=auth, json={
+        "category_id": category_id, "amount": 10000, "currency": "RUB",
+        "period": "quarter", "period_start": april, "rollover_mode": "carry_remaining",
+    })
+    assert first.status_code == 201, first.text
+    expense = client.post("/api/transactions/", headers=auth, json={
+        "type": "expense", "amount": 3000, "currency": "RUB", "account_id": account["id"],
+        "category_id": category_id, "date": "2026-05-10T12:00:00+00:00",
+    })
+    assert expense.status_code == 201, expense.text
+    second = client.post("/api/budgets/", headers=auth, json={
+        "category_id": category_id, "amount": 20000, "currency": "RUB",
+        "period": "quarter", "period_start": july,
+    })
+    assert second.status_code == 201, second.text
+
+    listed = client.get("/api/budgets/?period=quarter&anchor=2026-08-15", headers=auth)
+    assert listed.status_code == 200, listed.text
+    assert listed.json()[0]["carry_in"] == 7000
+    assert listed.json()[0]["effective_limit"] == 27000

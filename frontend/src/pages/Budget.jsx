@@ -13,7 +13,9 @@ export default function Budget() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [addForm, setAddForm] = useState(null); // { category_id, amount, currency }
+  const [period, setPeriod] = useState("month");
+  const [anchor, setAnchor] = useState(() => new Date().toISOString().slice(0, 10));
+  const [addForm, setAddForm] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editAmount, setEditAmount] = useState("");
 
@@ -21,9 +23,10 @@ export default function Budget() {
     setLoading(true);
     setError("");
     try {
+      const params = { period, anchor };
       const [budgetsRes, suggestionsRes, categoriesRes] = await Promise.all([
-        api.get("/api/budgets/"),
-        api.get("/api/budgets/suggestions"),
+        api.get("/api/budgets/", { params }),
+        api.get("/api/budgets/suggestions", { params }),
         api.get("/api/categories/"),
       ]);
       setBudgets(budgetsRes.data);
@@ -34,11 +37,11 @@ export default function Budget() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [anchor, period]);
   useEffect(() => { load(); }, [load]);
 
   const totals = useMemo(() => ({
-    limit: budgets.reduce((sum, b) => sum + b.amount, 0),
+    limit: budgets.reduce((sum, b) => sum + b.effective_limit, 0),
     spent: budgets.reduce((sum, b) => sum + b.spent, 0),
   }), [budgets]);
 
@@ -52,8 +55,16 @@ export default function Budget() {
     category_id: String(suggestion.category_id),
     amount: String(Math.round(suggestion.average_amount)),
     currency: suggestion.currency,
+    period,
+    period_start: anchor,
+    rollover_mode: "none",
+    include_planned: false,
+    scope: "personal",
   });
-  const openAddManual = () => setAddForm({ category_id: "", amount: "", currency: mainCurrency });
+  const openAddManual = () => setAddForm({
+    category_id: "", amount: "", currency: mainCurrency, period, period_start: anchor,
+    rollover_mode: "none", include_planned: false, scope: "personal",
+  });
 
   const submitAdd = async event => {
     event.preventDefault();
@@ -62,9 +73,9 @@ export default function Budget() {
     setError("");
     try {
       await api.post("/api/budgets/", {
+        ...addForm,
         category_id: Number(addForm.category_id),
         amount: Number(addForm.amount),
-        currency: addForm.currency,
       });
       setAddForm(null);
       setMessage("Лимит добавлен");
@@ -111,14 +122,27 @@ export default function Budget() {
   return (
     <main className="page budget-page">
       <header className="page-heading">
-        <div><h1>Бюджет</h1><p>Лимиты расходов по категориям на текущий месяц.</p></div>
+        <div><h1>Бюджет</h1><p>Планируйте лимиты расходов, общий бюджет и остатки по категориям.</p></div>
       </header>
       {error && <div className="form-error">{error}</div>}
       {message && <div className="budget-message">{message}</div>}
 
+      <section className="budget-controls" aria-label="Период бюджета">
+        <label>Период
+          <select value={period} onChange={event => setPeriod(event.target.value)}>
+            <option value="month">Месяц</option>
+            <option value="quarter">Квартал</option>
+            <option value="year">Год</option>
+          </select>
+        </label>
+        <label>Дата периода
+          <input type="date" value={anchor} onChange={event => setAnchor(event.target.value)} />
+        </label>
+      </section>
+
       {budgets.length > 0 && (
         <section className="budget-totals-card">
-          <div><span>Всего лимит</span><strong>{formatMoney(totals.limit)} {mainCurrency}</strong></div>
+          <div><span>Лимит с переносом</span><strong>{formatMoney(totals.limit)} {mainCurrency}</strong></div>
           <div><span>Потрачено</span><strong className={totals.spent > totals.limit ? "danger" : ""}>{formatMoney(totals.spent)} {mainCurrency}</strong></div>
           <div><span>Остаток</span><strong>{formatMoney(totals.limit - totals.spent)} {mainCurrency}</strong></div>
         </section>
@@ -134,13 +158,22 @@ export default function Budget() {
               <div key={b.id} className={b.is_overspent ? "budget-row overspent" : "budget-row"}>
                 <div className="budget-row-head">
                   <span>{b.category_icon} {b.category_name}</span>
-                  <span>{formatMoney(b.spent)} / {formatMoney(b.amount)} {b.currency}</span>
+                  <span>{formatMoney(b.spent)} / {formatMoney(b.effective_limit)} {b.currency}</span>
                 </div>
                 <div className="budget-bar"><div style={{ width: `${Math.min(100, b.percent)}%` }} /></div>
                 <div className="budget-row-foot">
                   <span>{b.is_overspent
                     ? `Перерасход ${formatMoney(Math.abs(b.remaining))} ${b.currency}`
                     : `Осталось ${formatMoney(b.remaining)} ${b.currency}`}</span>
+                  {(b.carry_in !== 0 || b.include_planned || b.scope !== "personal") && (
+                    <small className="budget-row-meta">
+                      {b.carry_in !== 0 && `Перенос: ${formatMoney(b.carry_in)} ${b.currency}`}
+                      {b.carry_in !== 0 && (b.include_planned || b.scope !== "personal") && " · "}
+                      {b.include_planned && "С планом"}
+                      {b.include_planned && b.scope !== "personal" && " · "}
+                      {b.scope === "family" ? "Семейные" : b.scope === "mixed" ? "Общий" : ""}
+                    </small>
+                  )}
                   {editingId === b.id ? (
                     <form onSubmit={event => submitEdit(event, b)} className="budget-edit-form">
                       <input type="number" min="0.01" step="0.01" value={editAmount} onChange={event => setEditAmount(event.target.value)} autoFocus />
@@ -187,8 +220,26 @@ export default function Budget() {
               <label><span>Категория</span>
                 <CategoryPicker categories={availableCategories} value={addForm.category_id} onChange={category_id => setAddForm({ ...addForm, category_id })} />
               </label>
-              <label><span>Лимит на месяц, {addForm.currency}</span>
+              <label><span>Лимит, {addForm.currency}</span>
                 <input type="number" required min="0.01" step="0.01" value={addForm.amount} onChange={event => setAddForm({ ...addForm, amount: event.target.value })} autoFocus />
+              </label>
+              <label><span>Перенос остатка на следующий период</span>
+                <select value={addForm.rollover_mode} onChange={event => setAddForm({ ...addForm, rollover_mode: event.target.value })}>
+                  <option value="none">Не переносить</option>
+                  <option value="carry_remaining">Переносить только неиспользованный</option>
+                  <option value="carry_balance">Переносить остаток или перерасход</option>
+                </select>
+              </label>
+              <label><span>Область бюджета</span>
+                <select value={addForm.scope} onChange={event => setAddForm({ ...addForm, scope: event.target.value })}>
+                  <option value="personal">Мои расходы</option>
+                  <option value="family">Общие семейные расходы</option>
+                  <option value="mixed">Мои и общие семейные расходы</option>
+                </select>
+              </label>
+              <label className="budget-checkbox">
+                <input type="checkbox" checked={addForm.include_planned} onChange={event => setAddForm({ ...addForm, include_planned: event.target.checked })} />
+                <span>Учитывать запланированные операции</span>
               </label>
               <div className="planning-modal-actions">
                 <button type="submit" disabled={busy || !addForm.category_id}>Сохранить</button>

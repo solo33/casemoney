@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 
 class UserRegister(BaseModel):
@@ -24,6 +24,8 @@ class UserResponse(BaseModel):
     plan_expires_at: Optional[datetime] = None
     family_upgrade_enabled: bool = False
     show_shopping_button_mobile: bool = True
+    hide_zero_balance_currencies: bool = False
+    dashboard_widgets: dict[str, Any] = Field(default_factory=dict)
     onboarding_completed: bool = False
     is_admin: bool = False
     email_verified: bool = True
@@ -37,6 +39,8 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(None, min_length=1, max_length=64)
     show_shopping_button_mobile: Optional[bool] = None
+    hide_zero_balance_currencies: Optional[bool] = None
+    dashboard_widgets: Optional[dict[str, Any]] = None
     onboarding_completed: Optional[bool] = None
 
 

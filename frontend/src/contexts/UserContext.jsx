@@ -9,6 +9,7 @@ const UserContext = createContext({
   limits: null,
   refresh: () => {},
   refreshLimits: () => {},
+  updateUser: async () => {},
   updateMainCurrency: async () => {},
 });
 
@@ -50,10 +51,16 @@ export function UserProvider({ children }) {
     refreshLimits();
   }, [refresh, refreshLimits]);
 
-  const updateMainCurrency = useCallback(async (currency) => {
-    const res = await api.put("/api/me/", { main_currency: currency });
+  const updateUser = useCallback(async (changes) => {
+    const res = await api.put("/api/me/", changes);
     setUser(res.data);
+    saveReferenceData({ user: res.data });
+    return res.data;
   }, []);
+
+  const updateMainCurrency = useCallback(async (currency) => {
+    await updateUser({ main_currency: currency });
+  }, [updateUser]);
 
   return (
     <UserContext.Provider value={{
@@ -63,6 +70,7 @@ export function UserProvider({ children }) {
       limits,
       refresh,
       refreshLimits,
+      updateUser,
       updateMainCurrency,
     }}>
       {children}

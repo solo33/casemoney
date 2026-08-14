@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/refs -- load version is read only inside async request handlers. */
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
@@ -68,9 +69,25 @@ function aggregateByCurrency(groups) {
 }
 
 const IS_MOBILE = typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
+const DASHBOARD_WIDGET_DEFAULTS = {
+  balance: { visible: true, collapsed: false, order: 0 },
+  credits: { visible: true, collapsed: false, order: 1 },
+  accounts: { visible: true, collapsed: false, order: 2 },
+  records: { visible: true, collapsed: false, order: 3 },
+  breakdown: { visible: true, collapsed: IS_MOBILE, order: 4 },
+  budget: { visible: true, collapsed: IS_MOBILE, order: 5 },
+};
+
+function dashboardWidgetSettings(value) {
+  const saved = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(Object.entries(DASHBOARD_WIDGET_DEFAULTS).map(([id, fallback]) => [
+    id,
+    { ...fallback, ...(saved[id] || {}) },
+  ]));
+}
 
 export default function Home() {
-  const { mainCurrency } = useUser();
+  const { mainCurrency, user, updateUser } = useUser();
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [grouped, setGrouped] = useState([]);
@@ -87,7 +104,11 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
-  const [breakdownCollapsed, setBreakdownCollapsed] = useState(IS_MOBILE);
+  const widgetSettings = dashboardWidgetSettings(user?.dashboard_widgets);
+  const widgetSettingsSignature = JSON.stringify(user?.dashboard_widgets || {});
+  const [collapsedWidgets, setCollapsedWidgets] = useState(() => Object.fromEntries(
+    Object.entries(DASHBOARD_WIDGET_DEFAULTS).map(([id, options]) => [id, options.collapsed]),
+  ));
   const [initialLoading, setInitialLoading] = useState(true);
   const [balanceLoading, setBalanceLoading] = useState(true);
   const [trendLoading, setTrendLoading] = useState(true);
@@ -99,6 +120,24 @@ export default function Home() {
     localStorage.setItem("cm_onb_done", "1");
     setOnbDismissed(true);
   };
+
+  useEffect(() => {
+    const saved = JSON.parse(widgetSettingsSignature);
+    const settings = dashboardWidgetSettings(saved);
+    setCollapsedWidgets(Object.fromEntries(Object.entries(settings).map(([id, options]) => [id, Boolean(options.collapsed)])));
+  }, [widgetSettingsSignature]);
+
+  const updateWidgetCollapsed = async (id, collapsed) => {
+    setCollapsedWidgets(current => ({ ...current, [id]: collapsed }));
+    const current = dashboardWidgetSettings(user?.dashboard_widgets);
+    try {
+      await updateUser({ dashboard_widgets: { ...current, [id]: { ...current[id], collapsed } } });
+    } catch {
+      // The local UI state still makes the widget usable if a connection is temporarily unavailable.
+    }
+  };
+
+  const isWidgetCollapsed = id => Boolean(collapsedWidgets[id]);
 
   const fetchAll = useCallback(async () => {
     const version = ++loadVersion.current;
@@ -169,7 +208,12 @@ export default function Home() {
     // Этап 2: общий баланс и последние изменённые записи.
     try {
       const d = await api.get("/api/dashboard/");
-      if (isCurrent()) setDashboard(d.data);
+      if (isCurrent()) {
+        setDashboard(d.data);
+        const syncedAt = new Date().toISOString();
+        localStorage.setItem("casemoney:last-successful-sync", syncedAt);
+        window.dispatchEvent(new CustomEvent("casemoney:last-successful-sync", { detail: syncedAt }));
+      }
     } catch {
       if (isCurrent()) setError("Не удалось обновить общий баланс");
     } finally {
@@ -343,11 +387,6 @@ export default function Home() {
           .home-layout { padding: 12px 12px 154px !important; gap: 12px !important; }
           .home-inline-add { display: none !important; }
           .home-aside, .home-main { display: contents !important; }
-          .home-balance-card { order: 1; }
-          .credit-widget { order: 2; }
-          .home-records-card { order: 3; }
-          .home-breakdown-card { order: 4; }
-          .home-accounts-card { order: 5; }
         }
       `}</style>
 
@@ -374,8 +413,11 @@ export default function Home() {
       {/* ============== LEFT SIDEBAR ============== */}
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
-        <Card className="home-balance-card" data-tour="balance">
-          <h3 style={sectionTitle}>Баланс</h3>
+        {widgetSettings.balance.visible && <Card className="home-balance-card" data-tour="balance" style={{ order: widgetSettings.balance.order }}>
+          <h3 onClick={() => updateWidgetCollapsed("balance", !isWidgetCollapsed("balance"))} style={{ ...sectionTitle, cursor: "pointer", userSelect: "none" }}>
+            <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{isWidgetCollapsed("balance") ? "▸" : "▾"}</span>Баланс
+          </h3>
+          {!isWidgetCollapsed("balance") && <>
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
             {balanceLoading || totalBalance == null ? (
               <BrandProgress label="Обновляем остатки…" size={38} style={{ minHeight: 40 }} />
@@ -397,7 +439,6 @@ export default function Home() {
               ))}
             </div>
           )}
-
           {trendLoading ? (
             <>
               <div style={{ borderTop: "1px solid #ece6d8", margin: "14px 0 10px" }} />
@@ -409,19 +450,25 @@ export default function Home() {
               <MonthBars points={trendDesc} sym={sym} />
             </>
           )}
-        </Card>
+          </>}
+        </Card>}
 
-        <CreditWidget />
+        {widgetSettings.credits.visible && <div style={{ order: widgetSettings.credits.order }}><CreditWidget
+          collapsed={isWidgetCollapsed("credits")}
+          onCollapseChange={collapsed => updateWidgetCollapsed("credits", collapsed)}
+        /></div>}
 
         {/* Accounts grouped — только учитываемые в балансе */}
-        <Card noPadding className="home-accounts-card">
+        {widgetSettings.accounts.visible && <Card noPadding className="home-accounts-card" style={{ order: widgetSettings.accounts.order }}>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <h3 style={{ ...sectionTitle, marginBottom: 0 }}>Счета</h3>
+            <h3 onClick={() => updateWidgetCollapsed("accounts", !isWidgetCollapsed("accounts"))} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
+              <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{isWidgetCollapsed("accounts") ? "▸" : "▾"}</span>Счета
+            </h3>
             <Link to="/accounts" style={{ fontSize: 12, color: "#9c7b3c", textDecoration: "none" }}>
               Настроить →
             </Link>
           </div>
-          {accountsLoading ? (
+          {!isWidgetCollapsed("accounts") && <>{accountsLoading ? (
             <AccountLoadingStructure />
           ) : grouped.length === 0 ? (
             <p style={{ padding: "10px 16px 16px", color: "#a6afb8", fontSize: 13 }}>
@@ -431,7 +478,10 @@ export default function Home() {
             grouped
               .map(bucket => {
                 const accounts = (bucket.accounts || [])
-                  .filter(a => a.include_in_balance !== false);
+                  .filter(a => a.include_in_balance !== false)
+                  .filter(account => !user?.hide_zero_balance_currencies || (account.balances || []).some(
+                    balance => Math.abs(Number(balance.balance || 0)) > 0.005,
+                  ));
                 return {
                   ...bucket,
                   accounts,
@@ -449,10 +499,11 @@ export default function Home() {
                   sym={sym}
                   onAccountClick={goToAccount}
                   onAdjustBalance={(account, balance) => setAdjustingBalance({ account, balance })}
+                  hideZeroBalances={Boolean(user?.hide_zero_balance_currencies)}
                 />
               ))
-          )}
-        </Card>
+          )}</>}
+        </Card>}
       </aside>
 
       {/* ============== RIGHT MAIN ============== */}
@@ -468,7 +519,7 @@ export default function Home() {
         </div>
 
         {/* Записи: табы Сегодня / Последние изменённые */}
-        <Card noPadding className="home-records-card">
+        {widgetSettings.records.visible && <Card noPadding className="home-records-card" style={{ order: widgetSettings.records.order }}>
           <div style={{
             display: "flex", alignItems: "stretch", flexWrap: "wrap",
             borderBottom: "1px solid #ece6d8",
@@ -493,7 +544,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {(() => {
+          {!isWidgetCollapsed("records") && (() => {
             const list = recordsTab === "today" ? todayTx : recentlyChanged;
             if (list.length === 0) {
               return (
@@ -519,18 +570,21 @@ export default function Home() {
               </div>
             );
           })()}
-        </Card>
+        </Card>}
 
         {/* Разбивка по категориям с переключателем Расходы/Доходы.
             На телефоне свёрнута по умолчанию — разворачивается по тапу. */}
-        <Card className="home-breakdown-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: breakdownCollapsed ? 0 : 12, gap: 8, flexWrap: "wrap" }}>
+        {widgetSettings.breakdown.visible && <Card className="home-breakdown-card" style={{ order: widgetSettings.breakdown.order }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: isWidgetCollapsed("breakdown") ? 0 : 12, gap: 8, flexWrap: "wrap" }}>
             <h3
-              onClick={() => setBreakdownCollapsed(c => !c)}
+              onClick={() => {
+                const next = !isWidgetCollapsed("breakdown");
+                updateWidgetCollapsed("breakdown", next);
+              }}
               style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}
             >
               <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>
-                {breakdownCollapsed ? "▸" : "▾"}
+                {isWidgetCollapsed("breakdown") ? "▸" : "▾"}
               </span>
               {breakdownWord} за {monthLabel.toLowerCase()}
             </h3>
@@ -542,7 +596,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          {breakdownCollapsed ? null : initialLoading ? (
+          {isWidgetCollapsed("breakdown") ? null : initialLoading ? (
             <BrandProgress label="Обновляем категории…" size={34} style={{ minHeight: 72 }} />
           ) : breakdownItems.length === 0 ? (
             <p style={{ color: "#a6afb8", fontSize: 14 }}>
@@ -574,7 +628,15 @@ export default function Home() {
               </div>
             </>
           )}
-        </Card>
+        </Card>}
+
+        {user?.plan === "family" && widgetSettings.budget.visible && (
+          <BudgetWidget
+            collapsed={isWidgetCollapsed("budget")}
+            order={widgetSettings.budget.order}
+            onCollapseChange={collapsed => updateWidgetCollapsed("budget", collapsed)}
+          />
+        )}
       </main>
 
       {editingTx && (
@@ -700,6 +762,59 @@ const sectionTitle = {
   textTransform: "uppercase",
   letterSpacing: 0.5,
 };
+
+function BudgetWidget({ collapsed, order, onCollapseChange }) {
+  const [budgets, setBudgets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    api.get("/api/budgets/")
+      .then(response => { if (active) setBudgets(response.data); })
+      .catch(() => { if (active) setBudgets([]); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  const totals = budgets.reduce((result, item) => ({
+    limit: result.limit + Number(item.effective_limit || item.amount || 0),
+    spent: result.spent + Number(item.spent || 0),
+  }), { limit: 0, spent: 0 });
+  const overspent = totals.spent > totals.limit;
+
+  return (
+    <Card className="home-budget-card" style={{ order }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <h3 onClick={() => onCollapseChange(!collapsed)} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
+          <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{collapsed ? "▸" : "▾"}</span>
+          Бюджет
+        </h3>
+        <Link to="/budget" style={{ color: "#9c7b3c", fontSize: 12, textDecoration: "none" }}>Открыть →</Link>
+      </div>
+      {!collapsed && (loading ? (
+        <BrandProgress label="Обновляем бюджет…" size={28} style={{ minHeight: 64 }} />
+      ) : budgets.length === 0 ? (
+        <p style={{ margin: "12px 0 0", color: "#7a8590", fontSize: 13 }}>Лимитов пока нет. Задайте первый бюджет.</p>
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, fontVariantNumeric: "tabular-nums", fontSize: 13 }}>
+            <span>Потрачено</span>
+            <strong style={{ color: overspent ? "#c0432b" : "#173a54" }}>{formatMoney(totals.spent)} / {formatMoney(totals.limit)}</strong>
+          </div>
+          <div className="budget-bar" style={{ marginTop: 7 }}><div style={{ width: `${Math.min(100, totals.limit ? totals.spent / totals.limit * 100 : 0)}%`, background: overspent ? "#c0432b" : undefined }} /></div>
+          <div style={{ display: "grid", gap: 7, marginTop: 12 }}>
+            {budgets.slice(0, 4).map(item => (
+              <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12 }}>
+                <span>{item.category_icon} {item.category_name}</span>
+                <span style={{ color: item.is_overspent ? "#c0432b" : "#617080" }}>{formatMoney(item.remaining)} {item.currency}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ))}
+    </Card>
+  );
+}
 
 function Card({ children, style, noPadding, className = "", ...props }) {
   return (
@@ -1078,7 +1193,7 @@ function AccountLoadingStructure() {
   );
 }
 
-function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance }) {
+function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance, hideZeroBalances }) {
   // На телефоне группы свёрнуты по умолчанию — важен итог, детали по тапу
   const [collapsed, setCollapsed] = useState(IS_MOBILE);
   return (
@@ -1118,6 +1233,7 @@ function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance }) {
               acc={acc}
               onClick={() => onAccountClick(acc.id)}
               onAdjustBalance={balance => onAdjustBalance(acc, balance)}
+              hideZeroBalances={hideZeroBalances}
             />
           ))}
         </div>
@@ -1126,8 +1242,11 @@ function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance }) {
   );
 }
 
-function AccountBlock({ acc, onClick, onAdjustBalance }) {
-  const balances = acc.balances || [];
+function AccountBlock({ acc, onClick, onAdjustBalance, hideZeroBalances }) {
+  const balances = (acc.balances || []).filter(balance => (
+    !hideZeroBalances || Math.abs(Number(balance.balance || 0)) > 0.005
+  ));
+  if (hideZeroBalances && balances.length === 0) return null;
   return (
     <div
       style={{

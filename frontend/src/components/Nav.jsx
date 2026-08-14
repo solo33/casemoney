@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol } from "../utils/money";
@@ -65,6 +65,7 @@ export default function Nav() {
   const [open, setOpen] = useState(false);
   const [mobileMenu, setMobileMenu] = useState("more");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => localStorage.getItem("casemoney:last-successful-sync"));
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
   const hasFamilyPlan = user?.plan === "family";
@@ -77,6 +78,12 @@ export default function Nav() {
     && (link.to !== "/goals" || hasFamilyPlan)
     && (link.to !== "/settings/family" || hasFamilyPlan)
   ));
+
+  useEffect(() => {
+    const onSync = event => setLastSyncedAt(event.detail || localStorage.getItem("casemoney:last-successful-sync"));
+    window.addEventListener("casemoney:last-successful-sync", onSync);
+    return () => window.removeEventListener("casemoney:last-successful-sync", onSync);
+  }, []);
   const settingsLinks = user?.is_admin
     ? [...visibleSettingsLinks, { to: "/admin", label: "Админка" }]
     : visibleSettingsLinks;
@@ -231,7 +238,13 @@ export default function Nav() {
         </div>
 
         <div className="nav-settings-desktop">
-          <DropdownNav label="?" links={HELP_LINKS} linkStyle={linkStyle} round />
+          <DropdownNav
+            label="?"
+            links={HELP_LINKS}
+            linkStyle={linkStyle}
+            round
+            footer={lastSyncedAt ? `Обновлено ${new Date(lastSyncedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : null}
+          />
         </div>
 
         <NotificationBell />
@@ -423,7 +436,7 @@ export default function Nav() {
   );
 }
 
-function DropdownNav({ label, links, linkStyle, round = false }) {
+function DropdownNav({ label, links, linkStyle, round = false, footer = null }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
@@ -469,6 +482,7 @@ function DropdownNav({ label, links, linkStyle, round = false }) {
                 {l.label}
               </NavLink>
             ))}
+            {footer && <div style={{ borderTop: "1px solid #ece6d8", marginTop: 4, padding: "8px 12px", color: "#7a8590", fontSize: 11, whiteSpace: "nowrap" }}>{footer}</div>}
           </div>
         </>
       )}

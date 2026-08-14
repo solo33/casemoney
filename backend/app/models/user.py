@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import JSON, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -17,6 +17,8 @@ class User(Base):
     plan_expires_at = Column(DateTime(timezone=True), nullable=True)
     family_upgrade_enabled = Column(Boolean, nullable=False, default=False)
     show_shopping_button_mobile = Column(Boolean, nullable=False, default=True)
+    hide_zero_balance_currencies = Column(Boolean, nullable=False, default=False)
+    dashboard_widgets = Column(JSON, nullable=False, default=dict)
     onboarding_completed = Column(Boolean, nullable=False, default=False)
     is_admin = Column(Boolean, nullable=False, default=False)
     email_verified = Column(Boolean, nullable=False, default=False)

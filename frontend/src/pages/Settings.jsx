@@ -4,9 +4,31 @@ import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import SettingsTabs from "../components/SettingsTabs";
 
+const DASHBOARD_WIDGETS = [
+  ["balance", "Баланс"],
+  ["credits", "Платежи и поступления"],
+  ["accounts", "Счета"],
+  ["records", "Последние записи"],
+  ["breakdown", "Расходы и доходы"],
+  ["budget", "Бюджет"],
+];
+
+function normalizedWidgetSettings(raw) {
+  const saved = raw && typeof raw === "object" ? raw : {};
+  return DASHBOARD_WIDGETS.reduce((result, [id], index) => {
+    const current = saved[id] || {};
+    result[id] = {
+      visible: current.visible !== false,
+      collapsed: Boolean(current.collapsed),
+      order: Number.isFinite(current.order) ? current.order : index,
+    };
+    return result;
+  }, {});
+}
+
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, refresh, limits } = useUser();
+  const { user, refresh, limits, updateUser } = useUser();
   const [emailForm, setEmailForm] = useState({ email: "", username: "" });
   const [pwdForm, setPwdForm] = useState({ current_password: "", new_password: "", repeat: "" });
   const [error, setError] = useState(null);
@@ -49,6 +71,30 @@ export default function Settings() {
     } catch (e) {
       flash(e.response?.data?.detail || "Ошибка смены пароля", true);
     }
+  };
+
+  const saveDisplayPreferences = async (changes) => {
+    try {
+      await updateUser(changes);
+      flash("Настройки отображения сохранены");
+    } catch (e) {
+      flash(e.response?.data?.detail || "Не удалось сохранить настройки", true);
+    }
+  };
+
+  const saveWidgetSettings = async (next) => saveDisplayPreferences({ dashboard_widgets: next });
+  const updateWidget = async (id, changes) => {
+    const current = normalizedWidgetSettings(user.dashboard_widgets);
+    await saveWidgetSettings({ ...current, [id]: { ...current[id], ...changes } });
+  };
+  const moveWidget = async (id, direction) => {
+    const current = normalizedWidgetSettings(user.dashboard_widgets);
+    const ordered = Object.entries(current).sort((a, b) => a[1].order - b[1].order);
+    const index = ordered.findIndex(([key]) => key === id);
+    const target = index + direction;
+    if (target < 0 || target >= ordered.length) return;
+    [ordered[index][1].order, ordered[target][1].order] = [ordered[target][1].order, ordered[index][1].order];
+    await saveWidgetSettings(Object.fromEntries(ordered));
   };
 
   const deleteAllRecords = async () => {
@@ -160,6 +206,46 @@ export default function Settings() {
             <button type="submit">Сменить пароль</button>
           </div>
         </form>
+      </Section>
+
+      <Section title="Отображение">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <label className="settings-checkbox-row">
+            <input
+              type="checkbox"
+              checked={Boolean(user.hide_zero_balance_currencies)}
+              onChange={event => saveDisplayPreferences({ hide_zero_balance_currencies: event.target.checked })}
+            />
+            <span>
+              <b>Скрывать нулевые валюты на главной</b>
+              <small>Счёт без ненулевых остатков также не будет показан в блоке счетов.</small>
+            </span>
+          </label>
+        </div>
+      </Section>
+
+      <Section title="Главная страница">
+        <p style={muted}>Выберите блоки главной страницы, их порядок и начальное состояние. На телефоне свёрнутые блоки остаются компактными.</p>
+        <div className="dashboard-widget-settings">
+          {Object.entries(normalizedWidgetSettings(user.dashboard_widgets))
+            .sort(([, a], [, b]) => a.order - b.order)
+            .map(([id, options], index, all) => {
+              const label = DASHBOARD_WIDGETS.find(([key]) => key === id)?.[1] || id;
+              return (
+                <div className="dashboard-widget-setting" key={id}>
+                  <label className="settings-checkbox-row">
+                    <input type="checkbox" checked={options.visible} onChange={event => updateWidget(id, { visible: event.target.checked })} />
+                    <span><b>{label}</b><small>{options.collapsed ? "Показывается свёрнутым" : "Показывается развёрнутым"}</small></span>
+                  </label>
+                  <div className="dashboard-widget-actions">
+                    <button type="button" className="btn-ghost" onClick={() => updateWidget(id, { collapsed: !options.collapsed })}>{options.collapsed ? "Развернуть" : "Свернуть"}</button>
+                    <button type="button" className="btn-ghost" disabled={index === 0} onClick={() => moveWidget(id, -1)} aria-label={`Поднять ${label}`}>↑</button>
+                    <button type="button" className="btn-ghost" disabled={index === all.length - 1} onClick={() => moveWidget(id, 1)} aria-label={`Опустить ${label}`}>↓</button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
       </Section>
 
       {/* Импорт и экспорт */}
