@@ -161,6 +161,21 @@ def _spent_for_category(
     return round(sum(convert_for_user(db, user_id, amount, tx_currency, currency) for amount, tx_currency in rows), 2)
 
 
+def _period_remaining(db: Session, budget: Budget) -> float:
+    """Остаток на конец периода: свой лимит + перенос из прошлого минус потрачено.
+
+    Общая формула для `_carry_in` (остаток предыдущего периода, который может
+    перетечь дальше) и `_serialize` (остаток текущего периода для ответа) —
+    вынесена в одно место, чтобы правки не расходились между двумя копиями.
+    """
+    start, end = _period_range(budget.period_start, budget.period)
+    spent = _spent_for_category(
+        db, budget.user_id, budget.category_id, budget.currency,
+        start, end, budget.include_planned, budget.scope,
+    )
+    return round(budget.amount + _carry_in(db, budget) - spent, 2)
+
+
 def _carry_in(db: Session, budget: Budget) -> float:
     previous_start = _previous_period_start(budget.period_start, budget.period)
     previous = db.query(Budget).filter(
@@ -169,19 +184,15 @@ def _carry_in(db: Session, budget: Budget) -> float:
         Budget.period == budget.period,
         Budget.period_start == previous_start,
     ).first()
-    if not previous:
+    if not previous or previous.rollover_mode == "none":
         return 0.0
-    if previous.rollover_mode == "none":
-        return 0.0
-    previous_start, previous_end = _period_range(previous.period_start, previous.period)
-    previous_spent = _spent_for_category(
-        db, previous.user_id, previous.category_id, previous.currency,
-        previous_start, previous_end, previous.include_planned, previous.scope,
-    )
-    remainder = previous.amount + _carry_in(db, previous) - previous_spent
+    remainder = _period_remaining(db, previous)
     if previous.rollover_mode == "carry_remaining":
-        return round(max(0, remainder), 2)
-    return round(remainder, 2)
+        remainder = max(0, remainder)
+    # _period_remaining(previous) is expressed in previous.currency — convert once here
+    # so a currency change between consecutive periods for the same category can't
+    # silently corrupt the current period's effective_limit.
+    return round(convert_for_user(db, budget.user_id, remainder, previous.currency, budget.currency), 2)
 
 
 def _serialize(db: Session, budget: Budget, category: Category) -> BudgetResponse:

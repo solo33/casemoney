@@ -25,6 +25,7 @@ import {
   formatMoneyWithCurrency,
   sortCurrenciesRubFirst,
 } from "../utils/money";
+import { isMobileViewport, normalizeDashboardWidgets as dashboardWidgetSettings } from "../utils/dashboardWidgets";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -68,24 +69,6 @@ function aggregateByCurrency(groups) {
     .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
 }
 
-const IS_MOBILE = typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches;
-const DASHBOARD_WIDGET_DEFAULTS = {
-  balance: { visible: true, collapsed: false, order: 0 },
-  credits: { visible: true, collapsed: false, order: 1 },
-  accounts: { visible: true, collapsed: false, order: 2 },
-  records: { visible: true, collapsed: false, order: 3 },
-  breakdown: { visible: true, collapsed: IS_MOBILE, order: 4 },
-  budget: { visible: true, collapsed: IS_MOBILE, order: 5 },
-};
-
-function dashboardWidgetSettings(value) {
-  const saved = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(Object.entries(DASHBOARD_WIDGET_DEFAULTS).map(([id, fallback]) => [
-    id,
-    { ...fallback, ...(saved[id] || {}) },
-  ]));
-}
-
 export default function Home() {
   const { mainCurrency, user, updateUser } = useUser();
   const navigate = useNavigate();
@@ -107,7 +90,7 @@ export default function Home() {
   const widgetSettings = dashboardWidgetSettings(user?.dashboard_widgets);
   const widgetSettingsSignature = JSON.stringify(user?.dashboard_widgets || {});
   const [collapsedWidgets, setCollapsedWidgets] = useState(() => Object.fromEntries(
-    Object.entries(DASHBOARD_WIDGET_DEFAULTS).map(([id, options]) => [id, options.collapsed]),
+    Object.entries(dashboardWidgetSettings()).map(([id, options]) => [id, options.collapsed]),
   ));
   const [initialLoading, setInitialLoading] = useState(true);
   const [balanceLoading, setBalanceLoading] = useState(true);
@@ -1195,7 +1178,7 @@ function AccountLoadingStructure() {
 
 function GroupBlock({ bucket, sym, onAccountClick, onAdjustBalance, hideZeroBalances }) {
   // На телефоне группы свёрнуты по умолчанию — важен итог, детали по тапу
-  const [collapsed, setCollapsed] = useState(IS_MOBILE);
+  const [collapsed, setCollapsed] = useState(isMobileViewport);
   return (
     <div style={{
       margin: "10px 12px 12px",

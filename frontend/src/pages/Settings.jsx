@@ -3,28 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import SettingsTabs from "../components/SettingsTabs";
-
-const DASHBOARD_WIDGETS = [
-  ["balance", "Баланс"],
-  ["credits", "Платежи и поступления"],
-  ["accounts", "Счета"],
-  ["records", "Последние записи"],
-  ["breakdown", "Расходы и доходы"],
-  ["budget", "Бюджет"],
-];
-
-function normalizedWidgetSettings(raw) {
-  const saved = raw && typeof raw === "object" ? raw : {};
-  return DASHBOARD_WIDGETS.reduce((result, [id], index) => {
-    const current = saved[id] || {};
-    result[id] = {
-      visible: current.visible !== false,
-      collapsed: Boolean(current.collapsed),
-      order: Number.isFinite(current.order) ? current.order : index,
-    };
-    return result;
-  }, {});
-}
+import { DASHBOARD_WIDGETS, normalizeDashboardWidgets as normalizedWidgetSettings } from "../utils/dashboardWidgets";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -230,7 +209,7 @@ export default function Settings() {
           {Object.entries(normalizedWidgetSettings(user.dashboard_widgets))
             .sort(([, a], [, b]) => a.order - b.order)
             .map(([id, options], index, all) => {
-              const label = DASHBOARD_WIDGETS.find(([key]) => key === id)?.[1] || id;
+              const label = DASHBOARD_WIDGETS.find(widget => widget.id === id)?.label || id;
               return (
                 <div className="dashboard-widget-setting" key={id}>
                   <label className="settings-checkbox-row">
