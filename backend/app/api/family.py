@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import datetime, timezone
 import html
 from typing import Optional
@@ -430,6 +431,7 @@ def family_analytics(
     planned_income = 0.0
     per_member: dict[int, float] = {}
     per_category: dict[str, float] = {}
+    planned_per_category: dict[str, float] = {}
     skipped_currencies: set[str] = set()
     notable_expenses: list[dict] = []
 
@@ -444,6 +446,8 @@ def family_analytics(
         if item.is_planned:
             if item.type == TransactionType.expense:
                 planned_expenses += amount
+                name = category_names.get(item.category_id, "Без категории")
+                planned_per_category[name] = planned_per_category.get(name, 0.0) + amount
             elif item.type == TransactionType.income:
                 planned_income += amount
             continue
@@ -522,6 +526,63 @@ def family_analytics(
         except exchange_svc.ExchangeError:
             skipped_currencies.add(item.currency)
 
+    now = datetime.now(timezone.utc)
+    is_current_period = now.year == year and now.month == month
+    total_days = monthrange(year, month)[1]
+    days_elapsed = now.day if is_current_period else total_days if now > end else 0
+    days_remaining = total_days - days_elapsed if is_current_period else 0
+    average_daily_expenses = actual_expenses / days_elapsed if days_elapsed else 0.0
+    predicted_expenses = actual_expenses + planned_expenses + average_daily_expenses * days_remaining
+    predicted_income = actual_income + planned_income
+
+    budget_risks = []
+    for item in budgets:
+        category_name = category_names.get(item.category_id)
+        if not category_name:
+            continue
+        try:
+            limit = exchange_svc.convert_for_user(
+                db, user_id, item.amount, item.currency, main_currency,
+            )
+        except exchange_svc.ExchangeError:
+            skipped_currencies.add(item.currency)
+            continue
+        category_actual = per_category.get(category_name, 0.0)
+        category_planned = planned_per_category.get(category_name, 0.0)
+        category_forecast = category_actual + category_planned + (
+            category_actual / days_elapsed * days_remaining if days_elapsed else 0.0
+        )
+        if is_current_period and category_forecast > limit:
+            budget_risks.append({
+                "category_name": category_name,
+                "limit": round(limit, 2),
+                "forecast": round(category_forecast, 2),
+                "overrun": round(category_forecast - limit, 2),
+            })
+    budget_risks.sort(key=lambda item: item["overrun"], reverse=True)
+
+    upcoming = []
+    if is_current_period:
+        for item in transactions:
+            item_date = item.date if item.date.tzinfo else item.date.replace(tzinfo=timezone.utc)
+            if not item.is_planned or item_date < now or item.type not in {TransactionType.expense, TransactionType.income}:
+                continue
+            try:
+                amount = exchange_svc.convert_for_user(
+                    db, item.user_id, item.amount, item.currency, main_currency,
+                )
+            except exchange_svc.ExchangeError:
+                skipped_currencies.add(item.currency)
+                continue
+            upcoming.append({
+                "id": item.id,
+                "date": item_date,
+                "type": item.type.value,
+                "amount": round(amount, 2),
+                "description": item.description or category_names.get(item.category_id) or "Запланированная операция",
+            })
+        upcoming.sort(key=lambda item: item["date"])
+
     def _change(current: float, previous: float) -> dict:
         amount = round(current - previous, 2)
         return {
@@ -567,6 +628,17 @@ def family_analytics(
             "plan": round(budget_plan, 2),
             "fact": round(actual_expenses, 2),
             "remaining": round(budget_plan - actual_expenses, 2),
+        },
+        "forecast": {
+            "is_current_period": is_current_period,
+            "days_elapsed": days_elapsed,
+            "days_remaining": days_remaining,
+            "average_daily_expenses": round(average_daily_expenses, 2),
+            "predicted_expenses": round(predicted_expenses, 2),
+            "predicted_income": round(predicted_income, 2),
+            "predicted_net": round(predicted_income - predicted_expenses, 2),
+            "budget_risks": budget_risks[:5],
+            "upcoming": upcoming[:5],
         },
         "members": member_rows,
         "categories": category_rows,

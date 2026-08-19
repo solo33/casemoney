@@ -278,3 +278,34 @@ def test_family_analytics_includes_comparison_settlements_and_large_expenses(cli
     assert body["settlements_total"] == 300
     assert body["settlements"][0]["to_name"]
     assert body["notable_expenses"][0]["description"] == "Большая покупка"
+
+
+def test_family_analytics_exposes_current_month_forecast(client):
+    owner = register_and_login(client, "forecast-owner@test.com")
+    enable_family_plan("forecast-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Прогноз"})
+    account = make_account(client, owner, balance=10000)
+    category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    now = datetime.now(timezone.utc)
+    actual = client.post("/api/transactions/", headers=owner, json={
+        "amount": 1500, "type": "expense", "currency": "RUB", "account_id": account["id"],
+        "category_id": category_id, "date": now.isoformat(), "is_family_expense": True,
+    })
+    assert actual.status_code == 201, actual.text
+    planned = client.post("/api/transactions/", headers=owner, json={
+        "amount": 900, "type": "expense", "currency": "RUB", "account_id": account["id"],
+        "category_id": category_id, "date": now.replace(day=min(now.day + 1, 28)).isoformat(),
+        "description": "Будущий общий платёж", "is_family_expense": True, "is_planned": True,
+    })
+    assert planned.status_code == 201, planned.text
+
+    response = client.get(f"/api/family/analytics?year={now.year}&month={now.month}", headers=owner)
+    assert response.status_code == 200, response.text
+    forecast = response.json()["forecast"]
+    assert forecast["is_current_period"] is True
+    assert forecast["average_daily_expenses"] > 0
+    assert forecast["predicted_expenses"] > 1500
+    assert forecast["upcoming"][0]["description"] == "Будущий общий платёж"

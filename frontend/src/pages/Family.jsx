@@ -180,6 +180,34 @@ export default function Family() {
               <article className={analytics?.net_total < 0 ? "family-stat-negative" : "family-stat-accent"}><span>Результат</span><strong>{formatMoney(analytics?.net_total || 0)} {analytics?.currency || "RUB"}</strong></article>
               <article><span>Запланировано</span><strong>{formatMoney(analytics?.planned_total || 0)} {analytics?.currency || "RUB"}</strong></article>
             </div>
+            <section className="family-forecast-block">
+              <div className="family-forecast-heading">
+                <div>
+                  <h3>Прогноз до конца месяца</h3>
+                  <p>Рассчитывается только по общим операциям и не показывает личные остатки участников.</p>
+                </div>
+                {analytics?.forecast?.is_current_period && <span className="family-forecast-days">Осталось {analytics.forecast.days_remaining} дн.</span>}
+              </div>
+              {analytics?.forecast?.is_current_period ? <>
+                <div className="family-forecast-stats">
+                  <article><span>Средний расход в день</span><strong>{formatMoney(analytics.forecast.average_daily_expenses)} {analytics.currency}</strong></article>
+                  <article><span>Прогноз расходов</span><strong>{formatMoney(analytics.forecast.predicted_expenses)} {analytics.currency}</strong></article>
+                  <article className={analytics.forecast.predicted_net < 0 ? "family-stat-negative" : "family-stat-accent"}><span>Прогноз результата</span><strong>{formatMoney(analytics.forecast.predicted_net)} {analytics.currency}</strong></article>
+                </div>
+                <div className="family-analytics-columns family-forecast-details">
+                  <div>
+                    <h3>Риск перерасхода</h3>
+                    {(analytics.forecast.budget_risks || []).map(item => <div className="family-analytics-row" key={item.category_name}><span>{item.category_name}<small>Прогноз {formatMoney(item.forecast)} {analytics.currency}</small></span><strong>+{formatMoney(item.overrun)} {analytics.currency}</strong></div>)}
+                    {!analytics.forecast.budget_risks?.length && <p className="family-analytics-empty">По заданным семейным лимитам риска перерасхода нет.</p>}
+                  </div>
+                  <div>
+                    <h3>Ближайшие общие платежи</h3>
+                    {(analytics.forecast.upcoming || []).map(item => <div className="family-analytics-row" key={item.id}><span>{item.description}<small>{new Date(item.date).toLocaleDateString("ru-RU")}</small></span><strong className={item.type === "expense" ? "family-expense-amount" : "family-income-amount"}>{item.type === "expense" ? "−" : "+"}{formatMoney(item.amount)} {analytics.currency}</strong></div>)}
+                    {!analytics.forecast.upcoming?.length && <p className="family-analytics-empty">Запланированных общих операций до конца месяца нет.</p>}
+                  </div>
+                </div>
+              </> : <p className="family-analytics-empty">Прогноз доступен для текущего месяца. Для выбранного периода показана фактическая сводка выше.</p>}
+            </section>
             <div className="family-analytics-columns">
               <div>
                 <h3>Вклад участников</h3>
@@ -396,6 +424,18 @@ export default function Family() {
         .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
         .family-analytics-stats span { color: #7a8590; font-size: 12px; }
         .family-analytics-stats strong { color: #173a54; font-size: 18px; }
+        .family-forecast-block { margin-top: 18px; padding: 15px; border: 1px solid #ded5c2; border-radius: 10px; background: #fffcf4; }
+        .family-forecast-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+        .family-forecast-heading h3 { margin: 0; color: #173a54; font-size: 16px; }
+        .family-forecast-heading p { margin: 4px 0 0; color: #7a8590; font-size: 12px; }
+        .family-forecast-days { flex-shrink: 0; color: #9c6f1d; font-size: 12px; font-weight: 800; background: #f7eed9; border-radius: 999px; padding: 5px 8px; }
+        .family-forecast-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 13px; }
+        .family-forecast-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 11px; display: grid; gap: 4px; background: #fffdf7; }
+        .family-forecast-stats span { color: #7a8590; font-size: 12px; }
+        .family-forecast-stats strong { color: #173a54; font-size: 17px; }
+        .family-forecast-details { margin-top: 13px; }
+        .family-expense-amount { color: #b6402b !important; }
+        .family-income-amount { color: #17704b !important; }
         .family-analytics-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
         .family-analytics-details { padding-top: 4px; border-top: 1px solid #eee8dc; }
         .family-analytics-columns h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
@@ -427,6 +467,8 @@ export default function Family() {
           .family-analytics-stats, .family-analytics-stats-four, .family-analytics-columns { grid-template-columns: 1fr; }
           .family-analytics-heading { align-items: stretch; flex-direction: column; }
           .family-analytics-heading input { width: 100%; }
+          .family-forecast-heading { flex-direction: column; }
+          .family-forecast-stats { grid-template-columns: 1fr; }
           .family-expenses article { align-items: flex-start; }
           .family-heading { align-items: flex-start; }
         }
