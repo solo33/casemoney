@@ -36,6 +36,7 @@ from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401
 from app.models.transaction_template import TransactionTemplate  # noqa: F401
 from app.models.recurring_transaction import RecurringTransaction  # noqa: F401
+from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision  # noqa: F401
 from app.models.budget import Budget  # noqa: F401
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router

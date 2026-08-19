@@ -52,6 +52,9 @@ def process_recurring_transactions(db: Session, today: date | None = None) -> in
                 description=schedule.description or schedule.name,
                 date=datetime.combine(due_date, time(12, 0), tzinfo=timezone.utc),
                 is_planned=True,
+                family_id=schedule.family_id,
+                is_family_expense=schedule.is_family_expense,
+                reimbursement_amount=schedule.reimbursement_amount,
             ))
             db.add(Notification(
                 user_id=schedule.user_id,

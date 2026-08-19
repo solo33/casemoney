@@ -9,6 +9,7 @@ export default function Family() {
   const [state, setState] = useState({ family: null, pending_invitations: [] });
   const [report, setReport] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [recurringSuggestions, setRecurringSuggestions] = useState([]);
   const [analyticsPeriod, setAnalyticsPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [familyName, setFamilyName] = useState("Наша семья");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -29,22 +30,25 @@ export default function Family() {
       const familyResponse = await api.get("/api/family/");
       setState(familyResponse.data);
       if (familyResponse.data.family) {
-        const [reportResponse, analyticsResponse] = await Promise.all([
+        const [reportResponse, analyticsResponse, suggestionsResponse] = await Promise.all([
           api.get("/api/family/report"),
           api.get("/api/family/analytics", { params: analyticsPeriod }),
+          api.get("/api/family/recurring-suggestions"),
         ]);
         setReport(reportResponse.data);
         setAnalytics(analyticsResponse.data);
+        setRecurringSuggestions(suggestionsResponse.data.items || []);
       } else {
         setReport(null);
         setAnalytics(null);
+        setRecurringSuggestions([]);
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось загрузить семейные финансы");
     } finally {
       setLoading(false);
     }
-  }, [analyticsPeriod, setAnalytics, setError, setLoading, setReport, setState]);
+  }, [analyticsPeriod, setAnalytics, setError, setLoading, setRecurringSuggestions, setReport, setState]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -157,6 +161,46 @@ export default function Family() {
               </article>
             )}
           </div>
+
+          <section className="family-card family-recurring-suggestions">
+            <div className="family-recurring-heading">
+              <div>
+                <p className="family-eyebrow">Family</p>
+                <h2>Регулярные платежи</h2>
+                <p>Находим только повторяющиеся общие расходы. Ничего не создаём без подтверждения.</p>
+              </div>
+              <span className="family-recurring-badge">{recurringSuggestions.length}</span>
+            </div>
+            {recurringSuggestions.length ? (
+              <div className="family-recurring-list">
+                {recurringSuggestions.map(item => (
+                  <article key={item.fingerprint} className="family-recurring-item">
+                    <div className="family-recurring-copy">
+                      <strong>{item.description}</strong>
+                      <span>{item.frequency_label} · {item.occurrences} повторения · следующий {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")}</span>
+                      <small>{item.category_name || "Без категории"}</small>
+                    </div>
+                    <div className="family-recurring-amount">
+                      <strong>{formatMoney(item.amount)} {item.currency}</strong>
+                      {item.change_amount !== 0 && <span className={item.change_amount > 0 ? "family-expense-amount" : "family-income-amount"}>
+                        {item.change_amount > 0 ? "+" : ""}{formatMoney(item.change_amount)} {item.currency} к прошлому платежу
+                      </span>}
+                    </div>
+                    <div className="family-recurring-actions">
+                      {item.can_create ? <button type="button" onClick={() => submit(async () => {
+                        await api.post(`/api/family/recurring-suggestions/${item.fingerprint}/create-recurring`);
+                        setMessage("Регулярный общий платёж добавлен в план");
+                      })}>Добавить в план</button> : <span className="family-recurring-owner">Создать может тот, кто оплачивал</span>}
+                      <button type="button" className="family-member-remove" onClick={() => submit(async () => {
+                        await api.post(`/api/family/recurring-suggestions/${item.fingerprint}/dismiss`);
+                        setMessage("Предложение скрыто");
+                      })}>Не учитывать</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="family-analytics-empty">Пока нет уверенных совпадений. Предложения появятся после трёх похожих общих платежей.</p>}
+          </section>
 
           <section className="family-card family-analytics">
             <div className="family-analytics-heading">
@@ -446,6 +490,17 @@ export default function Family() {
         .family-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .family-card { padding: 18px; margin-bottom: 14px; }
         .family-card h2 { margin: 0 0 10px; font-size: 19px; }
+        .family-recurring-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .family-recurring-badge { display: grid; place-items: center; flex: 0 0 auto; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 999px; background: #f7eed9; color: #9c6f1d; font-weight: 800; }
+        .family-recurring-list { display: grid; gap: 8px; margin-top: 14px; }
+        .family-recurring-item { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fffcf4; }
+        .family-recurring-copy, .family-recurring-amount { display: grid; gap: 3px; min-width: 0; }
+        .family-recurring-copy strong { color: #173a54; }
+        .family-recurring-copy span, .family-recurring-copy small, .family-recurring-amount span { color: #7a8590; font-size: 12px; }
+        .family-recurring-amount { text-align: right; }
+        .family-recurring-amount strong { color: #173a54; white-space: nowrap; }
+        .family-recurring-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .family-recurring-owner { color: #7a8590; font-size: 12px; max-width: 145px; text-align: right; }
         .family-card form { display: grid; gap: 9px; margin-top: 15px; }
         .family-card form button { justify-self: start; }
         .family-members > div, .family-expenses article {
@@ -469,6 +524,10 @@ export default function Family() {
           .family-analytics-heading input { width: 100%; }
           .family-forecast-heading { flex-direction: column; }
           .family-forecast-stats { grid-template-columns: 1fr; }
+          .family-recurring-item { grid-template-columns: 1fr; gap: 9px; }
+          .family-recurring-amount { text-align: left; }
+          .family-recurring-actions { justify-content: flex-start; }
+          .family-recurring-owner { max-width: none; text-align: left; }
           .family-expenses article { align-items: flex-start; }
           .family-heading { align-items: flex-start; }
         }

@@ -1,7 +1,9 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from tests.conftest import TestingSessionLocal, make_account, register_and_login
+from app.models.transaction import Transaction
 from app.models.user import User
+from app.services.recurring_transactions import process_recurring_transactions
 
 
 def enable_family_plan(email: str) -> None:
@@ -309,3 +311,63 @@ def test_family_analytics_exposes_current_month_forecast(client):
     assert forecast["average_daily_expenses"] > 0
     assert forecast["predicted_expenses"] > 1500
     assert forecast["upcoming"][0]["description"] == "Будущий общий платёж"
+
+
+def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(client):
+    owner = register_and_login(client, "recurring-owner@test.com")
+    enable_family_plan("recurring-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Регулярные"})
+    account = make_account(client, owner, balance=10000)
+    categories = client.get("/api/categories/", headers=owner).json()
+    category_id = next(item["id"] for item in categories if item["name"] == "Коммунальные" and item["type"] == "expense")
+    for transaction_date in ("2026-06-05T12:00:00Z", "2026-07-05T12:00:00Z", "2026-08-05T12:00:00Z"):
+        response = client.post("/api/transactions/", headers=owner, json={
+            "type": "expense",
+            "amount": 1200,
+            "currency": "RUB",
+            "account_id": account["id"],
+            "category_id": category_id,
+            "description": "Интернет",
+            "date": transaction_date,
+            "is_family_expense": True,
+        })
+        assert response.status_code == 201, response.text
+
+    suggestions = client.get("/api/family/recurring-suggestions", headers=owner)
+    assert suggestions.status_code == 200, suggestions.text
+    item = next(value for value in suggestions.json()["items"] if value["description"] == "Интернет")
+    assert item["frequency"] == "monthly"
+    assert item["can_create"] is True
+
+    created = client.post(
+        f"/api/family/recurring-suggestions/{item['fingerprint']}/create-recurring",
+        headers=owner,
+    )
+    assert created.status_code == 201, created.text
+    assert client.get("/api/family/recurring-suggestions", headers=owner).json()["items"] == []
+
+    # When the schedule is due it creates a planned *shared* operation, so it
+    # appears in the family plan and keeps the original privacy boundary.
+    db = TestingSessionLocal()
+    try:
+        assert process_recurring_transactions(db, today=date(2026, 9, 5)) == 1
+        generated = db.query(Transaction).filter(
+            Transaction.description == "Интернет", Transaction.is_planned.is_(True),
+        ).one()
+        assert generated.is_family_expense is True
+        assert generated.family_id is not None
+    finally:
+        db.close()
+
+    # A similar pattern can be hidden permanently instead of becoming a plan.
+    for transaction_date in ("2026-06-12T12:00:00Z", "2026-07-12T12:00:00Z", "2026-08-12T12:00:00Z"):
+        response = client.post("/api/transactions/", headers=owner, json={
+            "type": "expense", "amount": 500, "currency": "RUB", "account_id": account["id"],
+            "category_id": category_id, "description": "Музыка", "date": transaction_date,
+            "is_family_expense": True,
+        })
+        assert response.status_code == 201, response.text
+    music = next(value for value in client.get("/api/family/recurring-suggestions", headers=owner).json()["items"] if value["description"] == "Музыка")
+    dismissed = client.post(f"/api/family/recurring-suggestions/{music['fingerprint']}/dismiss", headers=owner)
+    assert dismissed.status_code == 201, dismissed.text
+    assert client.get("/api/family/recurring-suggestions", headers=owner).json()["items"] == []

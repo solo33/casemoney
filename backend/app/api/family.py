@@ -14,7 +14,9 @@ from app.models.account import Account
 from app.models.budget import Budget
 from app.models.category import Category
 from app.models.family import Family, FamilyMember, FamilySettlement
+from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision
 from app.models.notification import Notification
+from app.models.recurring_transaction import RecurringTransaction
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
@@ -22,6 +24,7 @@ from app.services.email import app_url, send_email
 from app.services.plans import ensure_family_plan
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.family_recurring import find_family_recurring_suggestions
 
 security = HTTPBearer()
 
@@ -407,6 +410,7 @@ def family_analytics(
         item.id: item
         for item in db.query(User).filter(User.id.in_([member.user_id for member in members])).all()
     }
+
     transactions = db.query(Transaction).filter(
         Transaction.family_id == membership.family_id,
         Transaction.is_family_expense.is_(True),
@@ -647,6 +651,107 @@ def family_analytics(
         "notable_expenses": notable_expenses[:5],
         "skipped_currencies": sorted(skipped_currencies),
     }
+
+
+@router.get("/recurring-suggestions")
+def family_recurring_suggestions(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    """Suggest, but never automatically create, recurring common payments."""
+    membership = require_membership(db, user_id)
+    return {
+        "items": find_family_recurring_suggestions(db, membership.family_id, user_id),
+    }
+
+
+def _family_recurring_suggestion_or_404(
+    db: Session, family_id: int, user_id: int, fingerprint: str,
+) -> dict:
+    for item in find_family_recurring_suggestions(
+        db, family_id, user_id, include_resolved=True,
+    ):
+        if item["fingerprint"] == fingerprint:
+            return item
+    raise HTTPException(status_code=404, detail="Предложение регулярного платежа не найдено")
+
+
+@router.post("/recurring-suggestions/{fingerprint}/dismiss", status_code=201)
+def dismiss_family_recurring_suggestion(
+    fingerprint: str,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    _family_recurring_suggestion_or_404(db, membership.family_id, user_id, fingerprint)
+    existing = db.query(FamilyRecurringSuggestionDecision).filter(
+        FamilyRecurringSuggestionDecision.family_id == membership.family_id,
+        FamilyRecurringSuggestionDecision.fingerprint == fingerprint,
+    ).first()
+    if existing:
+        return {"status": existing.status}
+    db.add(FamilyRecurringSuggestionDecision(
+        family_id=membership.family_id,
+        fingerprint=fingerprint,
+        status="dismissed",
+        decided_by_user_id=user_id,
+    ))
+    db.commit()
+    return {"status": "dismissed"}
+
+
+@router.post("/recurring-suggestions/{fingerprint}/create-recurring", status_code=201)
+def create_family_recurring_suggestion(
+    fingerprint: str,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    suggestion = _family_recurring_suggestion_or_404(db, membership.family_id, user_id, fingerprint)
+    if not suggestion["can_create"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Регулярную операцию может создать участник, с чьего счёта проходили эти расходы",
+        )
+    existing = db.query(FamilyRecurringSuggestionDecision).filter(
+        FamilyRecurringSuggestionDecision.family_id == membership.family_id,
+        FamilyRecurringSuggestionDecision.fingerprint == fingerprint,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Это предложение уже обработано")
+
+    schedule = RecurringTransaction(
+        user_id=user_id,
+        name=suggestion["description"][:120],
+        type=TransactionType.expense,
+        amount=suggestion["amount"],
+        currency=suggestion["currency"],
+        account_id=suggestion["account_id"],
+        category_id=suggestion["category_id"],
+        description=suggestion["description"],
+        frequency=suggestion["frequency"],
+        next_date=suggestion["next_date"],
+        family_id=membership.family_id,
+        is_family_expense=True,
+        reimbursement_amount=suggestion["reimbursement_amount"],
+        suggestion_fingerprint=fingerprint,
+    )
+    db.add(schedule)
+    db.add(FamilyRecurringSuggestionDecision(
+        family_id=membership.family_id,
+        fingerprint=fingerprint,
+        status="created",
+        decided_by_user_id=user_id,
+    ))
+    db.add(Notification(
+        user_id=user_id,
+        title="Создан регулярный общий платёж",
+        message=f"«{suggestion['description']}» будет добавляться в план {suggestion['frequency_label']}.",
+        link="/planning",
+    ))
+    db.commit()
+    db.refresh(schedule)
+    return {"id": schedule.id, "status": "created"}
 
 
 @router.post("/settlements", status_code=201)

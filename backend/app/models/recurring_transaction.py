@@ -18,6 +18,13 @@ class RecurringTransaction(Base):
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     description = Column(String(500), nullable=True)
+    # Family schedules are created from a confirmed suggestion in the Family
+    # report.  The generated planned transaction keeps the same visibility
+    # rules as the original shared expense.
+    family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_family_expense = Column(Boolean, nullable=False, default=False)
+    reimbursement_amount = Column(Float, nullable=False, default=0)
+    suggestion_fingerprint = Column(String(64), nullable=True, index=True)
     frequency = Column(String(16), nullable=False, default="monthly")
     next_date = Column(Date, nullable=False, index=True)
     last_generated_for = Column(Date, nullable=True)
