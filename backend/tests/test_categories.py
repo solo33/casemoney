@@ -68,3 +68,20 @@ def test_reorder_rejects_categories_from_different_levels(client, auth):
         },
     )
     assert response.status_code == 400
+
+
+def test_uncategorized_category_cannot_be_hidden_from_entry(client, auth):
+    created = client.post(
+        "/api/categories/",
+        headers=auth,
+        json={"name": "Без категории", "type": "expense"},
+    )
+    assert created.status_code == 201, created.text
+
+    response = client.put(
+        f"/api/categories/{created.json()['id']}",
+        headers=auth,
+        json={"is_hidden": True},
+    )
+    assert response.status_code == 400
+    assert "нельзя скрыть" in response.json()["detail"]

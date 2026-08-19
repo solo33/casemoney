@@ -187,6 +187,17 @@ def update_category(
 
     update_fields = data.model_dump(exclude_unset=True)
 
+    # The fallback category is needed to correct old imports and operations,
+    # therefore it must always stay in the entry picker.
+    if (
+        update_fields.get("is_hidden") is True
+        and category.name.strip().casefold() == "без категории"
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Категорию «Без категории» нельзя скрыть при вводе",
+        )
+
     # Если меняется parent_id или type — пересчитываем валидацию
     if "parent_id" in update_fields:
         new_parent_id = update_fields["parent_id"]

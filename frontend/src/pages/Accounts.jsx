@@ -210,7 +210,10 @@ export default function Accounts() {
   };
 
   const handleEditNote = async (acc) => {
-    const note = window.prompt("Комментарий к счёту", acc.note || "");
+    const note = window.prompt(
+      "Комментарий к счёту. Не указывайте пароль, PIN, CVV или реквизиты карты.",
+      acc.note || "",
+    );
     if (note === null || note === (acc.note || "")) return;
     try {
       await api.put(`/api/accounts/${acc.id}`, { note: note.trim() || null });
@@ -420,8 +423,13 @@ export default function Accounts() {
             placeholder="Комментарий к счёту"
             value={newAccount.note}
             onChange={e => setNewAccount({ ...newAccount, note: e.target.value })}
+            maxLength={500}
+            title="Не указывайте пароль, PIN, CVV или реквизиты карты"
             style={{ minWidth: 220 }}
           />
+          <small style={{ flexBasis: "100%", color: "#7a8590", fontSize: 12 }}>
+            Комментарий виден только вам. Не храните здесь пароль, PIN, CVV и полные реквизиты карты.
+          </small>
           <label style={{
             display: "flex", alignItems: "center", gap: 6,
             fontSize: 13, color: "#515c68", cursor: "pointer",

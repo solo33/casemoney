@@ -46,7 +46,7 @@ class AccountBase(BaseModel):
     group_id: Optional[int] = None
     include_in_balance: bool = True
     show_for_entries: bool = True
-    note: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=500)
 
 
 class AccountCreate(AccountBase):
@@ -63,7 +63,7 @@ class AccountUpdate(BaseModel):
     group_id: Optional[int] = None  # передать null чтобы вынести из группы
     include_in_balance: Optional[bool] = None
     show_for_entries: Optional[bool] = None
-    note: Optional[str] = None
+    note: Optional[str] = Field(None, max_length=500)
 
 
 class AccountResponse(AccountBase):

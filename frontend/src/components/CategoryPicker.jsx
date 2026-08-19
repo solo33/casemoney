@@ -22,11 +22,22 @@ export default function CategoryPicker({
   className = "",
 }) {
   const [open, setOpen] = useState(false);
-  // Hidden items remain selectable when editing an older operation that already
-  // uses one, but are not offered for new input.
-  const visibleCategories = useMemo(() => categories.filter(category => (
-    !category.is_hidden || String(category.id) === String(value)
-  )), [categories, value]);
+  // A hidden group must hide its children too. The exception is an already
+  // saved category while editing an old operation: it stays available together
+  // with its parent, so the operation can be corrected without losing it.
+  const visibleCategories = useMemo(() => {
+    const byId = new Map(categories.map(category => [String(category.id), category]));
+    const selectedId = value == null || value === "" ? null : String(value);
+
+    return categories.filter(category => {
+      const isSelected = String(category.id) === selectedId;
+      const parent = category.parent_id == null ? null : byId.get(String(category.parent_id));
+      const isSelectedParent = parent && String(parent.id) === selectedId;
+
+      if (isSelected || isSelectedParent) return true;
+      return !category.is_hidden && !(parent && parent.is_hidden);
+    });
+  }, [categories, value]);
   const selected = categories.find(category => String(category.id) === String(value));
 
   const groups = useMemo(() => {

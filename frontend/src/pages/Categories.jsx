@@ -13,6 +13,7 @@ import api from "../api/client";
 import SettingsTabs from "../components/SettingsTabs";
 
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b" };
+const isUncategorized = category => category.name.trim().toLocaleLowerCase("ru-RU") === "без категории";
 
 export default function Categories() {
   const [tree, setTree] = useState([]);
@@ -368,8 +369,8 @@ function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subForm, se
             onChange={e => setEditForm({ ...editForm, color: e.target.value })}
             style={{ width: 40, padding: 2, cursor: "pointer" }}
           />
-          <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }}>
-            <input type="checkbox" checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
+          <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }} title={isUncategorized(root) ? "Эта категория всегда доступна для ввода" : undefined}>
+            <input type="checkbox" disabled={isUncategorized(root)} checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
             Скрыть при вводе
           </label>
           <button type="submit" style={{ fontSize: 13, padding: "6px 14px" }}>Сохранить</button>
@@ -539,8 +540,8 @@ function ChildNode({ child, onDelete, editingId, editForm, setEditForm, startEdi
           onChange={e => setEditForm({ ...editForm, color: e.target.value })}
           style={{ width: 34, padding: 2, cursor: "pointer" }}
         />
-        <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }}>
-          <input type="checkbox" checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
+        <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12 }} title={isUncategorized(child) ? "Эта категория всегда доступна для ввода" : undefined}>
+          <input type="checkbox" disabled={isUncategorized(child)} checked={Boolean(editForm.is_hidden)} onChange={e => setEditForm({ ...editForm, is_hidden: e.target.checked })} />
           Скрыть
         </label>
         <button type="submit" style={{ fontSize: 13, padding: "5px 12px" }}>OK</button>
