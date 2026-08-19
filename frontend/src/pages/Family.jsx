@@ -66,6 +66,13 @@ export default function Family() {
     return [...values];
   }, [report]);
 
+  const changeLabel = (change) => {
+    if (!change) return "—";
+    const sign = change.amount > 0 ? "+" : "";
+    const percent = change.percent === null ? "нет базы для сравнения" : `${sign}${change.percent}%`;
+    return `${sign}${formatMoney(change.amount)} · ${percent}`;
+  };
+
   return (
     <main className="page family-page">
       <h1>Семейные финансы</h1>
@@ -155,7 +162,7 @@ export default function Family() {
             <div className="family-analytics-heading">
               <div>
                 <p className="family-eyebrow">Family</p>
-                <h2>План и факт общих расходов</h2>
+                <h2>Семейный отчёт</h2>
               </div>
               <input
                 type="month"
@@ -167,10 +174,11 @@ export default function Family() {
                 aria-label="Месяц семейного отчёта"
               />
             </div>
-            <div className="family-analytics-stats">
-              <article><span>Факт</span><strong>{formatMoney(analytics?.actual_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+            <div className="family-analytics-stats family-analytics-stats-four">
+              <article><span>Доходы</span><strong>{formatMoney(analytics?.income_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+              <article><span>Расходы</span><strong>{formatMoney(analytics?.expense_total || 0)} {analytics?.currency || "RUB"}</strong></article>
+              <article className={analytics?.net_total < 0 ? "family-stat-negative" : "family-stat-accent"}><span>Результат</span><strong>{formatMoney(analytics?.net_total || 0)} {analytics?.currency || "RUB"}</strong></article>
               <article><span>Запланировано</span><strong>{formatMoney(analytics?.planned_total || 0)} {analytics?.currency || "RUB"}</strong></article>
-              <article className="family-stat-accent"><span>Прогноз на месяц</span><strong>{formatMoney(analytics?.projected_total || 0)} {analytics?.currency || "RUB"}</strong></article>
             </div>
             <div className="family-analytics-columns">
               <div>
@@ -181,6 +189,34 @@ export default function Family() {
                 <h3>Категории общих расходов</h3>
                 {(analytics?.categories || []).slice(0, 5).map(item => <div className="family-analytics-row" key={item.name}><span>{item.name}</span><strong>{formatMoney(item.actual)} {analytics.currency}</strong></div>)}
                 {!analytics?.categories?.length && <p className="family-analytics-empty">В этом периоде пока нет общих расходов.</p>}
+              </div>
+            </div>
+            <div className="family-analytics-columns family-analytics-details">
+              <div>
+                <h3>Сравнение с прошлым месяцем</h3>
+                <div className="family-analytics-row"><span>Доходы</span><strong>{changeLabel(analytics?.comparison?.income_change)}</strong></div>
+                <div className="family-analytics-row"><span>Расходы</span><strong>{changeLabel(analytics?.comparison?.expense_change)}</strong></div>
+                <p className="family-analytics-note">Расходы прошлого месяца: {formatMoney(analytics?.comparison?.previous_expenses || 0)} {analytics?.currency || "RUB"}</p>
+              </div>
+              <div>
+                <h3>План и факт бюджета</h3>
+                {analytics?.budget?.count ? <>
+                  <div className="family-analytics-row"><span>Лимит</span><strong>{formatMoney(analytics.budget.plan)} {analytics.currency}</strong></div>
+                  <div className="family-analytics-row"><span>Факт</span><strong>{formatMoney(analytics.budget.fact)} {analytics.currency}</strong></div>
+                  <div className="family-analytics-row"><span>Остаток</span><strong>{formatMoney(analytics.budget.remaining)} {analytics.currency}</strong></div>
+                </> : <p className="family-analytics-empty">Для этого месяца нет семейных лимитов в разделе «Бюджет».</p>}
+              </div>
+            </div>
+            <div className="family-analytics-columns family-analytics-details">
+              <div>
+                <h3>Взаиморасчёты за месяц</h3>
+                {(analytics?.settlements || []).slice(0, 4).map(item => <div className="family-analytics-row" key={item.id}><span>{item.from_name} → {item.to_name}</span><strong>{formatMoney(item.amount)} {analytics.currency}</strong></div>)}
+                {!analytics?.settlements?.length && <p className="family-analytics-empty">Возмещений за этот месяц пока нет.</p>}
+              </div>
+              <div>
+                <h3>Крупные покупки</h3>
+                {(analytics?.notable_expenses || []).map(item => <div className="family-analytics-row" key={item.id}><span>{item.description}<small>{item.paid_by_name}</small></span><strong>{formatMoney(item.amount)} {analytics.currency}</strong></div>)}
+                {!analytics?.notable_expenses?.length && <p className="family-analytics-empty">Пока нет операций для анализа.</p>}
               </div>
             </div>
             {analytics?.skipped_currencies?.length > 0 && <p className="family-analytics-note">Не удалось пересчитать: {analytics.skipped_currencies.join(", ")}. Используйте доступный курс в настройках валют.</p>}
@@ -351,17 +387,21 @@ export default function Family() {
         .family-stat span { color: #7a8590; font-size: 12px; }
         .family-stat strong { color: #173a54; font-size: 21px; }
         .family-stat-accent { border-color: #d8b96f; background: #fff9e9; }
+        .family-stat-negative { border-color: #e8b4a7; background: #fff3ef; }
         .family-analytics-heading { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
         .family-eyebrow { color: #9c6f1d !important; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 800; margin: 0 0 4px !important; }
         .family-analytics-heading input { width: auto; }
         .family-analytics-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .family-analytics-stats-four { grid-template-columns: repeat(4, 1fr); }
         .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
         .family-analytics-stats span { color: #7a8590; font-size: 12px; }
         .family-analytics-stats strong { color: #173a54; font-size: 18px; }
         .family-analytics-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
+        .family-analytics-details { padding-top: 4px; border-top: 1px solid #eee8dc; }
         .family-analytics-columns h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
         .family-analytics-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eee8dc; color: #596572; font-size: 13px; }
-        .family-analytics-row strong { color: #173a54; white-space: nowrap; }
+        .family-analytics-row strong { color: #173a54; white-space: nowrap; text-align: right; }
+        .family-analytics-row small { display: block; color: #7a8590; margin-top: 2px; }
         .family-analytics-empty, .family-analytics-note { color: #7a8590 !important; font-size: 13px; }
         .family-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .family-card { padding: 18px; margin-bottom: 14px; }
@@ -384,7 +424,9 @@ export default function Family() {
         .family-expenses article > div:last-child { text-align: right; }
         @media (max-width: 720px) {
           .family-columns { grid-template-columns: 1fr; }
-          .family-analytics-stats, .family-analytics-columns { grid-template-columns: 1fr; }
+          .family-analytics-stats, .family-analytics-stats-four, .family-analytics-columns { grid-template-columns: 1fr; }
+          .family-analytics-heading { align-items: stretch; flex-direction: column; }
+          .family-analytics-heading input { width: 100%; }
           .family-expenses article { align-items: flex-start; }
           .family-heading { align-items: flex-start; }
         }

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.account import Account
+from app.models.budget import Budget
 from app.models.category import Category
 from app.models.family import Family, FamilyMember, FamilySettlement
 from app.models.notification import Notification
@@ -383,7 +384,12 @@ def family_analytics(
     db: Session = Depends(get_db),
     user_id: int = Depends(current_user_id),
 ):
-    """Monthly Family plan/fact report without exposing private account balances."""
+    """Monthly Family report without exposing private account balances.
+
+    Only operations that a participant explicitly marked as family-related are
+    included.  This keeps private accounts and personal spending out of the
+    shared report while still making the household picture useful.
+    """
     if month < 1 or month > 12:
         raise HTTPException(status_code=422, detail="Месяц должен быть от 1 до 12")
 
@@ -403,17 +409,29 @@ def family_analytics(
     transactions = db.query(Transaction).filter(
         Transaction.family_id == membership.family_id,
         Transaction.is_family_expense.is_(True),
-        Transaction.type == TransactionType.expense,
         Transaction.date >= start,
         Transaction.date < end,
     ).all()
+    previous_end = start
+    previous_start = datetime(
+        year - (month == 1), 12 if month == 1 else month - 1, 1, tzinfo=timezone.utc,
+    )
+    previous_transactions = db.query(Transaction).filter(
+        Transaction.family_id == membership.family_id,
+        Transaction.is_family_expense.is_(True),
+        Transaction.date >= previous_start,
+        Transaction.date < previous_end,
+    ).all()
     category_names = dict(db.query(Category.id, Category.name).all())
 
-    actual_total = 0.0
-    planned_total = 0.0
+    actual_expenses = 0.0
+    actual_income = 0.0
+    planned_expenses = 0.0
+    planned_income = 0.0
     per_member: dict[int, float] = {}
     per_category: dict[str, float] = {}
     skipped_currencies: set[str] = set()
+    notable_expenses: list[dict] = []
 
     for item in transactions:
         try:
@@ -424,12 +442,92 @@ def family_analytics(
             skipped_currencies.add(item.currency)
             continue
         if item.is_planned:
-            planned_total += amount
+            if item.type == TransactionType.expense:
+                planned_expenses += amount
+            elif item.type == TransactionType.income:
+                planned_income += amount
             continue
-        actual_total += amount
+        if item.type == TransactionType.income:
+            actual_income += amount
+            continue
+        if item.type != TransactionType.expense:
+            continue
+        actual_expenses += amount
         per_member[item.user_id] = per_member.get(item.user_id, 0.0) + amount
         name = category_names.get(item.category_id, "Без категории")
         per_category[name] = per_category.get(name, 0.0) + amount
+        notable_expenses.append({
+            "id": item.id,
+            "description": item.description or name,
+            "category_name": name,
+            "paid_by_name": _user_label(users.get(item.user_id), ""),
+            "date": item.date,
+            "amount": round(amount, 2),
+        })
+
+    previous_expenses = 0.0
+    previous_income = 0.0
+    for item in previous_transactions:
+        if item.is_planned or item.type not in {TransactionType.expense, TransactionType.income}:
+            continue
+        try:
+            amount = exchange_svc.convert_for_user(
+                db, item.user_id, item.amount, item.currency, main_currency,
+            )
+        except exchange_svc.ExchangeError:
+            skipped_currencies.add(item.currency)
+            continue
+        if item.type == TransactionType.expense:
+            previous_expenses += amount
+        else:
+            previous_income += amount
+
+    settlements = db.query(FamilySettlement).filter(
+        FamilySettlement.family_id == membership.family_id,
+        FamilySettlement.date >= start,
+        FamilySettlement.date < end,
+    ).order_by(FamilySettlement.date.desc(), FamilySettlement.id.desc()).all()
+    settlement_rows = []
+    settlements_total = 0.0
+    for item in settlements:
+        try:
+            amount = exchange_svc.convert_for_user(
+                db, user_id, item.amount, item.currency, main_currency,
+            )
+        except exchange_svc.ExchangeError:
+            skipped_currencies.add(item.currency)
+            continue
+        settlements_total += amount
+        settlement_rows.append({
+            "id": item.id,
+            "from_name": _user_label(users.get(item.from_user_id), ""),
+            "to_name": _user_label(users.get(item.to_user_id), ""),
+            "amount": round(amount, 2),
+            "date": item.date,
+            "description": item.description,
+        })
+
+    budget_plan = 0.0
+    budgets = db.query(Budget).filter(
+        Budget.user_id == user_id,
+        Budget.scope == "family",
+        Budget.period == "month",
+        Budget.period_start == start.date(),
+    ).all()
+    for item in budgets:
+        try:
+            budget_plan += exchange_svc.convert_for_user(
+                db, user_id, item.amount, item.currency, main_currency,
+            )
+        except exchange_svc.ExchangeError:
+            skipped_currencies.add(item.currency)
+
+    def _change(current: float, previous: float) -> dict:
+        amount = round(current - previous, 2)
+        return {
+            "amount": amount,
+            "percent": round(amount / previous * 100, 1) if previous else None,
+        }
 
     member_rows = [
         {
@@ -443,6 +541,9 @@ def family_analytics(
         {"name": name, "actual": round(amount, 2)}
         for name, amount in sorted(per_category.items(), key=lambda pair: pair[1], reverse=True)
     ]
+    notable_expenses.sort(key=lambda item: item["amount"], reverse=True)
+    actual_total = actual_expenses
+    planned_total = planned_expenses
     return {
         "year": year,
         "month": month,
@@ -451,8 +552,27 @@ def family_analytics(
         "planned_total": round(planned_total, 2),
         "remaining_plan": round(planned_total, 2),
         "projected_total": round(actual_total + planned_total, 2),
+        "income_total": round(actual_income, 2),
+        "expense_total": round(actual_expenses, 2),
+        "net_total": round(actual_income - actual_expenses, 2),
+        "planned_income_total": round(planned_income, 2),
+        "comparison": {
+            "previous_income": round(previous_income, 2),
+            "previous_expenses": round(previous_expenses, 2),
+            "income_change": _change(actual_income, previous_income),
+            "expense_change": _change(actual_expenses, previous_expenses),
+        },
+        "budget": {
+            "count": len(budgets),
+            "plan": round(budget_plan, 2),
+            "fact": round(actual_expenses, 2),
+            "remaining": round(budget_plan - actual_expenses, 2),
+        },
         "members": member_rows,
         "categories": category_rows,
+        "settlements": settlement_rows,
+        "settlements_total": round(settlements_total, 2),
+        "notable_expenses": notable_expenses[:5],
         "skipped_currencies": sorted(skipped_currencies),
     }
 

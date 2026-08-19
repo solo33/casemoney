@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from tests.conftest import TestingSessionLocal, make_account, register_and_login
 from app.models.user import User
 
@@ -236,3 +238,43 @@ def test_settlement_reduces_outstanding_without_creating_expense(client):
     report = client.get("/api/family/report", headers=owner).json()
     assert report["outstanding"][0]["amount"] == 600
     assert report["totals"] == [{"currency": "RUB", "amount": 1000}]
+
+
+def test_family_analytics_includes_comparison_settlements_and_large_expenses(client):
+    owner = register_and_login(client, "analytics-owner@test.com")
+    member = register_and_login(client, "analytics-member@test.com")
+    enable_family_plan("analytics-owner@test.com")
+    enable_family_plan("analytics-member@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Аналитика"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "analytics-member@test.com"}
+    ).json()
+    accepted = client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member).json()
+    member_id = next(item["user_id"] for item in accepted["members"] if item["email"] == "analytics-member@test.com")
+    account = make_account(client, member, balance=10000)
+    categories = client.get("/api/categories/", headers=member).json()
+    category_id = next(item["id"] for item in categories if item["name"] == "Продукты" and item["type"] == "expense")
+    current = datetime(2026, 8, 15, tzinfo=timezone.utc)
+    previous = datetime(2026, 7, 15, tzinfo=timezone.utc)
+    for amount, tx_date, description in ((1200, current, "Большая покупка"), (500, previous, "Прошлый месяц")):
+        response = client.post("/api/transactions/", headers=member, json={
+            "amount": amount, "type": "expense", "currency": "RUB", "account_id": account["id"],
+            "category_id": category_id, "date": tx_date.isoformat(), "description": description,
+            "is_family_expense": True,
+        })
+        assert response.status_code == 201, response.text
+    settlement = client.post("/api/family/settlements", headers=owner, json={
+        "to_user_id": member_id, "amount": 300, "currency": "RUB", "date": current.isoformat(),
+    })
+    assert settlement.status_code == 201, settlement.text
+
+    response = client.get("/api/family/analytics?year=2026&month=8", headers=owner)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["expense_total"] == 1200
+    assert body["comparison"]["previous_expenses"] == 500
+    assert body["comparison"]["expense_change"] == {"amount": 700, "percent": 140.0}
+    assert next(item for item in body["members"] if item["user_id"] == member_id)["actual"] == 1200
+    assert body["settlements_total"] == 300
+    assert body["settlements"][0]["to_name"]
+    assert body["notable_expenses"][0]["description"] == "Большая покупка"
