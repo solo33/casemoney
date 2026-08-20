@@ -77,7 +77,7 @@ def test_cannot_budget_income_category(client):
     assert response.status_code == 400
 
 
-def test_suggestions_use_past_six_months_average(client):
+def test_suggestions_use_twelve_full_months_average_rounded_to_rubles(client):
     auth = register_and_login(client, "owner-budget-suggest@test.com")
     enable_family_plan("owner-budget-suggest@test.com")
     account = make_account(client, auth, balance=100000)
@@ -102,12 +102,14 @@ def test_suggestions_use_past_six_months_average(client):
 
     suggestions = client.get("/api/budgets/suggestions", headers=auth).json()
     match = next(s for s in suggestions if s["category_id"] == category_id)
-    assert match["average_amount"] == 3000
+    # 9 000 ₽ за три месяца делятся на все 12 завершённых месяцев, а не
+    # только на активные: лимит не должен завышаться из-за редких покупок.
+    assert match["average_amount"] == 750
     assert match["months_with_data"] == 3
 
     # После создания бюджета категория пропадает из подсказок.
     client.post("/api/budgets/", headers=auth, json={
-        "category_id": category_id, "amount": 3000, "currency": "RUB",
+        "category_id": category_id, "amount": 750, "currency": "RUB",
     })
     suggestions_after = client.get("/api/budgets/suggestions", headers=auth).json()
     assert all(s["category_id"] != category_id for s in suggestions_after)

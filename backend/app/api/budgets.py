@@ -258,7 +258,10 @@ def budget_suggestions(
         raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
     main_currency = accounts_svc.get_user_main_currency(db, user_id)
     selected_start = _period_start(anchor or date.today(), period)
-    since = selected_start - timedelta(days=183)
+    # Берём 12 полных календарных месяцев до выбранного периода. Делим всегда
+    # на 12, а не только на месяцы с расходами: так разовая покупка не
+    # превращается в завышенный ежемесячный лимит.
+    since = date(selected_start.year - 1, selected_start.month, 1)
     previous_end = selected_start - timedelta(days=1)
     already_budgeted = {row[0] for row in db.query(Budget.category_id).filter(
         Budget.user_id == user_id, Budget.period == period, Budget.period_start == selected_start,
@@ -283,10 +286,10 @@ def budget_suggestions(
     for category_id, bucket in by_category.items():
         category = categories.get(category_id)
         if category:
-            months = len(bucket["months"]) or 1
+            months = len(bucket["months"])
             result.append(BudgetSuggestion(
                 category_id=category_id, category_name=category.name, category_icon=category.icon,
-                average_amount=round(bucket["total"] / months, 2), currency=main_currency, months_with_data=months,
+                average_amount=round(bucket["total"] / 12), currency=main_currency, months_with_data=months,
             ))
     return sorted(result, key=lambda item: item.average_amount, reverse=True)
 

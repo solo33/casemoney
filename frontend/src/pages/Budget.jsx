@@ -196,7 +196,7 @@ export default function Budget() {
       {suggestions.length > 0 && (
         <section className="budget-suggestions-card">
           <h2>Похоже, вы регулярно тратите</h2>
-          <p>Средний расход по категориям без лимита за прошлые месяцы — можно сразу поставить лимитом.</p>
+          <p>Средний ежемесячный расход за последние 12 полных месяцев, округлённый до рубля. Его можно сразу использовать как лимит.</p>
           <div className="budget-suggestions">
             {suggestions.map(s => (
               <button type="button" key={s.category_id} className="budget-suggestion" onClick={() => openAddFromSuggestion(s)}>
