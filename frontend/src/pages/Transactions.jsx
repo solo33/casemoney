@@ -17,6 +17,7 @@ import { cachedAccountsAndCategories, saveReferenceData } from "../services/offl
 import AmountInput from "../components/AmountInput";
 import CurrencyField from "../components/CurrencyField";
 import useTransferQuote from "../hooks/useTransferQuote";
+import { useUser } from "../contexts/UserContext";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -28,11 +29,13 @@ function isoToday() {
 }
 
 export default function Transactions() {
+  const { user } = useUser();
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState({ items: [], total: 0 });
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [frequentCategories, setFrequentCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
@@ -129,6 +132,12 @@ export default function Transactions() {
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  useEffect(() => {
+    if (newTx.type === "transfer") { setFrequentCategories([]); return; }
+    api.get("/api/transactions/frequent-categories", { params: { tx_type: newTx.type } })
+      .then(response => setFrequentCategories(response.data || []))
+      .catch(() => setFrequentCategories([]));
+  }, [newTx.type]);
 
   // Reload on FAB add
   useEffect(() => {
@@ -359,13 +368,26 @@ export default function Transactions() {
               <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={newTx.fee_category_id} onChange={fee_category_id => setNewTx({ ...newTx, fee_category_id })} placeholder="Категория комиссии" style={{ minWidth: 180 }} />
             </>
           ) : (
-            <CategoryPicker
-              categories={filteredCategoriesForCreate}
-              value={newTx.category_id}
-              onChange={category_id => setNewTx({ ...newTx, category_id })}
-              placeholder="— Категория —"
-              style={{ minWidth: 180 }}
-            />
+            <>
+              <CategoryPicker
+                categories={filteredCategoriesForCreate}
+                value={newTx.category_id}
+                onChange={category_id => setNewTx({ ...newTx, category_id })}
+                placeholder="— Категория —"
+                style={{ minWidth: 180 }}
+              />
+              {frequentCategories.length > 0 && (
+                <div className="quick-category-pills" aria-label="Частые категории">
+                  {frequentCategories.map(category => (
+                    <button type="button" key={category.id}
+                      className={String(newTx.category_id) === String(category.id) ? "is-active" : ""}
+                      onClick={() => setNewTx({ ...newTx, category_id: String(category.id) })}
+                    >{category.icon ? `${category.icon} ` : ""}{category.name}</button>
+                  ))}
+                </div>
+              )}
+              {user?.plan === "family" && <Link className="quick-template-link" to="/settings/templates">Шаблоны</Link>}
+            </>
           )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
           <input

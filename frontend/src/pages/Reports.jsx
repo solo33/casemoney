@@ -83,6 +83,7 @@ export default function Reports() {
 
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
+  const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -101,11 +102,14 @@ export default function Reports() {
     Promise.all([
       api.get("/api/reports/summary", { params }),
       api.get("/api/reports/monthly-trend", { params: { months: trendMonths, end_date: trendEndDate, include_planned: includePlanned } }),
+      hasFamilyPlan
+        ? api.post("/api/finance-insights/summary", { period_days: 30 })
+        : Promise.resolve({ data: null }),
     ])
-      .then(([s, t]) => { setSummary(s.data); setTrend(t.data); })
+      .then(([s, t, i]) => { setSummary(s.data); setTrend(t.data); setInsights(i.data); })
       .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
-  }, [gran, anchor, breakdownType, trendMonths, trendEndDate, includePlanned]);
+  }, [gran, anchor, breakdownType, trendMonths, trendEndDate, includePlanned, hasFamilyPlan]);
 
   // Значение для пикера (<input>) под текущую гранулярность
   const pickerValue = gran === "day"
@@ -280,6 +284,24 @@ export default function Reports() {
               sym={sym}
             />
           </div>
+
+          {hasFamilyPlan && insights && (
+            <section className="finance-insights-card">
+              <div>
+                <p className="finance-insights-eyebrow">ФИНАНСОВЫЙ ПОМОЩНИК</p>
+                <h2>Наблюдения за 30 дней</h2>
+                <p>Подсказки строятся только по вашим суммам и категориям. Свободные вопросы и доступ к личным данным других людей отключены.</p>
+              </div>
+              <div className="finance-insights-list">
+                {(insights.insights || []).map((item, index) => (
+                  <article key={`${item.title}-${index}`} className={`finance-insight finance-insight-${item.kind}`}>
+                    <strong>{item.title}</strong>
+                    <span>{item.message}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Графики */}
           <div className="report-chart-grid" style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>

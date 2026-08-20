@@ -1494,6 +1494,20 @@ hr {
 .settings-checkbox-row small { color: var(--muted); }
 .mobile-shopping-button { display: none; }
 .report-planned-toggle { display: inline-flex; align-items: center; gap: 7px; margin: -6px 0 14px; color: #515c68; font-size: 13px; }
+.finance-insights-card { display: grid; grid-template-columns: minmax(230px, .9fr) minmax(0, 1.6fr); gap: 18px; margin: 0 0 24px; padding: 18px; background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; }
+.finance-insights-card h2 { margin: 4px 0 6px; color: #173a54; font-size: 21px; }
+.finance-insights-card p { margin: 0; color: #657181; font-size: 13px; line-height: 1.45; }
+.finance-insights-eyebrow { color: #a47b2c !important; font-size: 11px !important; font-weight: 800; letter-spacing: .06em; }
+.finance-insights-list { display: grid; gap: 8px; }
+.finance-insight { display: grid; gap: 3px; padding: 11px 13px; border-radius: 9px; border-left: 4px solid #6b7785; background: #f5f3ed; }
+.finance-insight strong { color: #173a54; font-size: 14px; }
+.finance-insight span { color: #5f6c79; font-size: 13px; line-height: 1.35; }
+.finance-insight-positive { border-left-color: #198754; background: #edf8f0; }
+.finance-insight-warning { border-left-color: #c0432b; background: #fff0ed; }
+.quick-category-pills { display: flex; gap: 5px; flex-wrap: wrap; flex: 1 1 100%; order: 10; }
+.quick-category-pills button { padding: 5px 8px; border-radius: 999px; border: 1px solid #e1d7c5; background: #f8f5ed; color: #43515f; font-size: 12px; line-height: 1.2; }
+.quick-category-pills button.is-active { background: #173a54; border-color: #173a54; color: #fff; }
+.quick-template-link { color: #9a6b1a; font-size: 13px; text-decoration: none; }
 
 @media (max-width: 767px) {
   .shopping-page { padding-bottom: 100px; }
@@ -1508,6 +1522,8 @@ hr {
   .shopping-item-actions .btn-secondary { font-size: 0; padding: 7px; }
   .shopping-item-actions .btn-secondary::after { content: "₽"; font-size: 15px; }
   .mobile-shopping-button { position: fixed; display: inline-flex; align-items: center; gap: 6px; right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 98; padding: 10px 13px; background: #173a54; color: #fffdf7; text-decoration: none; border-radius: 999px; box-shadow: 0 8px 22px rgba(15,30,45,.26); font-size: 13px; font-weight: 700; }
+  .finance-insights-card { grid-template-columns: 1fr; padding: 15px; margin-bottom: 16px; }
+  .quick-category-pills { order: initial; }
 }
 
 .landing-proof{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.landing-proof span,.roadmap-status{font-size:12px;font-weight:750;border-radius:999px;padding:6px 10px;background:#e9f2ed;color:#176d45}.landing-proof span:last-child{background:#fbefd0;color:#94671d}.landing-roadmap-link{display:inline-block;margin-top:22px;color:#9c6f1d;font-weight:750;text-decoration:none}.roadmap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.roadmap-card h2{margin:12px 0;font-size:22px;color:#173a54}.roadmap-card ul{margin:0;padding-left:20px;color:#515c68;line-height:1.65;font-size:14px}.roadmap-card li+li{margin-top:9px}.roadmap-card--next .roadmap-status{background:#fbefd0;color:#94671d}.roadmap-card--later .roadmap-status{background:#edf0f2;color:#5d6873}.roadmap-cta{margin-top:24px;padding:24px;display:flex;gap:24px;justify-content:space-between;align-items:center;background:#173a54;border-radius:12px;color:#fff}.roadmap-cta h2{margin:0 0 8px;font-size:24px}.roadmap-cta p{margin:0;line-height:1.55;color:#dce6ec}.roadmap-cta a{flex:0 0 auto;background:#fff;color:#173a54;text-decoration:none;font-weight:750;padding:11px 15px;border-radius:8px}@media(max-width:800px){.roadmap-grid{grid-template-columns:1fr}.roadmap-cta{align-items:flex-start;flex-direction:column}}

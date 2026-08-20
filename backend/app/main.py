@@ -65,6 +65,7 @@ from app.api.chat import router as chat_router
 from app.api.budgets import router as budgets_router
 from app.api.calendar import router as calendar_router
 from app.api.automation import router as automation_router
+from app.api.finance_insights import router as finance_insights_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -139,6 +140,7 @@ app.include_router(chat_router)
 app.include_router(budgets_router)
 app.include_router(calendar_router)
 app.include_router(automation_router)
+app.include_router(finance_insights_router)
 
 
 @app.on_event("startup")

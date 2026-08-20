@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import json
 
@@ -344,6 +344,46 @@ def get_history(
         .offset(offset).limit(limit).all()
     )
     return HistoryPage(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/frequent-categories")
+def frequent_categories(
+    tx_type: str = Query("expense", pattern="^(income|expense)$"),
+    limit: int = Query(8, ge=1, le=12),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Most used own categories for the quick-entry form.
+
+    The result is suggestion-only: it never selects or changes a category on
+    behalf of the user.  Planned operations are excluded because the goal is
+    to make today's entry fast.
+    """
+    cutoff = datetime.now().replace(tzinfo=None) - timedelta(days=180)
+    rows = (
+        db.query(Transaction.category_id, func.count(Transaction.id).label("uses"), func.max(Transaction.date).label("last_used"))
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType(tx_type),
+            Transaction.is_planned.is_(False),
+            Transaction.category_id.isnot(None),
+            Transaction.date >= cutoff,
+        )
+        .group_by(Transaction.category_id)
+        .order_by(func.count(Transaction.id).desc(), func.max(Transaction.date).desc())
+        .limit(limit)
+        .all()
+    )
+    ids = [row.category_id for row in rows]
+    categories = {
+        item.id: item
+        for item in db.query(Category).filter(Category.user_id == user_id, Category.id.in_(ids)).all()
+    } if ids else {}
+    return [
+        {"id": row.category_id, "name": categories[row.category_id].name, "icon": categories[row.category_id].icon,
+         "parent_id": categories[row.category_id].parent_id, "uses": row.uses}
+        for row in rows if row.category_id in categories
+    ]
 
 
 @router.get("/", response_model=TransactionsPage)
