@@ -51,3 +51,23 @@ def test_expense_rule_is_not_applied_to_income(client, auth):
     })
     assert response.status_code == 201, response.text
     assert response.json()["category_id"] is None
+
+
+def test_automation_settings_can_disable_rules_and_duplicate_review(client, auth):
+    account = make_account(client, auth)
+    food = _expense_category(client, auth)
+    client.post("/api/automation/rules", headers=auth, json={"pattern": "Пятёрочка", "category_id": food["id"]})
+
+    settings = client.patch(
+        "/api/automation/settings",
+        headers=auth,
+        json={"rules_enabled": False, "duplicates_enabled": False},
+    )
+    assert settings.status_code == 200, settings.text
+    assert settings.json() == {"rules_enabled": False, "duplicates_enabled": False}
+
+    payload = {"type": "expense", "amount": 100, "currency": "RUB", "account_id": account["id"], "description": "Пятёрочка"}
+    response = client.post("/api/transactions/", headers=auth, json=payload)
+    assert response.status_code == 201, response.text
+    assert response.json()["category_id"] is None
+    assert client.get("/api/automation/duplicates", headers=auth).json() == []

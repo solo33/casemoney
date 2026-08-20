@@ -34,6 +34,7 @@ def test_mortgage_payment_creates_expense_and_history(client):
             "original_amount": 1_000_000,
             "current_balance": 900_000,
             "monthly_payment": 11_000,
+            "annual_interest_rate": 12,
             "due_day": 15,
             "source_account_id": account["id"],
         },
@@ -47,12 +48,15 @@ def test_mortgage_payment_creates_expense_and_history(client):
     )
     assert paid.status_code == 201, paid.text
     assert paid.json()["transaction_id"] is not None
-    assert paid.json()["balance_after"] == 889_000
+    assert paid.json()["principal_amount"] == 2_000
+    assert paid.json()["interest_amount"] == 9_000
+    assert paid.json()["balance_after"] == 898_000
     assert account_balance(client, auth, account["id"]) == 39_000
 
     details = client.get("/api/credits/", headers=auth).json()[0]
-    assert details["current_balance"] == 889_000
+    assert details["current_balance"] == 898_000
     assert len(details["payments"]) == 1
+    assert details["payments"][0]["principal_amount"] == 2_000
 
 
 def test_loan_disbursement_increases_account_without_becoming_income(client):

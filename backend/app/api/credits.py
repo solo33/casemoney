@@ -105,6 +105,26 @@ def _calculate_deposit_income(credit: CreditObligation) -> Optional[float]:
     return round(principal * rate / 12, 2)
 
 
+def _calculate_mortgage_split(credit: CreditObligation, amount: float) -> tuple[Optional[float], Optional[float]]:
+    """Return the principal and interest portions of one mortgage payment.
+
+    The person records one real payment.  Its interest portion is calculated
+    from the remaining principal and the annual rate saved in the mortgage;
+    only the rest reduces the debt.  When a rate has not been entered yet, the
+    former simple behaviour is retained so an existing mortgage stays usable.
+    """
+    if credit.kind != "mortgage" or credit.annual_interest_rate is None:
+        return None, None
+    balance = max(0.0, float(credit.current_balance or 0))
+    interest = round(balance * float(credit.annual_interest_rate) / 1200, 2)
+    interest = min(round(amount, 2), interest)
+    principal = min(balance, max(0.0, round(amount - interest, 2)))
+    # An overpayment is still a payment, but it cannot reduce the principal
+    # below zero. Keep the persisted split equal to the actual payment.
+    interest = round(amount - principal, 2)
+    return principal, interest
+
+
 def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True) -> CreditResponse:
     source = _own_account(db, credit.user_id, credit.source_account_id)
     linked = _own_account(db, credit.user_id, credit.linked_account_id)
@@ -397,17 +417,23 @@ def register_payment(
     _apply_tx_effect(db, transaction)
     _write_history(db, user_id, transaction, "created")
 
+    principal_amount, interest_amount = _calculate_mortgage_split(credit, data.amount)
+
     # Доход по депозиту не уменьшает его тело. Для займа возврат, напротив,
-    # сокращает остаток задолженности.
+    # сокращает остаток задолженности. У ипотеки остаток сокращает только
+    # погашение тела, а не вся сумма ежемесячного платежа.
     if credit.kind == "deposit" and credit.capitalization and credit.current_balance is not None:
         credit.current_balance = round(credit.current_balance + data.amount, 2)
     elif credit.kind != "deposit" and credit.current_balance is not None:
-        credit.current_balance = max(0.0, round(credit.current_balance - data.amount, 2))
+        balance_reduction = principal_amount if principal_amount is not None else data.amount
+        credit.current_balance = max(0.0, round(credit.current_balance - balance_reduction, 2))
     payment = CreditPayment(
         credit_id=credit.id,
         user_id=user_id,
         transaction_id=transaction.id,
         amount=data.amount,
+        principal_amount=principal_amount,
+        interest_amount=interest_amount,
         currency=credit.currency,
         paid_at=paid_at,
         account_id=account.id,

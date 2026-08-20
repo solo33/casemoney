@@ -13,7 +13,8 @@ from app.models.account import Account
 from app.models.category import Category
 from app.models.category_rule import CategoryRule
 from app.models.transaction import Transaction, TransactionType
-from app.schemas.automation import CategoryRuleCreate, CategoryRuleResponse, DuplicateGroupResponse, DuplicateTransactionItem
+from app.models.user import User
+from app.schemas.automation import (AutomationSettings, AutomationSettingsUpdate, CategoryRuleCreate, CategoryRuleResponse, DuplicateGroupResponse, DuplicateTransactionItem)
 from app.services.auth import decode_token
 from app.services.automation import normalize_rule_pattern
 
@@ -38,6 +39,31 @@ def _rule_response(rule: CategoryRule, category: Category) -> CategoryRuleRespon
         category_type=category.type,
         is_active=rule.is_active,
     )
+
+
+def _settings_response(user: User) -> AutomationSettings:
+    return AutomationSettings(
+        rules_enabled=bool(user.automation_rules_enabled),
+        duplicates_enabled=bool(user.automation_duplicates_enabled),
+    )
+
+
+@router.get("/settings", response_model=AutomationSettings)
+def get_settings(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
+    user = db.query(User).filter(User.id == user_id).one()
+    return _settings_response(user)
+
+
+@router.patch("/settings", response_model=AutomationSettings)
+def update_settings(data: AutomationSettingsUpdate, db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
+    user = db.query(User).filter(User.id == user_id).one()
+    if data.rules_enabled is not None:
+        user.automation_rules_enabled = data.rules_enabled
+    if data.duplicates_enabled is not None:
+        user.automation_duplicates_enabled = data.duplicates_enabled
+    db.commit()
+    db.refresh(user)
+    return _settings_response(user)
 
 
 @router.get("/rules", response_model=list[CategoryRuleResponse])
@@ -83,6 +109,9 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db), user_id: int = Depe
 @router.get("/duplicates", response_model=list[DuplicateGroupResponse])
 def possible_duplicates(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
     """Potential duplicates for review; nothing is deleted or merged automatically."""
+    user = db.query(User).filter(User.id == user_id).one()
+    if not user.automation_duplicates_enabled:
+        return []
     cutoff = datetime.now(timezone.utc) - timedelta(days=365)
     rows = (
         db.query(Transaction, Account)

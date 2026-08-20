@@ -89,6 +89,8 @@ class CreditPaymentResponse(BaseModel):
     id: int
     transaction_id: Optional[int]
     amount: float
+    principal_amount: Optional[float]
+    interest_amount: Optional[float]
     currency: str
     paid_at: datetime
     account_id: Optional[int]

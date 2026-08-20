@@ -3,6 +3,16 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class AutomationSettings(BaseModel):
+    rules_enabled: bool = True
+    duplicates_enabled: bool = True
+
+
+class AutomationSettingsUpdate(BaseModel):
+    rules_enabled: Optional[bool] = None
+    duplicates_enabled: Optional[bool] = None
+
+
 class CategoryRuleCreate(BaseModel):
     pattern: str = Field(min_length=2, max_length=160)
     category_id: int

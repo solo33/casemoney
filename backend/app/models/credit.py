@@ -73,6 +73,8 @@ class CreditPayment(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     amount = Column(Float, nullable=False)
+    principal_amount = Column(Float, nullable=True)
+    interest_amount = Column(Float, nullable=True)
     currency = Column(String(10), nullable=False)
     paid_at = Column(DateTime(timezone=True), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)

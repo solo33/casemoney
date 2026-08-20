@@ -20,6 +20,11 @@ class User(Base):
     hide_zero_balance_currencies = Column(Boolean, nullable=False, default=False)
     dashboard_widgets = Column(JSON, nullable=False, default=dict)
     onboarding_completed = Column(Boolean, nullable=False, default=False)
+    # Пользователь сам решает, подставлять ли категории по его правилам и
+    # показывать ли ему подборку похожих операций. Ничего не удаляется и не
+    # меняется автоматически.
+    automation_rules_enabled = Column(Boolean, nullable=False, default=True)
+    automation_duplicates_enabled = Column(Boolean, nullable=False, default=True)
     is_admin = Column(Boolean, nullable=False, default=False)
     email_verified = Column(Boolean, nullable=False, default=False)
     verification_email_sent_at = Column(DateTime(timezone=True), nullable=True)

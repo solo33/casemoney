@@ -7,6 +7,7 @@ export default function Automation() {
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
+  const [settings, setSettings] = useState({ rules_enabled: true, duplicates_enabled: true });
   const [pattern, setPattern] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [error, setError] = useState("");
@@ -14,14 +15,16 @@ export default function Automation() {
 
   const load = useCallback(async () => {
     try {
-      const [rulesResponse, categoriesResponse, duplicatesResponse] = await Promise.all([
+      const [rulesResponse, categoriesResponse, duplicatesResponse, settingsResponse] = await Promise.all([
         api.get("/api/automation/rules"),
         api.get("/api/categories/"),
         api.get("/api/automation/duplicates"),
+        api.get("/api/automation/settings"),
       ]);
       setRules(rulesResponse.data || []);
       setCategories(categoriesResponse.data || []);
       setDuplicates(duplicatesResponse.data || []);
+      setSettings(settingsResponse.data || { rules_enabled: true, duplicates_enabled: true });
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Не удалось загрузить автоматизацию.");
     }
@@ -59,10 +62,31 @@ export default function Automation() {
     }
   };
 
+  const changeSetting = async (key, value) => {
+    const previous = settings;
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    setSaving(true);
+    try {
+      const response = await api.patch("/api/automation/settings", { [key]: value });
+      setSettings(response.data);
+      if (key === "duplicates_enabled" && !value) setDuplicates([]);
+      setError("");
+    } catch (requestError) {
+      setSettings(previous);
+      setError(requestError.response?.data?.detail || "Не удалось сохранить настройку.");
+    } finally { setSaving(false); }
+  };
+
   return <main className="page automation-page">
     <SettingsTabs />
     <header className="page-heading"><div><h1>Автоматизация</h1><p>Правила подставляют категорию только в новую операцию без категории. Прошлые записи не меняются.</p></div></header>
     {error && <div className="form-error">{error}</div>}
+    <section className="automation-card automation-settings">
+      <h2>Настройки</h2>
+      <label><input type="checkbox" checked={settings.rules_enabled} disabled={saving} onChange={event => changeSetting("rules_enabled", event.target.checked)} /><span><b>Подсказывать категорию по правилам</b><small>Правило применяется только к новой записи без выбранной категории.</small></span></label>
+      <label><input type="checkbox" checked={settings.duplicates_enabled} disabled={saving} onChange={event => changeSetting("duplicates_enabled", event.target.checked)} /><span><b>Показывать возможные дубли</b><small>Сервис только показывает похожие записи — удаление всегда остаётся ручным.</small></span></label>
+    </section>
     <section className="automation-card">
       <h2>Правило категории</h2>
       <p>Например: «Пятёрочка» → «Продукты». Регистр букв не важен.</p>
@@ -76,9 +100,9 @@ export default function Automation() {
         {rules.length === 0 ? <p className="empty-state">Правил пока нет.</p> : rules.map(rule => <div key={rule.id}><span>«{rule.pattern}»</span><b>→ {rule.category_name}</b><button type="button" className="btn-ghost danger" onClick={() => removeRule(rule)}>Удалить</button></div>)}
       </div>
     </section>
-    <section className="automation-card">
+    {settings.duplicates_enabled && <section className="automation-card">
       <div className="automation-card-head"><div><h2>Возможные дубли</h2><p>Операции с одинаковыми счётом, датой, суммой и комментарием за последний год. Ничего не удаляем автоматически.</p></div><button type="button" className="btn-secondary" onClick={load}>Проверить снова</button></div>
       {duplicates.length === 0 ? <p className="empty-state">Потенциальных дублей не найдено.</p> : <div className="automation-duplicates">{duplicates.map(group => <article key={group.key}><strong>Проверьте {group.transactions.length} похожие операции</strong>{group.transactions.map(item => <div key={item.id}><time>{new Date(`${item.date}T12:00:00`).toLocaleDateString("ru-RU")}</time><span>{item.account_name} · {item.description}</span><b>{formatMoney(item.amount)} {item.currency}</b></div>)}</article>)}</div>}
-    </section>
+    </section>}
   </main>;
 }

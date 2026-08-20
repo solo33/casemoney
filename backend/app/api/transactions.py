@@ -494,7 +494,10 @@ def create_transaction(
         )
 
     category_id = data.category_id
+    user = None
     if category_id is None and tx_type != TransactionType.transfer:
+        user = db.query(User).filter(User.id == user_id).first()
+    if category_id is None and tx_type != TransactionType.transfer and user and user.automation_rules_enabled:
         category_id = matched_category_id(db, user_id, data.description, tx_type.value)
     if category_id is not None and tx_type != TransactionType.transfer:
         _ensure_own_category(db, user_id, category_id)
