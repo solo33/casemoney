@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 
@@ -359,7 +359,7 @@ def frequent_categories(
     behalf of the user.  Planned operations are excluded because the goal is
     to make today's entry fast.
     """
-    cutoff = datetime.now().replace(tzinfo=None) - timedelta(days=180)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=180)
     rows = (
         db.query(Transaction.category_id, func.count(Transaction.id).label("uses"), func.max(Transaction.date).label("last_used"))
         .filter(
