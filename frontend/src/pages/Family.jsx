@@ -224,6 +224,17 @@ export default function Family() {
               <article className={analytics?.net_total < 0 ? "family-stat-negative" : "family-stat-accent"}><span>Результат</span><strong>{formatMoney(analytics?.net_total || 0)} {analytics?.currency || "RUB"}</strong></article>
               <article><span>Запланировано</span><strong>{formatMoney(analytics?.planned_total || 0)} {analytics?.currency || "RUB"}</strong></article>
             </div>
+            {(analytics?.month_summary || []).length > 0 && (
+              <section className="family-month-summary" aria-label="Итоги семейного месяца">
+                {(analytics.month_summary || []).map(item => (
+                  <article className={`family-month-summary-item family-month-summary-item--${item.kind}`} key={`${item.kind}-${item.title}`}>
+                    <span>{item.title}</span>
+                    <strong>{item.kind === "deficit" ? "−" : ""}{formatMoney(item.amount)} {analytics.currency}</strong>
+                    <small>{item.description}</small>
+                  </article>
+                ))}
+              </section>
+            )}
             <section className="family-forecast-block">
               <div className="family-forecast-heading">
                 <div>
@@ -468,6 +479,16 @@ export default function Family() {
         .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
         .family-analytics-stats span { color: #7a8590; font-size: 12px; }
         .family-analytics-stats strong { color: #173a54; font-size: 18px; }
+        .family-month-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+        .family-month-summary-item { display: grid; gap: 5px; padding: 12px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fffcf4; }
+        .family-month-summary-item span { color: #173a54; font-size: 13px; font-weight: 800; }
+        .family-month-summary-item strong { color: #173a54; font-size: 18px; }
+        .family-month-summary-item small { color: #7a8590; font-size: 12px; line-height: 1.35; }
+        .family-month-summary-item--deficit { border-color: #e2a99a; background: #fff3ef; }
+        .family-month-summary-item--deficit strong, .family-month-summary-item--budget_risk strong { color: #b6402b; }
+        .family-month-summary-item--budget_risk { border-color: #e5c67a; background: #fff9e9; }
+        .family-month-summary-item--reserve { border-color: #b8d9c8; background: #edf8f1; }
+        .family-month-summary-item--reserve strong { color: #17704b; }
         .family-forecast-block { margin-top: 18px; padding: 15px; border: 1px solid #ded5c2; border-radius: 10px; background: #fffcf4; }
         .family-forecast-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
         .family-forecast-heading h3 { margin: 0; color: #173a54; font-size: 16px; }
@@ -519,7 +540,7 @@ export default function Family() {
         .family-expenses article > div:last-child { text-align: right; }
         @media (max-width: 720px) {
           .family-columns { grid-template-columns: 1fr; }
-          .family-analytics-stats, .family-analytics-stats-four, .family-analytics-columns { grid-template-columns: 1fr; }
+          .family-analytics-stats, .family-analytics-stats-four, .family-month-summary, .family-analytics-columns { grid-template-columns: 1fr; }
           .family-analytics-heading { align-items: stretch; flex-direction: column; }
           .family-analytics-heading input { width: 100%; }
           .family-forecast-heading { flex-direction: column; }

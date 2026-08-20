@@ -609,6 +609,39 @@ def family_analytics(
     notable_expenses.sort(key=lambda item: item["amount"], reverse=True)
     actual_total = actual_expenses
     planned_total = planned_expenses
+    month_summary = []
+    predicted_net = predicted_income - predicted_expenses
+    if is_current_period:
+        if predicted_net < 0:
+            month_summary.append({
+                "kind": "deficit",
+                "title": "Вероятен дефицит общих денег",
+                "amount": round(abs(predicted_net), 2),
+                "description": "Прогноз расходов до конца месяца превышает ожидаемые общие доходы.",
+            })
+        else:
+            month_summary.append({
+                "kind": "reserve",
+                "title": "Прогноз общего остатка положительный",
+                "amount": round(predicted_net, 2),
+                "description": "Это прогноз по общим операциям, а не сумма на личных счетах участников.",
+            })
+    if budget_risks:
+        top_risk = budget_risks[0]
+        month_summary.append({
+            "kind": "budget_risk",
+            "title": f"Риск превышения бюджета: {top_risk['category_name']}",
+            "amount": top_risk["overrun"],
+            "description": "Расходы по текущему темпу и запланированным операциям могут превысить лимит.",
+        })
+    if category_rows:
+        largest_category = category_rows[0]
+        month_summary.append({
+            "kind": "largest_category",
+            "title": f"Главная статья общих расходов: {largest_category['name']}",
+            "amount": largest_category["actual"],
+            "description": "Больше всего фактически потрачено в этой категории за выбранный месяц.",
+        })
     return {
         "year": year,
         "month": month,
@@ -640,7 +673,7 @@ def family_analytics(
             "average_daily_expenses": round(average_daily_expenses, 2),
             "predicted_expenses": round(predicted_expenses, 2),
             "predicted_income": round(predicted_income, 2),
-            "predicted_net": round(predicted_income - predicted_expenses, 2),
+            "predicted_net": round(predicted_net, 2),
             "budget_risks": budget_risks[:5],
             "upcoming": upcoming[:5],
         },
@@ -649,6 +682,7 @@ def family_analytics(
         "settlements": settlement_rows,
         "settlements_total": round(settlements_total, 2),
         "notable_expenses": notable_expenses[:5],
+        "month_summary": month_summary,
         "skipped_currencies": sorted(skipped_currencies),
     }
 

@@ -311,6 +311,9 @@ def test_family_analytics_exposes_current_month_forecast(client):
     assert forecast["average_daily_expenses"] > 0
     assert forecast["predicted_expenses"] > 1500
     assert forecast["upcoming"][0]["description"] == "Будущий общий платёж"
+    summary = response.json()["month_summary"]
+    assert any(item["kind"] == "deficit" for item in summary)
+    assert any(item["kind"] == "largest_category" and item["title"] == "Главная статья общих расходов: Продукты" for item in summary)
 
 
 def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(client):
