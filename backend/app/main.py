@@ -16,6 +16,7 @@ from slowapi.middleware import SlowAPIMiddleware
 # Схему БД меняем ТОЛЬКО через alembic, create_all больше не вызываем.
 from app.models.user import User  # noqa: F401
 from app.models.category import Category  # noqa: F401
+from app.models.category_rule import CategoryRule  # noqa: F401
 from app.models.account import Account  # noqa: F401
 from app.models.account_group import AccountGroup  # noqa: F401
 from app.models.account_balance import AccountBalance  # noqa: F401
@@ -62,6 +63,8 @@ from app.api.transaction_templates import router as transaction_templates_router
 from app.api.recurring_transactions import router as recurring_transactions_router
 from app.api.chat import router as chat_router
 from app.api.budgets import router as budgets_router
+from app.api.calendar import router as calendar_router
+from app.api.automation import router as automation_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -134,6 +137,8 @@ app.include_router(transaction_templates_router)
 app.include_router(recurring_transactions_router)
 app.include_router(chat_router)
 app.include_router(budgets_router)
+app.include_router(calendar_router)
+app.include_router(automation_router)
 
 
 @app.on_event("startup")

@@ -23,6 +23,7 @@ from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
 from app.services.plans import ensure_family_plan
+from app.services.automation import matched_category_id
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
@@ -452,8 +453,11 @@ def create_transaction(
             data.to_account_id, data.to_currency, data.to_amount,
         )
 
-    if data.category_id is not None and tx_type != TransactionType.transfer:
-        _ensure_own_category(db, user_id, data.category_id)
+    category_id = data.category_id
+    if category_id is None and tx_type != TransactionType.transfer:
+        category_id = matched_category_id(db, user_id, data.description, tx_type.value)
+    if category_id is not None and tx_type != TransactionType.transfer:
+        _ensure_own_category(db, user_id, category_id)
 
     if data.is_planned:
         ensure_family_plan(db, user_id)
@@ -473,7 +477,7 @@ def create_transaction(
         description=data.description,
         date=data.date,
         account_id=data.account_id,
-        category_id=None if tx_type == TransactionType.transfer else data.category_id,
+        category_id=None if tx_type == TransactionType.transfer else category_id,
         user_id=user_id,
         to_account_id=to_account_id,
         to_amount=to_amount,

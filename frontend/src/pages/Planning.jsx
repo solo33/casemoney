@@ -5,6 +5,8 @@ import { formatMoney } from "../utils/money";
 const today = () => new Date().toISOString().slice(0, 10);
 const blankForm = () => ({ type: "expense", amount: "", currency: "RUB", account_id: "", category_id: "", description: "", date: today() });
 const FREQUENCY_LABELS = { daily: "Ежедневно", weekly: "Еженедельно", biweekly: "Раз в 2 недели", monthly: "Ежемесячно", yearly: "Ежегодно" };
+const MONTH_NAMES = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+const isoDate = value => String(value || "").slice(0, 10);
 
 export default function Planning() {
   const [transactions, setTransactions] = useState([]);
@@ -12,6 +14,8 @@ export default function Planning() {
   const [categories, setCategories] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [recurring, setRecurring] = useState([]);
+  const [calendarUrl, setCalendarUrl] = useState("");
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [form, setForm] = useState(blankForm);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -19,16 +23,18 @@ export default function Planning() {
 
   const load = useCallback(async () => {
     try {
-      const [transactionsResponse, accountsResponse, categoriesResponse, templatesResponse, recurringResponse] = await Promise.all([
+      const [transactionsResponse, accountsResponse, categoriesResponse, templatesResponse, recurringResponse, calendarResponse] = await Promise.all([
         api.get("/api/transactions/", { params: { is_planned: true, limit: 500 } }),
         api.get("/api/accounts/"), api.get("/api/categories/"), api.get("/api/transaction-templates/"),
         api.get("/api/recurring-transactions/"),
+        api.get("/api/calendar/subscription"),
       ]);
       setTransactions(transactionsResponse.data.items || []);
       setAccounts(accountsResponse.data || []);
       setCategories(categoriesResponse.data || []);
       setTemplates(templatesResponse.data || []);
       setRecurring(recurringResponse.data || []);
+      setCalendarUrl(calendarResponse.data?.url || "");
       setForm(current => current.account_id ? current : { ...current, account_id: String(accountsResponse.data?.[0]?.id || "") });
     } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось загрузить планирование."); }
     finally { setLoading(false); }
@@ -42,6 +48,10 @@ export default function Planning() {
     return result;
   }, {}), [transactions]);
   const currencies = useMemo(() => [...new Set(accounts.flatMap(account => (account.balances || []).map(balance => balance.currency)))].sort(), [accounts]);
+  const calendarEntries = useMemo(() => [
+    ...transactions.map(item => ({ date: isoDate(item.date), type: item.type, recurring: false, title: item.description || (item.type === "income" ? "Плановый доход" : "Плановый расход"), amount: item.amount, currency: item.currency })),
+    ...recurring.filter(item => item.is_active).map(item => ({ date: isoDate(item.next_date), type: item.type, recurring: true, title: item.name, amount: item.amount, currency: item.currency })),
+  ], [transactions, recurring]);
   const change = (field, value) => setForm(current => ({ ...current, [field]: value }));
 
   const save = async event => {
@@ -120,6 +130,15 @@ export default function Planning() {
     try { await api.delete(`/api/recurring-transactions/${item.id}`); setRecurring(current => current.filter(entry => entry.id !== item.id)); }
     catch { setError("Не удалось удалить регулярную операцию."); }
   };
+  const rotateCalendarLink = async () => {
+    if (!window.confirm("Старая ссылка перестанет работать. Выпустить новую ссылку календаря?")) return;
+    try { const response = await api.post("/api/calendar/subscription/rotate"); setCalendarUrl(response.data?.url || ""); setError(""); }
+    catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось обновить ссылку календаря."); }
+  };
+  const copyCalendarLink = async () => {
+    try { await navigator.clipboard.writeText(calendarUrl); setError("Ссылка календаря скопирована."); }
+    catch { setError("Не удалось скопировать ссылку. Скопируйте её вручную."); }
+  };
 
   if (loading) return <div className="page">Загружаем планирование…</div>;
   return <main className="page planning-page">
@@ -127,6 +146,11 @@ export default function Planning() {
     {error && <div className="form-error">{error}</div>}
     <section className="planning-summary">
       {Object.keys(summary).length === 0 ? <p>На будущее пока ничего не запланировано.</p> : Object.entries(summary).map(([currency, values]) => <div className="planning-summary-card" key={currency}><strong>{currency}</strong><span className="income">+{formatMoney(values.income)}</span><span className="expense">−{formatMoney(values.expense)}</span><b>{formatMoney(values.income - values.expense)}</b></div>)}
+    </section>
+    <section className="planning-calendar-card">
+      <div className="planning-calendar-head"><div><h2>Календарь операций</h2><p>Плановые операции и ближайшие повторения. Подпишите Google или Яндекс Календарь на личную ссылку ниже.</p></div><div className="planning-calendar-nav"><button type="button" className="btn-secondary" aria-label="Предыдущий месяц" onClick={() => setCalendarMonth(current => new Date(current.getFullYear(), current.getMonth() - 1, 1))}>‹</button><strong>{MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}</strong><button type="button" className="btn-secondary" aria-label="Следующий месяц" onClick={() => setCalendarMonth(current => new Date(current.getFullYear(), current.getMonth() + 1, 1))}>›</button></div></div>
+      <PlanningCalendar month={calendarMonth} entries={calendarEntries} />
+      <div className="planning-calendar-feed"><div><strong>Личная ссылка iCalendar</strong><span>Не передавайте её другим: по ней видны названия и суммы плановых операций.</span></div><input readOnly value={calendarUrl} aria-label="Ссылка календаря" /><button type="button" className="btn-secondary" onClick={copyCalendarLink}>Копировать</button><button type="button" className="btn-ghost" onClick={rotateCalendarLink}>Обновить ссылку</button></div>
     </section>
     <section className="planning-create-card"><h2>Запланировать операцию</h2><form className="planning-form" onSubmit={save}>
       <select value={form.type} onChange={event => change("type", event.target.value)}><option value="expense">Расход</option><option value="income">Доход</option></select>
@@ -147,6 +171,24 @@ export default function Planning() {
     </section>
     {modal && <PlanningActionModal modal={modal} setModal={setModal} onSaveTemplate={submitTemplate} onSaveRecurring={submitRecurring} />}
   </main>;
+}
+
+function PlanningCalendar({ month, entries }) {
+  const year = month.getFullYear();
+  const monthIndex = month.getMonth();
+  const offset = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells = Array.from({ length: Math.ceil((offset + daysInMonth) / 7) * 7 }, (_, index) => index - offset + 1);
+  const byDate = entries.reduce((result, item) => { (result[item.date] ||= []).push(item); return result; }, {});
+  return <div className="planning-calendar" role="grid" aria-label={`Календарь ${MONTH_NAMES[monthIndex]} ${year}`}>
+    {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => <div className="planning-calendar-weekday" key={day}>{day}</div>)}
+    {cells.map((day, index) => {
+      if (day < 1 || day > daysInMonth) return <div className="planning-calendar-day is-empty" key={`empty-${index}`} />;
+      const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const items = byDate[key] || [];
+      return <div className="planning-calendar-day" key={key}><strong>{day}</strong>{items.slice(0, 3).map((item, itemIndex) => <span className={item.type === "income" ? "income" : "expense"} title={`${item.title}: ${formatMoney(item.amount)} ${item.currency}`} key={`${item.title}-${itemIndex}`}>{item.recurring ? "↻ " : ""}{item.title}</span>)}{items.length > 3 && <small>ещё {items.length - 3}</small>}</div>;
+    })}
+  </div>;
 }
 
 function PlanningActionModal({ modal, setModal, onSaveTemplate, onSaveRecurring }) {

@@ -55,6 +55,7 @@ const SETTINGS_LINKS = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
+  { to: "/settings/automation", label: "Автоматизация" },
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/shopping", label: "Списки покупок" },
   { to: "/about", label: "О программе" },

@@ -49,6 +49,7 @@ const Billing = lazy(() => import('./pages/Billing'))
 const Shopping = lazy(() => import('./pages/Shopping'))
 const Planning = lazy(() => import('./pages/Planning'))
 const Budget = lazy(() => import('./pages/Budget'))
+const Automation = lazy(() => import('./pages/Automation'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -271,6 +272,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Currencies />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings/automation"
+          element={
+            <ProtectedRoute>
+              <Automation />
             </ProtectedRoute>
           }
         />

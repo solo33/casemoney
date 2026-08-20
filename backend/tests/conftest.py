@@ -22,6 +22,7 @@ import app.main as main_module
 # Регистрируем все модели в Base.metadata (импорт ради side-effect)
 import app.models.user            # noqa: F401
 import app.models.category        # noqa: F401
+import app.models.category_rule   # noqa: F401
 import app.models.account         # noqa: F401
 import app.models.account_group   # noqa: F401
 import app.models.account_balance # noqa: F401

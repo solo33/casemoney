@@ -24,6 +24,9 @@ class User(Base):
     email_verified = Column(Boolean, nullable=False, default=False)
     verification_email_sent_at = Column(DateTime(timezone=True), nullable=True)
     verification_email_attempts = Column(Integer, nullable=False, default=0)
+    # Секретный токен для подписки на личный календарь. Это не JWT: его можно
+    # безопасно отозвать из раздела «Расписание», не затрагивая сессии пользователя.
+    calendar_token = Column(String(96), nullable=True, unique=True, index=True)
     # Одноразовая изолированная песочница с публичной кнопки «Демо-вход».
     # Удаляется фоновым воркером через TTL — см. app/services/demo_cleanup.py.
     is_demo = Column(Boolean, nullable=False, default=False, index=True)

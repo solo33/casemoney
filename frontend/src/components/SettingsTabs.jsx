@@ -5,6 +5,7 @@ const tabs = [
   { to: "/settings/personal", label: "Персональные" },
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
+  { to: "/settings/automation", label: "Автоматизация" },
   { to: "/settings/billing", label: "Тариф и оплата" },
   { to: "/settings/family", label: "Семья" },
 ];
