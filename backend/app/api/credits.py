@@ -402,6 +402,8 @@ def register_payment(
             if credit.kind == "deposit"
             else "Возврат долга"
             if credit.direction == "receivable"
+            else "Досрочное погашение"
+            if data.is_early_payment
             else "Платёж"
         ) + f": {credit.name}",
         date=paid_at,
@@ -417,7 +419,13 @@ def register_payment(
     _apply_tx_effect(db, transaction)
     _write_history(db, user_id, transaction, "created")
 
-    principal_amount, interest_amount = _calculate_mortgage_split(credit, data.amount)
+    if data.is_early_payment:
+        if credit.kind not in {"mortgage", "loan", "private_debt"} or credit.direction != "owe":
+            raise HTTPException(status_code=400, detail="Досрочное погашение доступно только для вашего кредита или займа")
+        principal_amount = min(float(data.amount), max(0.0, float(credit.current_balance or 0)))
+        interest_amount = 0.0
+    else:
+        principal_amount, interest_amount = _calculate_mortgage_split(credit, data.amount)
 
     # Доход по депозиту не уменьшает его тело. Для займа возврат, напротив,
     # сокращает остаток задолженности. У ипотеки остаток сокращает только
@@ -434,6 +442,7 @@ def register_payment(
         amount=data.amount,
         principal_amount=principal_amount,
         interest_amount=interest_amount,
+        is_early_payment=data.is_early_payment,
         currency=credit.currency,
         paid_at=paid_at,
         account_id=account.id,

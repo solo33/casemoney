@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import CategoryOptions from "./CategoryOptions";
+import api from "../api/client";
 
 const isUncategorized = category => (
   category.name.trim().toLocaleLowerCase("ru-RU") === "без категории"
@@ -22,6 +23,7 @@ export default function CategoryPicker({
   className = "",
 }) {
   const [open, setOpen] = useState(false);
+  const [frequent, setFrequent] = useState([]);
   // A hidden group must hide its children too. The exception is an already
   // saved category while editing an old operation: it stays available together
   // with its parent, so the operation can be corrected without losing it.
@@ -62,6 +64,24 @@ export default function CategoryPicker({
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = original; };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || navigator.onLine === false) return undefined;
+    const type = visibleCategories.find(category => category.type)?.type;
+    if (type !== "income" && type !== "expense") {
+      setFrequent([]);
+      return undefined;
+    }
+    let active = true;
+    api.get("/api/transactions/frequent-categories", { params: { tx_type: type, limit: 6 } })
+      .then(response => {
+        if (!active) return;
+        const allowed = new Set(visibleCategories.map(category => String(category.id)));
+        setFrequent(response.data.filter(category => allowed.has(String(category.id))));
+      })
+      .catch(() => { if (active) setFrequent([]); });
+    return () => { active = false; };
+  }, [open, visibleCategories]);
 
   const choose = nextValue => {
     onChange(String(nextValue));
@@ -107,6 +127,10 @@ export default function CategoryPicker({
               <button type="button" className="category-picker-empty" onClick={() => choose("")}>
                 {placeholder}
               </button>
+              {frequent.length > 0 && <div className="category-picker-frequent">
+                <span>Часто используемые</span>
+                <div>{frequent.map(category => <button type="button" key={category.id} onClick={() => choose(category.id)}>{labelFor(category)}</button>)}</div>
+              </div>}
               {groups.roots.map(parent => (
                 <div className="category-picker-group" key={parent.id}>
                   <button type="button" className="category-picker-parent" onClick={() => choose(parent.id)}>

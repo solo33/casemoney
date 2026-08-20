@@ -75,6 +75,9 @@ class CreditPayment(Base):
     amount = Column(Float, nullable=False)
     principal_amount = Column(Float, nullable=True)
     interest_amount = Column(Float, nullable=True)
+    # A separate early repayment reduces the principal in full and does not
+    # include the regular monthly interest calculation.
+    is_early_payment = Column(Boolean, nullable=False, default=False)
     currency = Column(String(10), nullable=False)
     paid_at = Column(DateTime(timezone=True), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)

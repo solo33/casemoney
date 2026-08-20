@@ -59,6 +59,36 @@ def test_mortgage_payment_creates_expense_and_history(client):
     assert details["payments"][0]["principal_amount"] == 2_000
 
 
+def test_early_mortgage_payment_reduces_only_principal(client):
+    auth = register_and_login(client, "mortgage-early@test.com")
+    enable_family("mortgage-early@test.com")
+    account = make_account(client, auth, balance=50_000)
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Ипотека с досрочным платежом",
+            "kind": "mortgage",
+            "currency": "RUB",
+            "current_balance": 900_000,
+            "annual_interest_rate": 12,
+            "source_account_id": account["id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    paid = client.post(
+        f"/api/credits/{created.json()['id']}/payments",
+        headers=auth,
+        json={"amount": 10_000, "account_id": account["id"], "is_early_payment": True},
+    )
+    assert paid.status_code == 201, paid.text
+    assert paid.json()["is_early_payment"] is True
+    assert paid.json()["principal_amount"] == 10_000
+    assert paid.json()["interest_amount"] == 0
+    assert paid.json()["balance_after"] == 890_000
+
+
 def test_loan_disbursement_increases_account_without_becoming_income(client):
     auth = register_and_login(client, "loan-disbursement@test.com")
     enable_family("loan-disbursement@test.com")

@@ -83,6 +83,7 @@ class CreditPaymentCreate(BaseModel):
     account_id: int
     paid_at: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
+    is_early_payment: bool = False
 
 
 class CreditPaymentResponse(BaseModel):
@@ -96,6 +97,7 @@ class CreditPaymentResponse(BaseModel):
     account_id: Optional[int]
     balance_after: Optional[float]
     notes: Optional[str]
+    is_early_payment: bool = False
 
     class Config:
         from_attributes = True

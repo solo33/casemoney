@@ -1202,6 +1202,34 @@ hr {
     color: #7a8590 !important;
     font-size: 13px;
   }
+  .category-picker-frequent {
+    padding: 8px 0 11px;
+    border-bottom: 1px solid rgba(228, 221, 205, 0.75);
+  }
+  .category-picker-frequent > span {
+    display: block;
+    padding: 0 10px 6px;
+    color: #7a8590;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .category-picker-frequent > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 10px;
+  }
+  .category-picker-frequent button {
+    width: auto !important;
+    min-height: 32px !important;
+    padding: 6px 9px !important;
+    background: #f1ecdf !important;
+    color: #173a54 !important;
+    font-size: 12px;
+    font-weight: 650;
+  }
   .category-picker-group + .category-picker-group {
     border-top: 1px solid rgba(228, 221, 205, 0.65);
   }

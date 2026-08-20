@@ -6,10 +6,12 @@
 export const DASHBOARD_WIDGETS = [
   { id: "balance", label: "Баланс", collapsedOnMobile: false },
   { id: "credits", label: "Платежи и поступления", collapsedOnMobile: false },
+  { id: "forecast", label: "Ближайшие события", collapsedOnMobile: true },
   { id: "accounts", label: "Счета", collapsedOnMobile: false },
   { id: "records", label: "Последние записи", collapsedOnMobile: false },
   { id: "breakdown", label: "Расходы и доходы", collapsedOnMobile: true },
   { id: "budget", label: "Бюджет", collapsedOnMobile: true },
+  { id: "goals", label: "Цели", collapsedOnMobile: true },
 ];
 
 export function isMobileViewport() {

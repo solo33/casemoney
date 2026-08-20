@@ -78,6 +78,7 @@ export default function Home() {
   const [summary, setSummary] = useState(null);
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
+  const [forecastDays, setForecastDays] = useState(30);
   const flowMonth = new Date().getMonth() + 1;
   const flowYear = new Date().getFullYear();
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
@@ -190,7 +191,7 @@ export default function Home() {
 
     // Этап 2: общий баланс и последние изменённые записи.
     try {
-      const d = await api.get("/api/dashboard/");
+      const d = await api.get("/api/dashboard/", { params: { forecast_days: forecastDays } });
       if (isCurrent()) {
         setDashboard(d.data);
         const syncedAt = new Date().toISOString();
@@ -222,7 +223,7 @@ export default function Home() {
     } finally {
       if (isCurrent()) setAccountsLoading(false);
     }
-  }, [breakdownType, flowMonth, flowYear]);
+  }, [breakdownType, flowMonth, flowYear, forecastDays]);
 
   const effectiveAccountGroups = grouped.length > 0 ? grouped : accountOptions;
   const flatAccounts = useMemo(
@@ -441,6 +442,17 @@ export default function Home() {
           onCollapseChange={collapsed => updateWidgetCollapsed("credits", collapsed)}
         /></div>}
 
+        {widgetSettings.forecast.visible && <ForecastWidget
+          forecast={dashboard?.forecast}
+          mainCurrency={mainCurrency}
+          days={forecastDays}
+          collapsed={isWidgetCollapsed("forecast")}
+          loading={balanceLoading}
+          onDaysChange={setForecastDays}
+          onCollapseChange={collapsed => updateWidgetCollapsed("forecast", collapsed)}
+          order={widgetSettings.forecast.order}
+        />}
+
         {/* Accounts grouped — только учитываемые в балансе */}
         {widgetSettings.accounts.visible && <Card noPadding className="home-accounts-card" style={{ order: widgetSettings.accounts.order }}>
           <div style={{ padding: "12px 16px 8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -620,6 +632,14 @@ export default function Home() {
             onCollapseChange={collapsed => updateWidgetCollapsed("budget", collapsed)}
           />
         )}
+
+        {user?.plan === "family" && widgetSettings.goals.visible && (
+          <GoalsWidget
+            collapsed={isWidgetCollapsed("goals")}
+            order={widgetSettings.goals.order}
+            onCollapseChange={collapsed => updateWidgetCollapsed("goals", collapsed)}
+          />
+        )}
       </main>
 
       {editingTx && (
@@ -745,6 +765,77 @@ const sectionTitle = {
   textTransform: "uppercase",
   letterSpacing: 0.5,
 };
+
+function ForecastWidget({ forecast, mainCurrency, days, collapsed, loading, onDaysChange, onCollapseChange, order }) {
+  const events = forecast?.events || [];
+  const net = Number(forecast?.net || 0);
+  const projected = forecast?.projected_balance;
+  return (
+    <Card className="home-forecast-card" style={{ order }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <h3 onClick={() => onCollapseChange(!collapsed)} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
+          <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{collapsed ? "▸" : "▾"}</span>
+          Ближайшие события
+        </h3>
+        <Link to="/planning" style={{ color: "#9c7b3c", fontSize: 12, textDecoration: "none" }}>Все →</Link>
+      </div>
+      {!collapsed && (loading ? (
+        <BrandProgress label="Считаем прогноз…" size={28} style={{ minHeight: 68 }} />
+      ) : (
+        <>
+          <div className="forecast-periods" aria-label="Горизонт прогноза">
+            {[7, 30, 90].map(value => <ToggleBtn key={value} active={days === value} onClick={() => onDaysChange(value)}>{value} дн.</ToggleBtn>)}
+          </div>
+          {projected != null && <div className="forecast-total">
+            <span>Ожидаемый баланс</span>
+            <strong>{formatMoney(projected)} {currencySymbol(mainCurrency)}</strong>
+            <small style={{ color: net < 0 ? "#c0432b" : net > 0 ? "#167a4a" : "#7a8590" }}>
+              {net > 0 ? "+" : ""}{formatMoney(net)} {currencySymbol(mainCurrency)} за период
+            </small>
+          </div>}
+          {events.length === 0 ? (
+            <p style={{ margin: "12px 0 0", color: "#7a8590", fontSize: 13 }}>На выбранный период плановых операций нет.</p>
+          ) : (
+            <div className="forecast-events">
+              {events.slice(0, 4).map(event => {
+                const sign = event.type === "income" ? "+" : event.type === "expense" ? "−" : "";
+                return <div key={event.id} className="forecast-event">
+                  <span>{new Date(event.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}</span>
+                  <div><b>{event.description || event.category_name || (event.type === "income" ? "Плановый доход" : event.type === "expense" ? "Плановый расход" : "Перевод")}</b><small>{event.account_name}</small></div>
+                  <strong style={{ color: event.type === "income" ? "#167a4a" : event.type === "expense" ? "#c0432b" : "#617080" }}>{sign}{formatMoneyWithCurrency(event.amount, event.currency)}</strong>
+                </div>;
+              })}
+              {events.length > 4 && <Link className="forecast-more" to="/planning">Ещё {events.length - 4} →</Link>}
+            </div>
+          )}
+        </>
+      ))}
+      <style>{`.forecast-periods{display:flex;gap:6px;margin-top:12px}.forecast-total{display:grid;gap:2px;margin-top:12px;padding:10px 0;border-top:1px solid #ece6d8;border-bottom:1px solid #ece6d8;font-size:12px;color:#7a8590}.forecast-total strong{font-size:18px;color:#173a54;font-variant-numeric:tabular-nums}.forecast-total small{font-size:12px}.forecast-events{display:grid;margin-top:5px}.forecast-event{display:grid;grid-template-columns:45px minmax(0,1fr) auto;gap:7px;align-items:center;padding:8px 0;border-bottom:1px solid #f0ebdf;font-size:12px}.forecast-event>span{color:#7a8590}.forecast-event div{min-width:0;display:grid;gap:2px}.forecast-event b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}.forecast-event small{color:#a6afb8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.forecast-event strong{font-variant-numeric:tabular-nums;white-space:nowrap}.forecast-more{display:block;padding-top:8px;color:#9c7b3c;font-size:12px;text-decoration:none;text-align:right}`}</style>
+    </Card>
+  );
+}
+
+function GoalsWidget({ collapsed, order, onCollapseChange }) {
+  const [goals, setGoals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    api.get("/api/goals/").then(response => { if (active) setGoals(response.data); }).catch(() => { if (active) setGoals([]); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+  return <Card className="home-goals-card" style={{ order }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+      <h3 onClick={() => onCollapseChange(!collapsed)} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
+        <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{collapsed ? "▸" : "▾"}</span>Цели
+      </h3>
+      <Link to="/goals" style={{ color: "#9c7b3c", fontSize: 12, textDecoration: "none" }}>Открыть →</Link>
+    </div>
+    {!collapsed && (loading ? <BrandProgress label="Обновляем цели…" size={28} style={{ minHeight: 64 }} /> : goals.length === 0 ? (
+      <p style={{ margin: "12px 0 0", color: "#7a8590", fontSize: 13 }}>Целей пока нет. Создайте первую цель.</p>
+    ) : <div className="goal-widget-list">{goals.slice(0, 3).map(goal => <Link to="/goals" key={goal.id} className="goal-widget-row"><div><span>{goal.icon || "◎"} {goal.name}</span><small>{formatMoney(goal.current_amount)} из {formatMoney(goal.target_amount)} {goal.currency}</small></div><b>{formatMoney(goal.progress_percent, { maxFraction: 0 })}%</b><i><em style={{ width: `${Math.min(100, Math.max(0, goal.progress_percent))}%` }} /></i></Link>)}</div>)}
+    <style>{`.goal-widget-list{display:grid;margin-top:9px}.goal-widget-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:8px 0;position:relative;text-decoration:none;color:#1b2531;border-bottom:1px solid #f0ebdf;font-size:12px}.goal-widget-row div{display:grid;gap:3px;min-width:0}.goal-widget-row span,.goal-widget-row small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.goal-widget-row small{color:#7a8590}.goal-widget-row b{color:#173a54;font-variant-numeric:tabular-nums}.goal-widget-row i{grid-column:1/-1;height:4px;background:#ece6d8;border-radius:999px;overflow:hidden}.goal-widget-row em{display:block;height:100%;background:#3c9a6d;border-radius:inherit}`}</style>
+  </Card>;
+}
 
 function BudgetWidget({ collapsed, order, onCollapseChange }) {
   const [budgets, setBudgets] = useState([]);
