@@ -450,12 +450,17 @@ def get_annual_balances(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    ensure_family_plan(db, user_id)
     """Остаток каждого счёта на конец каждого месяца года, в основной валюте.
 
-    На баланс влияют только доходы (+) и расходы (−); переводы — ноль.
-    Остаток на конец месяца M = текущий баланс − эффект всех операций после конца M.
+    Доход увеличивает остаток, расход уменьшает его. Перевод не меняет
+    общий капитал, но меняет оба конкретных счёта: списывает сумму со
+    счёта-источника и зачисляет сумму в валюте счёта-получателя. Плановые
+    операции в фактический остаток не входят.
+
+    Остаток на конец месяца M = текущий баланс − эффект всех фактических
+    операций после конца M.
     """
+    ensure_family_plan(db, user_id)
     main = accounts_svc.get_user_main_currency(db, user_id)
 
     accounts = (
@@ -477,8 +482,8 @@ def get_annual_balances(
         current[(b.account_id, b.currency)] = b.balance
         currencies_by_acc.setdefault(b.account_id, set()).add(b.currency)
 
-    # Эффекты операций: помесячно внутри года + суммарно «после года»
-    # effect = +amount (доход), -amount (расход), 0 (перевод)
+    # Эффекты операций: помесячно внутри года + суммарно «после года».
+    # У перевода две стороны: −amount на источнике и +to_amount на получателе.
     month_eff: dict[tuple[int, str], list[float]] = {}   # (acc,cur) -> [12]
     future_eff: dict[tuple[int, str], float] = {}        # (acc,cur) -> сумма после 31.12.year
 
@@ -488,23 +493,30 @@ def get_annual_balances(
         .filter(
             Transaction.user_id == user_id,
             func.date(Transaction.date) >= year_start,
+            Transaction.is_planned.is_(False),
         )
         .all()
     )
+
+    def add_effect(account_id: int, currency: str, effect: float, occurred_at: datetime) -> None:
+        """Сохраняет изменение одного баланса в нужном месяце или будущем периоде."""
+        key = (account_id, currency)
+        currencies_by_acc.setdefault(account_id, set()).add(currency)
+        if occurred_at.year == year:
+            arr = month_eff.setdefault(key, [0.0] * 12)
+            arr[occurred_at.month - 1] += effect
+        else:  # год больше запрошенного → «будущее» относительно конца года
+            future_eff[key] = future_eff.get(key, 0.0) + effect
+
     for t in txs:
         if t.type == TransactionType.income:
-            eff = t.amount
+            add_effect(t.account_id, t.currency, t.amount, t.date)
         elif t.type == TransactionType.expense:
-            eff = -t.amount
-        else:
-            continue  # перевод не меняет баланс
-        key = (t.account_id, t.currency)
-        currencies_by_acc.setdefault(t.account_id, set()).add(t.currency)
-        if t.date.year == year:
-            arr = month_eff.setdefault(key, [0.0] * 12)
-            arr[t.date.month - 1] += eff
-        else:  # год больше запрошенного → «будущее» относительно конца года
-            future_eff[key] = future_eff.get(key, 0.0) + eff
+            add_effect(t.account_id, t.currency, -t.amount, t.date)
+        elif t.type == TransactionType.transfer:
+            add_effect(t.account_id, t.currency, -t.amount, t.date)
+            if t.to_account_id and t.to_currency and t.to_amount is not None:
+                add_effect(t.to_account_id, t.to_currency, t.to_amount, t.date)
 
     def eom_series_in_currency(acc_id: int, cur: str) -> list[float]:
         """12 значений остатка (в валюте cur) на конец каждого месяца."""
