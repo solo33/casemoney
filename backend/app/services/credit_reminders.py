@@ -66,7 +66,11 @@ def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[i
             credit.last_reminder_for_date = credit.next_payment_date
 
         if credit.last_email_reminder_for_date != credit.next_payment_date:
-            if is_enabled(user, "credit_due", "email") and send_credit_payment_reminder(
+            if not is_enabled(user, "credit_due", "email"):
+                # Do not backfill old reminders when the person later turns
+                # this channel on.
+                credit.last_email_reminder_for_date = credit.next_payment_date
+            elif send_credit_payment_reminder(
                 to_email=user.email,
                 username=user.username,
                 credit_name=credit.name,
@@ -78,7 +82,10 @@ def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[i
                 credit_url=f"{app_url()}/credits",
             ):
                 email_count += 1
-            credit.last_email_reminder_for_date = credit.next_payment_date
+                # On a transport failure leave the marker intact: the next
+                # scheduler pass must retry the email without duplicating the
+                # in-app notification.
+                credit.last_email_reminder_for_date = credit.next_payment_date
 
         db.commit()
 
