@@ -8,6 +8,7 @@ import CookieBanner from './components/CookieBanner'
 import { GlobalNetworkProgress } from './components/BrandProgress'
 import MobilePwaInstallPrompt from './components/MobilePwaInstallPrompt'
 import OfflineSyncStatus from './components/OfflineSyncStatus'
+import PwaUpdatePrompt from './components/PwaUpdatePrompt'
 import YandexMetrikaRouteTracker from './components/YandexMetrikaRouteTracker'
 import GuidedTour from './components/GuidedTour'
 import Seo from './components/Seo'
@@ -67,6 +68,7 @@ function ProtectedRoute({ children }) {
       <QuickAddFab />
       <MobilePwaInstallPrompt />
       <OfflineSyncStatus />
+      <PwaUpdatePrompt />
     </UserProvider>
   )
 }

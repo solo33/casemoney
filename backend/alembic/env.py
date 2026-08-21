@@ -34,6 +34,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 from app.models.user import User
+from app.models.ai_usage import AiUsage
 from app.models.pending_registration import PendingRegistration
 from app.models.category import Category
 from app.models.account import Account

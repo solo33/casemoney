@@ -19,6 +19,10 @@ class User(Base):
     show_shopping_button_mobile = Column(Boolean, nullable=False, default=True)
     hide_zero_balance_currencies = Column(Boolean, nullable=False, default=False)
     dashboard_widgets = Column(JSON, nullable=False, default=dict)
+    # Каналы уведомлений пользователь настраивает отдельно для каждого события.
+    # Храним JSON, чтобы новые типы событий можно было добавлять без новой
+    # колонки и без изменения персональных финансовых данных.
+    notification_preferences = Column(JSON, nullable=False, default=dict)
     onboarding_completed = Column(Boolean, nullable=False, default=False)
     # Пользователь сам решает, подставлять ли категории по его правилам и
     # показывать ли ему подборку похожих операций. Ничего не удаляется и не

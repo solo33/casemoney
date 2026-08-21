@@ -3,9 +3,10 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models.notification import Notification
 from app.models.recurring_transaction import RecurringTransaction
 from app.models.transaction import Transaction
+from app.models.user import User
+from app.services.notifications import notify_user
 
 
 def _next_occurrence(value: date, frequency: str) -> date:
@@ -56,12 +57,14 @@ def process_recurring_transactions(db: Session, today: date | None = None) -> in
                 is_family_expense=schedule.is_family_expense,
                 reimbursement_amount=schedule.reimbursement_amount,
             ))
-            db.add(Notification(
-                user_id=schedule.user_id,
-                title=f"Запланирована операция: {schedule.name}",
-                message=f"{due_date.strftime('%d.%m.%Y')} добавлена плановая операция на {schedule.amount:g} {schedule.currency}.",
-                link="/planning",
-            ))
+            user = db.query(User).filter(User.id == schedule.user_id).first()
+            if user:
+                notify_user(
+                    db, user, event="planned_operation",
+                    title=f"Запланирована операция: {schedule.name}",
+                    message=f"{due_date.strftime('%d.%m.%Y')} добавлена плановая операция на {schedule.amount:g} {schedule.currency}.",
+                    link="/planning",
+                )
             schedule.last_generated_for = due_date
             count += 1
         while schedule.next_date <= today:

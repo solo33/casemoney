@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
@@ -203,6 +203,8 @@ export default function Settings() {
         </div>
       </Section>
 
+      <NotificationSettings flash={flash} />
+
       <Section title="Главная страница">
         <p style={muted}>Выберите блоки главной страницы, их порядок и начальное состояние. На телефоне свёрнутые блоки остаются компактными.</p>
         <div className="dashboard-widget-settings">
@@ -309,6 +311,64 @@ export default function Settings() {
         </div>
       </Section>
     </div>
+  );
+}
+
+function NotificationSettings({ flash }) {
+  const [settings, setSettings] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get("/api/notifications/settings", { skipGlobalProgress: true })
+      .then(response => { if (active) setSettings(response.data); })
+      .catch(() => { if (active) setSettings({ events: {}, preferences: {} }); });
+    return () => { active = false; };
+  }, []);
+
+  const setChannel = (event, channel, value) => {
+    setSettings(current => ({
+      ...current,
+      preferences: {
+        ...current.preferences,
+        [event]: { ...current.preferences[event], [channel]: value },
+      },
+    }));
+  };
+
+  const save = async () => {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const response = await api.put("/api/notifications/settings", { preferences: settings.preferences });
+      setSettings(response.data);
+      flash("Настройки уведомлений сохранены");
+    } catch (error) {
+      flash(error.response?.data?.detail || "Не удалось сохранить настройки уведомлений", true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Section title="Уведомления">
+      <p style={muted}>Выберите, о каких событиях CaseMoney будет сообщать в колокольчике и на email. Email включён по умолчанию только для важных платежей и подписки.</p>
+      {!settings ? <p style={muted}>Загружаем настройки…</p> : (
+        <>
+          <div className="notification-settings-grid">
+            {Object.entries(settings.events || {}).map(([key, event]) => {
+              const choice = settings.preferences?.[key] || { in_app: true, email: false };
+              return <div className="notification-settings-row" key={key}>
+                <div><b>{event.label}</b><small>{event.description}</small></div>
+                <label><input type="checkbox" checked={choice.in_app} onChange={item => setChannel(key, "in_app", item.target.checked)} /> В приложении</label>
+                <label><input type="checkbox" checked={choice.email} onChange={item => setChannel(key, "email", item.target.checked)} /> Email</label>
+              </div>;
+            })}
+          </div>
+          <button type="button" onClick={save} disabled={saving} style={{ marginTop: 14 }}>{saving ? "Сохраняем…" : "Сохранить уведомления"}</button>
+        </>
+      )}
+    </Section>
   );
 }
 

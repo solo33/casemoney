@@ -64,3 +64,19 @@ def test_admin_can_notify_one_user_without_exposing_it_to_another(client):
     assert created.json()["recipients_count"] == 1
     assert client.get("/api/notifications/", headers=recipient).json()["unread_count"] == 1
     assert client.get("/api/notifications/", headers=other).json()["unread_count"] == 0
+
+
+def test_user_can_choose_notification_channels(client):
+    auth = register_and_login(client, "notification-settings@test.com")
+    initial = client.get("/api/notifications/settings", headers=auth)
+    assert initial.status_code == 200, initial.text
+    assert initial.json()["preferences"]["credit_due"] == {"in_app": True, "email": True}
+
+    preferences = initial.json()["preferences"]
+    preferences["credit_due"] = {"in_app": False, "email": False}
+    saved = client.put("/api/notifications/settings", headers=auth, json={"preferences": preferences})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["preferences"]["credit_due"] == {"in_app": False, "email": False}
+
+    loaded = client.get("/api/notifications/settings", headers=auth)
+    assert loaded.json()["preferences"]["credit_due"] == {"in_app": False, "email": False}

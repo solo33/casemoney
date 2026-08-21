@@ -5,8 +5,8 @@ import './index.css'
 import App from './App.jsx'
 import { APP_FULL_VERSION } from './config/version.js'
 
-// Регистрация service worker — autoUpdate включен в vite.config.js,
-// новая версия автоматически активируется при следующем визите.
+// Service worker не активирует новую сборку сам: пользователь видит понятное
+// предложение обновиться и сам выбирает момент перезапуска.
 let reloadingForUpdate = false
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -19,7 +19,11 @@ if ('serviceWorker' in navigator) {
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    updateSW(true)
+    const update = () => updateSW(true)
+    // Сохраняем callback, чтобы предложение не потерялось, если service worker
+    // успел обнаружить сборку раньше монтирования защищённого интерфейса.
+    window.__casemoneyPwaUpdate = update
+    window.dispatchEvent(new CustomEvent('casemoney:pwa-update-available', { detail: { update } }))
   },
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return
@@ -37,9 +41,8 @@ async function checkServerVersion() {
 
     const registrations = await navigator.serviceWorker.getRegistrations()
     await Promise.all(registrations.map((registration) => registration.update()))
-    registrations.forEach((registration) => {
-      registration.waiting?.postMessage({ type: 'SKIP_WAITING' })
-    })
+    // registration.update() загрузит новую сборку и вызовет onNeedRefresh.
+    // Не активируем её здесь — пользователь должен подтвердить перезапуск.
   } catch {
     // Проверка версии не должна мешать работе приложения без сети.
   }
@@ -61,6 +64,11 @@ window.addEventListener('beforeinstallprompt', (event) => {
 window.addEventListener('appinstalled', () => {
   window.__casemoneyInstallPrompt = null
 })
+
+window.__casemoneyCheckForUpdates = async () => {
+  const registrations = await navigator.serviceWorker?.getRegistrations?.() || []
+  await Promise.all(registrations.map(registration => registration.update()))
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

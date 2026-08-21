@@ -3,9 +3,9 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 from app.models.credit import CreditObligation
-from app.models.notification import Notification
 from app.models.user import User
 from app.services.email import app_url, send_credit_payment_reminder
+from app.services.notifications import is_enabled, notify_user
 
 
 def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[int, int]:
@@ -50,21 +50,23 @@ def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[i
                 else f"До {credit.next_payment_date.strftime('%d.%m.%Y')} нужно внести{amount}."
             )
 
+        user = db.query(User).filter(User.id == credit.user_id).first()
+        if not user:
+            continue
+        notification_title = f"{title}: {credit.name}"
         if credit.last_reminder_for_date != credit.next_payment_date:
-            db.add(
-                Notification(
-                    user_id=credit.user_id,
-                    title=f"{title}: {credit.name}",
-                    message=message,
-                    link="/credits",
+            if is_enabled(user, "credit_due", "in_app"):
+                notify_user(
+                    db, user, event="credit_due", title=notification_title,
+                    message=message, link="/credits",
                 )
-            )
+                system_count += 1
+            # A disabled channel must not accumulate old reminders after the
+            # person later enables it.
             credit.last_reminder_for_date = credit.next_payment_date
-            system_count += 1
 
         if credit.last_email_reminder_for_date != credit.next_payment_date:
-            user = db.query(User).filter(User.id == credit.user_id).first()
-            if user and send_credit_payment_reminder(
+            if is_enabled(user, "credit_due", "email") and send_credit_payment_reminder(
                 to_email=user.email,
                 username=user.username,
                 credit_name=credit.name,
@@ -75,8 +77,8 @@ def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[i
                 is_income=is_income,
                 credit_url=f"{app_url()}/credits",
             ):
-                credit.last_email_reminder_for_date = credit.next_payment_date
                 email_count += 1
+            credit.last_email_reminder_for_date = credit.next_payment_date
 
         db.commit()
 

@@ -6,10 +6,56 @@ from sqlalchemy.orm import Session
 from app.api.me import get_current_user_id
 from app.database import get_db
 from app.models.notification import Notification
-from app.schemas.notification import NotificationsPage
+from app.schemas.notification import (
+    NotificationSettingsResponse,
+    NotificationSettingsUpdate,
+    NotificationsPage,
+)
+from app.models.user import User
+from app.services.notifications import NOTIFICATION_EVENTS, normalized_preferences
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+
+
+@router.get("/settings", response_model=NotificationSettingsResponse)
+def get_notification_settings(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return {
+        "events": {
+            key: {"label": value["label"], "description": value["description"]}
+            for key, value in NOTIFICATION_EVENTS.items()
+        },
+        "preferences": normalized_preferences(user.notification_preferences),
+    }
+
+
+@router.put("/settings", response_model=NotificationSettingsResponse)
+def update_notification_settings(
+    data: NotificationSettingsUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    known = {key: value.model_dump() for key, value in data.preferences.items() if key in NOTIFICATION_EVENTS}
+    # Always persist a full, normalized map — the UI can safely render new
+    # events after a deployment without requiring a separate migration.
+    user.notification_preferences = normalized_preferences(known)
+    db.commit()
+    return {
+        "events": {
+            key: {"label": value["label"], "description": value["description"]}
+            for key, value in NOTIFICATION_EVENTS.items()
+        },
+        "preferences": user.notification_preferences,
+    }
 
 
 @router.get("/", response_model=NotificationsPage)

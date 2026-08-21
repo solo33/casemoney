@@ -21,6 +21,20 @@ class NotificationsPage(BaseModel):
     unread_count: int
 
 
+class NotificationChannelSettings(BaseModel):
+    in_app: bool
+    email: bool
+
+
+class NotificationSettingsResponse(BaseModel):
+    events: dict[str, dict[str, str]]
+    preferences: dict[str, NotificationChannelSettings]
+
+
+class NotificationSettingsUpdate(BaseModel):
+    preferences: dict[str, NotificationChannelSettings]
+
+
 class AdminNotificationCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     message: str = Field(min_length=1, max_length=4000)

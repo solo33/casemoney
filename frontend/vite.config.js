@@ -22,7 +22,9 @@ export default defineConfig({
     react(),
     versionAssetPlugin(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Новая сборка ждёт явного подтверждения пользователя. Это защищает
+      // незавершённый ввод операции от неожиданной перезагрузки PWA.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icon.svg', 'icons/*.png'],
       manifest: {
         name: 'CaseMoney — личная бухгалтерия',
@@ -52,7 +54,7 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: true,
+        skipWaiting: false,
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api/],

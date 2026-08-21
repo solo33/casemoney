@@ -84,6 +84,9 @@ export default function Reports() {
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
   const [insights, setInsights] = useState(null);
+  const [aiInsight, setAiInsight] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -139,6 +142,19 @@ export default function Reports() {
     setDrillCatId(null);
     setExpandedRows(new Set());
   }, [breakdownType]);
+
+  const requestAiInsight = async (scenario) => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const response = await api.post("/api/finance-ai/insight", { scenario, period_days: 30 });
+      setAiInsight(response.data);
+    } catch (requestError) {
+      setAiError(requestError.response?.data?.detail || "Не удалось получить подсказку.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const sym = currencySymbol(summary?.main_currency || mainCurrency);
 
@@ -299,6 +315,21 @@ export default function Reports() {
                     <span>{item.message}</span>
                   </article>
                 ))}
+              </div>
+              <div className="finance-ai-actions">
+                <b>AI-помощник</b>
+                <span>Работает только с итогами и категориями за 30 дней — без свободных вопросов и без доступа к отдельным операциям.</span>
+                <div>
+                  <button type="button" className="btn-ghost" disabled={aiLoading} onClick={() => requestAiInsight("monthly_overview")}>Итог месяца</button>
+                  <button type="button" className="btn-ghost" disabled={aiLoading} onClick={() => requestAiInsight("spending_anomalies")}>Проверить расходы</button>
+                  <button type="button" className="btn-ghost" disabled={aiLoading} onClick={() => requestAiInsight("budget_tips")}>Идеи для бюджета</button>
+                </div>
+                {aiLoading && <small>Готовим подсказку…</small>}
+                {aiError && <small className="finance-ai-error">{aiError}</small>}
+                {aiInsight && <div className="finance-ai-result">
+                  {aiInsight.recommendations.map((item, index) => <p key={`${index}-${item}`}>{item}</p>)}
+                  <small>{aiInsight.source_note} Осталось подсказок в этом месяце: {aiInsight.remaining_requests}.</small>
+                </div>}
               </div>
             </section>
           )}

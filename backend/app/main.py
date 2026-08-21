@@ -15,6 +15,7 @@ from slowapi.middleware import SlowAPIMiddleware
 # Импорты моделей нужны для регистрации в Base.metadata (используется alembic).
 # Схему БД меняем ТОЛЬКО через alembic, create_all больше не вызываем.
 from app.models.user import User  # noqa: F401
+from app.models.ai_usage import AiUsage  # noqa: F401
 from app.models.category import Category  # noqa: F401
 from app.models.category_rule import CategoryRule  # noqa: F401
 from app.models.account import Account  # noqa: F401
@@ -66,6 +67,7 @@ from app.api.budgets import router as budgets_router
 from app.api.calendar import router as calendar_router
 from app.api.automation import router as automation_router
 from app.api.finance_insights import router as finance_insights_router
+from app.api.finance_ai import router as finance_ai_router
 from app.database import SessionLocal
 from app.seeds import seed_demo_user
 from app.services.credit_reminders import process_credit_reminders
@@ -141,6 +143,7 @@ app.include_router(budgets_router)
 app.include_router(calendar_router)
 app.include_router(automation_router)
 app.include_router(finance_insights_router)
+app.include_router(finance_ai_router)
 
 
 @app.on_event("startup")

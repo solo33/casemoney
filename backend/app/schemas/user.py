@@ -26,6 +26,7 @@ class UserResponse(BaseModel):
     show_shopping_button_mobile: bool = True
     hide_zero_balance_currencies: bool = False
     dashboard_widgets: dict[str, Any] = Field(default_factory=dict)
+    notification_preferences: dict[str, Any] = Field(default_factory=dict)
     onboarding_completed: bool = False
     is_admin: bool = False
     email_verified: bool = True
@@ -41,6 +42,7 @@ class UserUpdate(BaseModel):
     show_shopping_button_mobile: Optional[bool] = None
     hide_zero_balance_currencies: Optional[bool] = None
     dashboard_widgets: Optional[dict[str, Any]] = None
+    notification_preferences: Optional[dict[str, Any]] = None
     onboarding_completed: Optional[bool] = None
 
 

@@ -30,17 +30,8 @@ export default function About() {
         return;
       }
 
-      if ("serviceWorker" in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map(registration => registration.update()));
-        registrations.forEach(registration => {
-          registration.waiting?.postMessage({ type: "SKIP_WAITING" });
-        });
-      }
+      await window.__casemoneyCheckForUpdates?.();
       setUpdateStatus("ready");
-      window.setTimeout(() => {
-        window.location.replace(`/about?updated=${Date.now()}`);
-      }, 1200);
     } catch {
       setUpdateStatus("error");
     }
@@ -72,7 +63,7 @@ export default function About() {
             <button type="button" onClick={checkForUpdates} disabled={updateStatus === "checking"}>
               {updateStatus === "checking" ? "Проверяем обновления…" : "Проверить обновления"}
             </button>
-            {updateStatus === "ready" && <p style={statusStyle}>Проверка завершена. Приложение перезапускается…</p>}
+            {updateStatus === "ready" && <p style={statusStyle}>Новая версия готовится к установке. Если она доступна, появится предложение обновиться.</p>}
             {updateStatus === "current" && <p style={statusStyle}>Установлена актуальная версия.</p>}
             {updateStatus === "error" && <p style={{ ...statusStyle, color: "#b42318" }}>Не удалось проверить обновления. Попробуйте ещё раз.</p>}
           </div>
