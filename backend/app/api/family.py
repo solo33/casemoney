@@ -21,6 +21,7 @@ from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
 from app.services.email import app_url, send_email
+from app.services.notifications import notify_user
 from app.services.plans import ensure_family_plan
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
@@ -381,6 +382,17 @@ def family_report(
     }
 
 
+def _convert_or_skip(
+    db: Session, user_id: int, amount: float, currency: str, main_currency: str, skipped_currencies: set[str],
+) -> Optional[float]:
+    """Конвертирует сумму, а при недоступном курсе — запоминает валюту и возвращает None."""
+    try:
+        return exchange_svc.convert_for_user(db, user_id, amount, currency, main_currency)
+    except exchange_svc.ExchangeError:
+        skipped_currencies.add(currency)
+        return None
+
+
 @router.get("/analytics")
 def family_analytics(
     year: int,
@@ -438,15 +450,13 @@ def family_analytics(
     planned_per_category: dict[str, float] = {}
     skipped_currencies: set[str] = set()
     notable_expenses: list[dict] = []
+    converted_amounts: dict[int, float] = {}
 
     for item in transactions:
-        try:
-            amount = exchange_svc.convert_for_user(
-                db, item.user_id, item.amount, item.currency, main_currency,
-            )
-        except exchange_svc.ExchangeError:
-            skipped_currencies.add(item.currency)
+        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        if amount is None:
             continue
+        converted_amounts[item.id] = amount
         if item.is_planned:
             if item.type == TransactionType.expense:
                 planned_expenses += amount
@@ -478,12 +488,8 @@ def family_analytics(
     for item in previous_transactions:
         if item.is_planned or item.type not in {TransactionType.expense, TransactionType.income}:
             continue
-        try:
-            amount = exchange_svc.convert_for_user(
-                db, item.user_id, item.amount, item.currency, main_currency,
-            )
-        except exchange_svc.ExchangeError:
-            skipped_currencies.add(item.currency)
+        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        if amount is None:
             continue
         if item.type == TransactionType.expense:
             previous_expenses += amount
@@ -498,12 +504,8 @@ def family_analytics(
     settlement_rows = []
     settlements_total = 0.0
     for item in settlements:
-        try:
-            amount = exchange_svc.convert_for_user(
-                db, user_id, item.amount, item.currency, main_currency,
-            )
-        except exchange_svc.ExchangeError:
-            skipped_currencies.add(item.currency)
+        amount = _convert_or_skip(db, user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        if amount is None:
             continue
         settlements_total += amount
         settlement_rows.append({
@@ -523,12 +525,9 @@ def family_analytics(
         Budget.period_start == start.date(),
     ).all()
     for item in budgets:
-        try:
-            budget_plan += exchange_svc.convert_for_user(
-                db, user_id, item.amount, item.currency, main_currency,
-            )
-        except exchange_svc.ExchangeError:
-            skipped_currencies.add(item.currency)
+        converted = _convert_or_skip(db, user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        if converted is not None:
+            budget_plan += converted
 
     now = datetime.now(timezone.utc)
     is_current_period = now.year == year and now.month == month
@@ -544,12 +543,8 @@ def family_analytics(
         category_name = category_names.get(item.category_id)
         if not category_name:
             continue
-        try:
-            limit = exchange_svc.convert_for_user(
-                db, user_id, item.amount, item.currency, main_currency,
-            )
-        except exchange_svc.ExchangeError:
-            skipped_currencies.add(item.currency)
+        limit = _convert_or_skip(db, user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        if limit is None:
             continue
         category_actual = per_category.get(category_name, 0.0)
         category_planned = planned_per_category.get(category_name, 0.0)
@@ -571,12 +566,10 @@ def family_analytics(
             item_date = item.date if item.date.tzinfo else item.date.replace(tzinfo=timezone.utc)
             if not item.is_planned or item_date < now or item.type not in {TransactionType.expense, TransactionType.income}:
                 continue
-            try:
-                amount = exchange_svc.convert_for_user(
-                    db, item.user_id, item.amount, item.currency, main_currency,
-                )
-            except exchange_svc.ExchangeError:
-                skipped_currencies.add(item.currency)
+            # Already converted in the pass over `transactions` above — reuse it
+            # instead of calling convert_for_user a second time for the same item.
+            amount = converted_amounts.get(item.id)
+            if amount is None:
                 continue
             upcoming.append({
                 "id": item.id,
@@ -777,12 +770,14 @@ def create_family_recurring_suggestion(
         status="created",
         decided_by_user_id=user_id,
     ))
-    db.add(Notification(
-        user_id=user_id,
-        title="Создан регулярный общий платёж",
-        message=f"«{suggestion['description']}» будет добавляться в план {suggestion['frequency_label']}.",
-        link="/planning",
-    ))
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        notify_user(
+            db, user, event="planned_operation",
+            title="Создан регулярный общий платёж",
+            message=f"«{suggestion['description']}» будет добавляться в план {suggestion['frequency_label']}.",
+            link="/planning",
+        )
     db.commit()
     db.refresh(schedule)
     return {"id": schedule.id, "status": "created"}

@@ -3,6 +3,7 @@ import api from "../api/client";
 import CategoryPicker from "../components/CategoryPicker";
 import { useUser } from "../contexts/UserContext";
 import { formatMoney } from "../utils/money";
+import { budgetTotals } from "../utils/budgetTotals";
 
 export default function Budget() {
   const { mainCurrency } = useUser();
@@ -40,10 +41,7 @@ export default function Budget() {
   }, [anchor, period]);
   useEffect(() => { load(); }, [load]);
 
-  const totals = useMemo(() => ({
-    limit: budgets.reduce((sum, b) => sum + b.effective_limit, 0),
-    spent: budgets.reduce((sum, b) => sum + b.spent, 0),
-  }), [budgets]);
+  const totals = useMemo(() => budgetTotals(budgets), [budgets]);
 
   const budgetedIds = useMemo(() => new Set(budgets.map(b => b.category_id)), [budgets]);
   const availableCategories = useMemo(

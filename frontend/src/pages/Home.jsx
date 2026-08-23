@@ -26,6 +26,7 @@ import {
   sortCurrenciesRubFirst,
 } from "../utils/money";
 import { isMobileViewport, normalizeDashboardWidgets as dashboardWidgetSettings } from "../utils/dashboardWidgets";
+import { budgetTotals } from "../utils/budgetTotals";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -79,6 +80,7 @@ export default function Home() {
   const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
   const [forecastDays, setForecastDays] = useState(30);
+  const [balanceMode, setBalanceMode] = useState("actual"); // actual | planned
   const flowMonth = new Date().getMonth() + 1;
   const flowYear = new Date().getFullYear();
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
@@ -88,8 +90,8 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
   const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
-  const widgetSettings = dashboardWidgetSettings(user?.dashboard_widgets);
-  const widgetSettingsSignature = JSON.stringify(user?.dashboard_widgets || {});
+  const widgetSettings = useMemo(() => dashboardWidgetSettings(user?.dashboard_widgets), [user?.dashboard_widgets]);
+  const widgetSettingsSignature = useMemo(() => JSON.stringify(user?.dashboard_widgets || {}), [user?.dashboard_widgets]);
   const [collapsedWidgets, setCollapsedWidgets] = useState(() => Object.fromEntries(
     Object.entries(dashboardWidgetSettings()).map(([id, options]) => [id, options.collapsed]),
   ));
@@ -398,17 +400,30 @@ export default function Home() {
       <aside className="home-aside" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Баланс + движение денег + статистика за 3 месяца — как в HomeMoney */}
         {widgetSettings.balance.visible && <Card className="home-balance-card" data-tour="balance" style={{ order: widgetSettings.balance.order }}>
-          <h3 onClick={() => updateWidgetCollapsed("balance", !isWidgetCollapsed("balance"))} style={{ ...sectionTitle, cursor: "pointer", userSelect: "none" }}>
-            <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{isWidgetCollapsed("balance") ? "▸" : "▾"}</span>Баланс
-          </h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <h3 onClick={() => updateWidgetCollapsed("balance", !isWidgetCollapsed("balance"))} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
+              <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{isWidgetCollapsed("balance") ? "▸" : "▾"}</span>Баланс
+            </h3>
+            {!isWidgetCollapsed("balance") && dashboard?.forecast && (
+              <div style={{ display: "flex", gap: 4 }} aria-label="Баланс: фактический или с учётом плана">
+                <ToggleBtn active={balanceMode === "actual"} onClick={() => setBalanceMode("actual")}>Факт</ToggleBtn>
+                <ToggleBtn active={balanceMode === "planned"} onClick={() => setBalanceMode("planned")}>С планом</ToggleBtn>
+              </div>
+            )}
+          </div>
           {!isWidgetCollapsed("balance") && <>
-          <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05 }}>
+          <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05, marginTop: 10 }}>
             {balanceLoading || totalBalance == null ? (
               <BrandProgress label="Обновляем остатки…" size={38} style={{ minHeight: 40 }} />
             ) : (
-              <>{formatMoney(totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span></>
+              <>{formatMoney(balanceMode === "planned" && dashboard?.forecast ? totalBalance + Number(dashboard.forecast.net || 0) : totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span></>
             )}
           </div>
+          {balanceMode === "planned" && dashboard?.forecast && !balanceLoading && (
+            <p style={{ margin: "2px 0 0", color: "#7a8590", fontSize: 12 }}>
+              С учётом плановых операций на {forecastDays} дн. Остатки счетов не меняются, пока операция не проведена.
+            </p>
+          )}
           {byCurrency.length > 0 && (
             <div style={{ marginTop: 8 }}>
               {byCurrency.map(c => (
@@ -850,10 +865,7 @@ function BudgetWidget({ collapsed, order, onCollapseChange }) {
     return () => { active = false; };
   }, []);
 
-  const totals = budgets.reduce((result, item) => ({
-    limit: result.limit + Number(item.effective_limit || item.amount || 0),
-    spent: result.spent + Number(item.spent || 0),
-  }), { limit: 0, spent: 0 });
+  const totals = budgetTotals(budgets);
   const overspent = totals.spent > totals.limit;
 
   return (

@@ -116,9 +116,9 @@ def _calculate_mortgage_split(credit: CreditObligation, amount: float) -> tuple[
     if credit.kind != "mortgage" or credit.annual_interest_rate is None:
         return None, None
     balance = max(0.0, float(credit.current_balance or 0))
-    interest = round(balance * float(credit.annual_interest_rate) / 1200, 2)
-    interest = min(round(amount, 2), interest)
-    principal = min(balance, max(0.0, round(amount - interest, 2)))
+    raw_interest = round(balance * float(credit.annual_interest_rate) / 1200, 2)
+    interest_share = min(round(amount, 2), raw_interest)
+    principal = min(balance, max(0.0, round(amount - interest_share, 2)))
     # An overpayment is still a payment, but it cannot reduce the principal
     # below zero. Keep the persisted split equal to the actual payment.
     interest = round(amount - principal, 2)

@@ -25,6 +25,7 @@ from app.models.category import Category
 from app.models.transaction import Transaction, TransactionType
 from app.models.user_currency import UserCurrency
 from app.models.user import User
+from app.services.automation import matched_category_id
 
 
 @dataclass
@@ -718,6 +719,14 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow]) -> dict:
                 to_account_id = target.id
                 to_amount = dest_amount
                 to_currency = dest_currency
+
+            # The file itself may not carry a category column (typical for bank
+            # statements) — fall back to the user's own category rules, same as
+            # manual entry, instead of always leaving the row uncategorized.
+            if cat is None and tx_type != TransactionType.transfer and user and user.automation_rules_enabled:
+                rule_category_id = matched_category_id(db, user_id, description, tx_type.value)
+                if rule_category_id is not None:
+                    cat = cats_by_id.get(rule_category_id)
 
             tx = Transaction(
                 amount=r.abs_amount,

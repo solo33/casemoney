@@ -16,6 +16,7 @@ from app.models.shopping import ShoppingList
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.services.auth import decode_token, hash_password, normalize_email, verify_password
 from app.services import limits as limits_svc
+from app.services.notifications import normalized_preferences
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 security = HTTPBearer()
@@ -64,6 +65,12 @@ def update_me(
         ).first()
         if other:
             raise HTTPException(status_code=400, detail="Email уже занят")
+    if "notification_preferences" in update_fields:
+        # Same sanitization as PUT /api/notifications/settings — drop unknown
+        # event keys and coerce to bool, regardless of which endpoint wrote it.
+        update_fields["notification_preferences"] = normalized_preferences(
+            update_fields["notification_preferences"]
+        )
     for k, v in update_fields.items():
         setattr(user, k, v)
     try:

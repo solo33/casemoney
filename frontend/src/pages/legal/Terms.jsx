@@ -1,5 +1,5 @@
 import LegalLayout, { H2, P, Ul } from "./LegalLayout";
-import { SUPPORT_EMAIL } from "../../config/contacts";
+import { LEGAL_EMAIL } from "../../config/contacts";
 
 // ВНИМАНИЕ: перед публикацией замените [ОПЕРАТОР] на реальные реквизиты.
 export default function Terms() {
@@ -64,7 +64,7 @@ export default function Terms() {
 
       <H2>7. Контакты</H2>
       <P>
-        Вопросы по работе Сервиса: <strong>{SUPPORT_EMAIL}</strong>. Оператор: [ОПЕРАТОР].
+        Вопросы по работе Сервиса: <strong>{LEGAL_EMAIL}</strong>. Оператор: [ОПЕРАТОР].
       </P>
     </LegalLayout>
   );

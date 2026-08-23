@@ -36,6 +36,33 @@ def test_csv_import_scans_and_imports_transfer(client, auth):
     assert account_balance(client, auth, by_name["Bank"]["id"]) == 300
 
 
+def test_import_applies_category_rule_when_row_has_no_category(client, auth):
+    categories = client.get("/api/categories/", headers=auth).json()
+    groceries_id = next(c["id"] for c in categories if c["name"] == "Продукты" and c["type"] == "expense")
+    rule = client.post("/api/automation/rules", headers=auth, json={
+        "pattern": "пятёрочка", "category_id": groceries_id,
+    })
+    assert rule.status_code == 201, rule.text
+
+    content = (
+        "date;account;category;amount;currency;description\n"
+        "01.06.2026;Cash;;-450,00;RUB;Пятёрочка на неделю\n"
+    ).encode("utf-8")
+    r = _preview(client, auth, content, "rule-import.csv")
+    assert r.status_code == 200, r.text
+    preview = r.json()
+    assert preview["totals"]["ok"] == 1
+
+    r = client.post("/api/import/confirm", headers=auth, json={
+        "import_token": preview["import_token"],
+    })
+    assert r.status_code == 200, r.text
+
+    transactions = client.get("/api/transactions/", headers=auth).json()["items"]
+    imported = next(t for t in transactions if t["description"] == "Пятёрочка на неделю")
+    assert imported["category_id"] == groceries_id
+
+
 def test_xlsx_import_scans_and_imports_transaction(client, auth):
     from openpyxl import Workbook
 

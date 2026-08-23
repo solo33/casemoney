@@ -1,1 +1,3 @@
-export const SUPPORT_EMAIL = "case.m0ney@ya.ru";
+export const SUPPORT_EMAIL = "support@casemoney.ru";
+export const LEGAL_EMAIL = "info@casemoney.ru";
+export const NO_REPLY_EMAIL = "no-reply@casemoney.ru";

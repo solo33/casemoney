@@ -360,6 +360,7 @@ export default function QuickAddInline({
               categories={filteredCategories}
               value={form.category_id}
               onChange={category_id => setForm({ ...form, category_id })}
+              onCategoryCreated={category => setCategories(current => [...current, category])}
             />
           )}
           {type === "transfer" ? (

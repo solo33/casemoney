@@ -487,6 +487,7 @@ export default function QuickAddFab() {
                     categories={categories.filter(c => c.type === form.type)}
                     value={form.category_id}
                     onChange={category_id => setForm({ ...form, category_id })}
+                    onCategoryCreated={category => setCategories(current => [...current, category])}
                     style={{ width: "100%", marginTop: 4 }}
                     placeholder="— Без категории —"
                   />

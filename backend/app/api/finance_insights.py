@@ -8,7 +8,7 @@ general AI gateway or sending account details and merchant notes to a model.
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -29,7 +29,6 @@ security = HTTPBearer()
 def current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     payload = decode_token(credentials.credentials)
     if not payload:
-        from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="Invalid token")
     return int(payload["sub"])
 

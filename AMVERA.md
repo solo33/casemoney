@@ -83,7 +83,7 @@ Dump и отчёт находятся в `migration-artifacts/` и исключ�
 | --- | --- |
 | `APP_URL` | Сначала бесплатный HTTPS-домен Amvera, после переключения — `https://casemoney.ru` |
 | `CORS_ORIGINS` | `https://casemoney.ru,https://www.casemoney.ru` |
-| `POSTBOX_FROM_EMAIL` | `noreply@casemoney.ru` |
+| `POSTBOX_FROM_EMAIL` | `no-reply@casemoney.ru` |
 | `POSTBOX_FROM_NAME` | `CaseMoney` |
 | `POSTBOX_ENDPOINT_URL` | `https://postbox.cloud.yandex.net` |
 | `REGISTRATION_NOTIFY_EMAIL` | `andrey.zakhartsev@gmail.com` |

@@ -374,3 +374,54 @@ def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(clie
     dismissed = client.post(f"/api/family/recurring-suggestions/{music['fingerprint']}/dismiss", headers=owner)
     assert dismissed.status_code == 201, dismissed.text
     assert client.get("/api/family/recurring-suggestions", headers=owner).json()["items"] == []
+
+
+def test_creating_family_recurring_suggestion_respects_notification_preference(client):
+    owner = register_and_login(client, "recurring-notify@test.com")
+    enable_family_plan("recurring-notify@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Регулярные"})
+    account = make_account(client, owner, balance=10000)
+    categories = client.get("/api/categories/", headers=owner).json()
+    category_id = next(item["id"] for item in categories if item["name"] == "Коммунальные" and item["type"] == "expense")
+    for transaction_date in ("2026-06-05T12:00:00Z", "2026-07-05T12:00:00Z", "2026-08-05T12:00:00Z"):
+        response = client.post("/api/transactions/", headers=owner, json={
+            "type": "expense", "amount": 1200, "currency": "RUB", "account_id": account["id"],
+            "category_id": category_id, "description": "Интернет", "date": transaction_date,
+            "is_family_expense": True,
+        })
+        assert response.status_code == 201, response.text
+
+    # Turn off in-app notifications for this event before the schedule is created.
+    settings = client.put("/api/notifications/settings", headers=owner, json={
+        "preferences": {"planned_operation": {"in_app": False, "email": False}},
+    })
+    assert settings.status_code == 200, settings.text
+
+    item = next(
+        value for value in client.get("/api/family/recurring-suggestions", headers=owner).json()["items"]
+        if value["description"] == "Интернет"
+    )
+    created = client.post(
+        f"/api/family/recurring-suggestions/{item['fingerprint']}/create-recurring",
+        headers=owner,
+    )
+    assert created.status_code == 201, created.text
+
+    unread = client.get("/api/notifications/", headers=owner).json()
+    assert all("регулярный общий платёж" not in n["title"].lower() for n in unread["items"])
+
+
+def test_me_update_sanitizes_notification_preferences(client):
+    auth = register_and_login(client, "prefs-sanitize@test.com")
+    response = client.put("/api/me/", headers=auth, json={
+        "notification_preferences": {
+            "planned_operation": {"in_app": False, "email": "yes"},
+            "not_a_real_event": {"in_app": True, "email": True},
+        },
+    })
+    assert response.status_code == 200, response.text
+    saved = response.json()["notification_preferences"]
+    assert "not_a_real_event" not in saved
+    assert saved["planned_operation"] == {"in_app": False, "email": True}
+    # Untouched events keep their documented defaults rather than being dropped.
+    assert saved["credit_due"] == {"in_app": True, "email": True}

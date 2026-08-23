@@ -1233,6 +1233,60 @@ hr {
   .category-picker-group + .category-picker-group {
     border-top: 1px solid rgba(228, 221, 205, 0.65);
   }
+  .category-picker-search {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .category-picker-search input {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    background: #f6f2e9;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .category-picker-empty-state {
+    padding: 14px 10px;
+    color: #7a8590;
+    font-size: 13px;
+    text-align: center;
+  }
+  .category-picker-create {
+    padding: 10px 0 2px;
+    border-top: 1px solid var(--line);
+  }
+  .category-picker-create-trigger {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    color: #173a54;
+    background: transparent;
+    border: 1px dashed #c7bb98;
+    border-radius: 8px;
+    font-weight: 650;
+    text-align: center;
+  }
+  .category-picker-create-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .category-picker-create-form input {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 10px;
+    background: #fffdf7;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .category-picker-create-error {
+    flex-basis: 100%;
+    color: #a83220;
+    font-size: 12px;
+  }
 }
 
 .pwa-update-prompt{position:fixed;z-index:1000;right:20px;bottom:20px;display:flex;align-items:center;gap:12px;max-width:min(440px,calc(100vw - 32px));padding:12px 12px 12px 15px;border:1px solid #d6c9ad;border-radius:12px;background:#fffdf7;box-shadow:0 15px 40px rgba(15,41,61,.22);color:#173a54}.pwa-update-prompt>div{display:grid;gap:2px;min-width:0}.pwa-update-prompt strong{font-size:14px}.pwa-update-prompt span{font-size:12px;line-height:1.35;color:#65717d}.pwa-update-prompt>button{flex:none;padding:8px 11px;font-size:13px;font-weight:700;background:#173a54;color:#fff}.pwa-update-prompt .pwa-update-later{width:28px;min-width:28px;height:28px;min-height:28px;padding:0;border-color:transparent;background:transparent;color:#7a8590;font-size:19px}.pwa-update-prompt .pwa-update-later:hover{background:#f2ede1;color:#173a54}@media(max-width:600px){.pwa-update-prompt{right:12px;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:12px;max-width:none}.pwa-update-prompt>button{padding:8px 10px}.pwa-update-prompt span{font-size:11px}}

@@ -51,16 +51,22 @@ def _escape_ics(value: object | None) -> str:
     return str(value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n")
 
 
-def _event(title: str, event_date: date, uid: str, description: str = "") -> list[str]:
-    return [
+def _event(title: str, event_date: date, uid: str, description: str = "", rrule: str | None = None) -> list[str]:
+    lines = [
         "BEGIN:VEVENT",
         f"UID:{uid}@casemoney",
         f"DTSTART;VALUE=DATE:{event_date.strftime('%Y%m%d')}",
-        f"DTEND;VALUE=DATE:{(event_date + timedelta(days=1)).strftime('%Y%m%d')}",
+    ]
+    if rrule:
+        lines.append(f"RRULE:{rrule}")
+    else:
+        lines.append(f"DTEND;VALUE=DATE:{(event_date + timedelta(days=1)).strftime('%Y%m%d')}")
+    lines += [
         f"SUMMARY:{_escape_ics(title)}",
         f"DESCRIPTION:{_escape_ics(description)}",
         "END:VEVENT",
     ]
+    return lines
 
 
 def _rrule(frequency: str) -> str:
@@ -72,12 +78,17 @@ def _rrule(frequency: str) -> str:
     }.get(frequency, "FREQ=MONTHLY")
 
 
-@router.get("/subscription")
-def calendar_subscription(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
-    ensure_family_plan(db, user_id)
+def _require_user(db: Session, user_id: int) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
+    return user
+
+
+@router.get("/subscription")
+def calendar_subscription(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
+    ensure_family_plan(db, user_id)
+    user = _require_user(db, user_id)
     token = _ensure_token(user)
     db.commit()
     return {"url": _subscription_url(token)}
@@ -86,9 +97,7 @@ def calendar_subscription(db: Session = Depends(get_db), user_id: int = Depends(
 @router.post("/subscription/rotate")
 def rotate_calendar_subscription(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
     ensure_family_plan(db, user_id)
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    user = _require_user(db, user_id)
     user.calendar_token = _token()
     db.commit()
     return {"url": _subscription_url(user.calendar_token)}
@@ -132,14 +141,11 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
         lines.extend(_event(title, transaction.date.date(), f"planned-{transaction.id}", "Плановая операция CaseMoney"))
     for schedule in schedules:
         prefix = "Доход" if schedule.type == TransactionType.income else "Расход"
-        lines.extend([
-            "BEGIN:VEVENT",
-            f"UID:recurring-{schedule.id}@casemoney",
-            f"DTSTART;VALUE=DATE:{schedule.next_date.strftime('%Y%m%d')}",
-            f"RRULE:{_rrule(schedule.frequency)}",
-            f"SUMMARY:{_escape_ics(f'{prefix}: {schedule.name} — {schedule.amount:g} {schedule.currency}')}",
-            f"DESCRIPTION:{_escape_ics(schedule.description or 'Повторяющаяся операция CaseMoney')}",
-            "END:VEVENT",
-        ])
+        title = f"{prefix}: {schedule.name} — {schedule.amount:g} {schedule.currency}"
+        lines.extend(_event(
+            title, schedule.next_date, f"recurring-{schedule.id}",
+            schedule.description or "Повторяющаяся операция CaseMoney",
+            rrule=_rrule(schedule.frequency),
+        ))
     lines.append("END:VCALENDAR")
     return Response("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8", headers={"Cache-Control": "private, max-age=300"})

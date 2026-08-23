@@ -6,10 +6,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+from app.api.family import active_membership
 from app.database import get_db
 from app.models.budget import Budget
 from app.models.category import Category
-from app.models.family import FamilyMember
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.budget import BudgetCreate, BudgetResponse, BudgetSuggestion, BudgetUpdate
 from app.services import accounts as accounts_svc
@@ -95,19 +95,12 @@ def _category_tree_ids(db: Session, user_id: int, category_id: int) -> set[int]:
     return ids
 
 
-def _active_family_id(db: Session, user_id: int) -> int | None:
-    membership = db.query(FamilyMember).filter(
-        FamilyMember.user_id == user_id,
-        FamilyMember.status == "active",
-    ).first()
-    return membership.family_id if membership else None
-
-
 def _transaction_scope_filter(db: Session, user_id: int, scope: str):
     if scope == "personal":
         return Transaction.user_id == user_id
 
-    family_id = _active_family_id(db, user_id)
+    membership = active_membership(db, user_id)
+    family_id = membership.family_id if membership else None
     if family_id is None:
         raise HTTPException(
             status_code=400,
@@ -161,19 +154,22 @@ def _spent_for_category(
     return round(sum(convert_for_user(db, user_id, amount, tx_currency, currency) for amount, tx_currency in rows), 2)
 
 
-def _period_remaining(db: Session, budget: Budget) -> float:
-    """Остаток на конец периода: свой лимит + перенос из прошлого минус потрачено.
+def _budget_state(db: Session, budget: Budget) -> tuple[float, float, float]:
+    """Возвращает (spent, carry_in, remaining) для периода этого бюджета.
 
-    Общая формула для `_carry_in` (остаток предыдущего периода, который может
-    перетечь дальше) и `_serialize` (остаток текущего периода для ответа) —
-    вынесена в одно место, чтобы правки не расходились между двумя копиями.
+    Единственное место, где считается "потрачено / перенесено / остаток" —
+    и `_carry_in` (остаток предыдущего периода, который может перетечь
+    дальше), и `_serialize` (ответ API) берут значения отсюда, а не
+    пересчитывают формулу каждый по-своему.
     """
     start, end = _period_range(budget.period_start, budget.period)
     spent = _spent_for_category(
         db, budget.user_id, budget.category_id, budget.currency,
         start, end, budget.include_planned, budget.scope,
     )
-    return round(budget.amount + _carry_in(db, budget) - spent, 2)
+    carry_in = _carry_in(db, budget)
+    remaining = round(budget.amount + carry_in - spent, 2)
+    return spent, carry_in, remaining
 
 
 def _carry_in(db: Session, budget: Budget) -> float:
@@ -186,24 +182,18 @@ def _carry_in(db: Session, budget: Budget) -> float:
     ).first()
     if not previous or previous.rollover_mode == "none":
         return 0.0
-    remainder = _period_remaining(db, previous)
+    _, _, remainder = _budget_state(db, previous)
     if previous.rollover_mode == "carry_remaining":
         remainder = max(0, remainder)
-    # _period_remaining(previous) is expressed in previous.currency — convert once here
-    # so a currency change between consecutive periods for the same category can't
-    # silently corrupt the current period's effective_limit.
+    # remainder is expressed in previous.currency — convert once here so a currency
+    # change between consecutive periods for the same category can't silently
+    # corrupt the current period's effective_limit.
     return round(convert_for_user(db, budget.user_id, remainder, previous.currency, budget.currency), 2)
 
 
 def _serialize(db: Session, budget: Budget, category: Category) -> BudgetResponse:
-    start, end = _period_range(budget.period_start, budget.period)
-    spent = _spent_for_category(
-        db, budget.user_id, budget.category_id, budget.currency,
-        start, end, budget.include_planned, budget.scope,
-    )
-    carry_in = _carry_in(db, budget)
+    spent, carry_in, remaining = _budget_state(db, budget)
     effective_limit = round(budget.amount + carry_in, 2)
-    remaining = round(effective_limit - spent, 2)
     percent = round(min(999, spent / effective_limit * 100), 1) if effective_limit > 0 else 999
     return BudgetResponse(
         id=budget.id,

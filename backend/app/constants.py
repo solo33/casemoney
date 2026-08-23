@@ -1,4 +1,6 @@
-SUPPORT_EMAIL = "case.m0ney@ya.ru"
+SUPPORT_EMAIL = "support@casemoney.ru"
+LEGAL_EMAIL = "info@casemoney.ru"
+NO_REPLY_EMAIL = "no-reply@casemoney.ru"
 
 DEFAULT_CATEGORIES = [
     # Доходы

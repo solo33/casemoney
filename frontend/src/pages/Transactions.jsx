@@ -373,6 +373,7 @@ export default function Transactions() {
                 categories={filteredCategoriesForCreate}
                 value={newTx.category_id}
                 onChange={category_id => setNewTx({ ...newTx, category_id })}
+                onCategoryCreated={category => setCategories(current => [...current, category])}
                 placeholder="— Категория —"
                 style={{ minWidth: 180 }}
               />
@@ -502,6 +503,7 @@ export default function Transactions() {
                   ? <EditRow
                       key={tx.id} tx={tx}
                       accounts={accounts} accountGroups={accountGroups} categories={categories}
+                      onCategoryCreated={category => setCategories(current => [...current, category])}
                       onCancel={() => setEditing(null)}
                       onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                     />
@@ -533,6 +535,7 @@ export default function Transactions() {
               {editing === tx.id && (
                 <table className="transactions-mobile-edit"><tbody><EditRow
                   tx={tx} accounts={accounts} accountGroups={accountGroups} categories={categories}
+                  onCategoryCreated={category => setCategories(current => [...current, category])}
                   onCancel={() => setEditing(null)}
                   onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                 /></tbody></table>
@@ -625,7 +628,7 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
   );
 }
 
-function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved }) {
+function EditRow({ tx, accounts, accountGroups, categories, onCategoryCreated, onCancel, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
@@ -768,6 +771,7 @@ function EditRow({ tx, accounts, accountGroups, categories, onCancel, onSaved })
               categories={cats}
               value={form.category_id}
               onChange={category_id => setForm({ ...form, category_id })}
+              onCategoryCreated={onCategoryCreated}
               placeholder="— Без категории —"
               style={{ minWidth: 180 }}
             />

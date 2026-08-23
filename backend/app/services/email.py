@@ -1,11 +1,11 @@
 """Email-сервис.
 
 Конфигурация через .env:
-    SMTP_HOST=smtp.yandex.com
+    SMTP_HOST=mail.casemoney.ru
     SMTP_PORT=465
-    SMTP_USER=case.m0ney@ya.ru
-    SMTP_PASSWORD=...       (пароль приложения / внешний пароль)
-    SMTP_FROM="CaseMoney <case.m0ney@ya.ru>"
+    SMTP_USER=no-reply@casemoney.ru
+    SMTP_PASSWORD=...       (пароль почтового ящика)
+    SMTP_FROM="CaseMoney <no-reply@casemoney.ru>"
     SMTP_STARTTLS=false
     SMTP_USE_SSL=true
     APP_URL=https://casemoney.ru
@@ -37,7 +37,7 @@ def _smtp_config() -> dict:
         "port": int(os.getenv("SMTP_PORT", "587")),
         "user": os.getenv("SMTP_USER"),
         "password": os.getenv("SMTP_PASSWORD"),
-        "from_addr": os.getenv("SMTP_FROM", "CaseMoney <noreply@casemoney.local>"),
+        "from_addr": os.getenv("SMTP_FROM", "CaseMoney <no-reply@casemoney.ru>"),
         "starttls": os.getenv("SMTP_STARTTLS", "true").lower() != "false",
         "use_ssl": os.getenv("SMTP_USE_SSL", "false").lower() == "true",
     }
