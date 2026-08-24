@@ -90,6 +90,74 @@ def test_early_mortgage_payment_reduces_only_principal(client):
     assert paid.json()["balance_after"] == 890_000
 
 
+def test_mortgage_schedule_shows_future_payment_split(client):
+    auth = register_and_login(client, "mortgage-schedule@test.com")
+    enable_family("mortgage-schedule@test.com")
+    account = make_account(client, auth, balance=100_000)
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Ипотека с графиком",
+            "kind": "mortgage",
+            "currency": "RUB",
+            "current_balance": 100_000,
+            "monthly_payment": 20_000,
+            "annual_interest_rate": 12,
+            "due_day": 15,
+            "source_account_id": account["id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    schedule = client.get(f"/api/credits/{created.json()['id']}/schedule", headers=auth)
+    assert schedule.status_code == 200, schedule.text
+    first = schedule.json()["items"][0]
+    assert first["payment_amount"] == 20_000
+    assert first["interest_amount"] == 1_000
+    assert first["principal_amount"] == 19_000
+    assert first["balance_after"] == 81_000
+
+
+def test_early_mortgage_payment_can_reduce_regular_payment(client):
+    auth = register_and_login(client, "mortgage-reduce-payment@test.com")
+    enable_family("mortgage-reduce-payment@test.com")
+    account = make_account(client, auth, balance=200_000)
+    created = client.post(
+        "/api/credits/",
+        headers=auth,
+        json={
+            "name": "Ипотека с меньшим платежом",
+            "kind": "mortgage",
+            "currency": "RUB",
+            "current_balance": 100_000,
+            "monthly_payment": 10_000,
+            "annual_interest_rate": 12,
+            "source_account_id": account["id"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    credit = created.json()
+
+    paid = client.post(
+        f"/api/credits/{credit['id']}/payments",
+        headers=auth,
+        json={
+            "amount": 10_000,
+            "account_id": account["id"],
+            "is_early_payment": True,
+            "early_repayment_mode": "reduce_payment",
+        },
+    )
+    assert paid.status_code == 201, paid.text
+    assert paid.json()["early_repayment_mode"] == "reduce_payment"
+
+    details = client.get("/api/credits/", headers=auth).json()[0]
+    assert details["early_repayment_mode"] == "reduce_payment"
+    assert details["monthly_payment"] < 10_000
+    assert details["monthly_payment"] > 0
+
+
 def test_loan_disbursement_increases_account_without_becoming_income(client):
     auth = register_and_login(client, "loan-disbursement@test.com")
     enable_family("loan-disbursement@test.com")

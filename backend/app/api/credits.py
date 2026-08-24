@@ -1,4 +1,5 @@
 import calendar
+import math
 from datetime import date, datetime, time, timezone
 from typing import Optional
 
@@ -19,6 +20,8 @@ from app.schemas.credit import (
     CreditResponse,
     CreditSummary,
     CreditUpdate,
+    MortgageScheduleItem,
+    MortgageScheduleResponse,
 )
 from app.services.auth import decode_token
 from app.services.plans import ensure_family_plan
@@ -125,6 +128,65 @@ def _calculate_mortgage_split(credit: CreditObligation, amount: float) -> tuple[
     return principal, interest
 
 
+def _monthly_rate(credit: CreditObligation) -> float:
+    return max(0.0, float(credit.annual_interest_rate or 0)) / 1200
+
+
+def _estimate_remaining_months(balance: float, payment: float, monthly_rate: float) -> Optional[int]:
+    """Return the number of equal monthly payments needed to close a mortgage."""
+    if balance <= 0:
+        return 0
+    if payment <= 0 or payment <= balance * monthly_rate:
+        return None
+    if monthly_rate == 0:
+        return max(1, math.ceil(balance / payment))
+    return max(1, math.ceil(-math.log(1 - balance * monthly_rate / payment) / math.log(1 + monthly_rate)))
+
+
+def _annuity_payment(balance: float, months: int, monthly_rate: float) -> Optional[float]:
+    if balance <= 0:
+        return 0.0
+    if months <= 0:
+        return None
+    if monthly_rate == 0:
+        return round(balance / months, 2)
+    multiplier = (1 + monthly_rate) ** months
+    return round(balance * monthly_rate * multiplier / (multiplier - 1), 2)
+
+
+def _mortgage_schedule(credit: CreditObligation) -> list[MortgageScheduleItem]:
+    if credit.kind != "mortgage":
+        raise HTTPException(status_code=400, detail="График доступен только для ипотеки")
+    balance = round(max(0.0, float(credit.current_balance or 0)), 2)
+    payment = round(float(credit.monthly_payment or 0), 2)
+    rate = _monthly_rate(credit)
+    if payment <= 0:
+        raise HTTPException(status_code=400, detail="Укажите регулярный платёж, чтобы построить график")
+    if payment <= balance * rate and balance > 0:
+        raise HTTPException(status_code=400, detail="Регулярный платёж не покрывает проценты по текущей ставке")
+
+    payment_date = credit.next_payment_date or _initial_payment_date(credit.due_day) or date.today()
+    items: list[MortgageScheduleItem] = []
+    for _ in range(600):
+        if balance <= 0.005:
+            break
+        interest = round(balance * rate, 2)
+        actual_payment = min(payment, round(balance + interest, 2))
+        principal = round(max(0.0, actual_payment - interest), 2)
+        if principal <= 0:
+            break
+        balance = round(max(0.0, balance - principal), 2)
+        items.append(MortgageScheduleItem(
+            payment_date=payment_date,
+            payment_amount=actual_payment,
+            principal_amount=principal,
+            interest_amount=round(actual_payment - principal, 2),
+            balance_after=balance,
+        ))
+        payment_date = _advance_month(payment_date, credit.due_day)
+    return items
+
+
 def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True) -> CreditResponse:
     source = _own_account(db, credit.user_id, credit.source_account_id)
     linked = _own_account(db, credit.user_id, credit.linked_account_id)
@@ -156,6 +218,7 @@ def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True
         credit_limit=credit.credit_limit,
         monthly_payment=credit.monthly_payment,
         annual_interest_rate=credit.annual_interest_rate,
+        early_repayment_mode=credit.early_repayment_mode,
         interest_payout_frequency=credit.interest_payout_frequency,
         capitalization=credit.capitalization,
         opened_at=credit.opened_at,
@@ -238,6 +301,7 @@ def create_credit(
         credit_limit=data.credit_limit,
         monthly_payment=data.monthly_payment,
         annual_interest_rate=data.annual_interest_rate,
+        early_repayment_mode=data.early_repayment_mode,
         interest_payout_frequency=data.interest_payout_frequency,
         capitalization=data.capitalization,
         opened_at=data.opened_at,
@@ -352,6 +416,27 @@ def delete_credit(
     db.commit()
 
 
+@router.get("/{credit_id}/schedule", response_model=MortgageScheduleResponse)
+def mortgage_schedule(
+    credit_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(require_family),
+):
+    credit = db.query(CreditObligation).filter(
+        CreditObligation.id == credit_id,
+        CreditObligation.user_id == user_id,
+    ).first()
+    if not credit:
+        raise HTTPException(status_code=404, detail="Ипотека не найдена")
+    return MortgageScheduleResponse(
+        credit_id=credit.id,
+        currency=credit.currency,
+        monthly_payment=float(credit.monthly_payment or 0),
+        early_repayment_mode=credit.early_repayment_mode,
+        items=_mortgage_schedule(credit),
+    )
+
+
 @router.post("/{credit_id}/payments", response_model=CreditPaymentResponse, status_code=201)
 def register_payment(
     credit_id: int,
@@ -424,6 +509,18 @@ def register_payment(
             raise HTTPException(status_code=400, detail="Досрочное погашение доступно только для вашего кредита или займа")
         principal_amount = min(float(data.amount), max(0.0, float(credit.current_balance or 0)))
         interest_amount = 0.0
+        mode = data.early_repayment_mode or credit.early_repayment_mode
+        if credit.kind == "mortgage":
+            old_balance = max(0.0, float(credit.current_balance or 0))
+            old_payment = float(credit.monthly_payment or 0)
+            rate = _monthly_rate(credit)
+            if mode == "reduce_payment" and old_payment > 0:
+                months = _estimate_remaining_months(old_balance, old_payment, rate)
+                if months is not None:
+                    new_payment = _annuity_payment(max(0.0, old_balance - principal_amount), months, rate)
+                    if new_payment is not None:
+                        credit.monthly_payment = new_payment
+            credit.early_repayment_mode = mode
     else:
         principal_amount, interest_amount = _calculate_mortgage_split(credit, data.amount)
 
@@ -443,6 +540,7 @@ def register_payment(
         principal_amount=principal_amount,
         interest_amount=interest_amount,
         is_early_payment=data.is_early_payment,
+        early_repayment_mode=(data.early_repayment_mode or credit.early_repayment_mode) if data.is_early_payment else None,
         currency=credit.currency,
         paid_at=paid_at,
         account_id=account.id,

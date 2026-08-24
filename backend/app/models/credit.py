@@ -46,6 +46,10 @@ class CreditObligation(Base):
     last_reminder_for_date = Column(Date, nullable=True)
     last_email_reminder_for_date = Column(Date, nullable=True)
     annual_interest_rate = Column(Float, nullable=True)
+    # What should change after an early mortgage repayment.  The actual
+    # payment history is never recomputed; this setting only affects the
+    # following forecast and, for reduce_payment, the new regular amount.
+    early_repayment_mode = Column(String(24), nullable=False, default="reduce_term")
     interest_payout_frequency = Column(String(16), nullable=True)  # monthly, maturity
     capitalization = Column(Boolean, nullable=False, default=False)
     opened_at = Column(Date, nullable=True)
@@ -78,6 +82,7 @@ class CreditPayment(Base):
     # A separate early repayment reduces the principal in full and does not
     # include the regular monthly interest calculation.
     is_early_payment = Column(Boolean, nullable=False, default=False)
+    early_repayment_mode = Column(String(24), nullable=True)
     currency = Column(String(10), nullable=False)
     paid_at = Column(DateTime(timezone=True), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)

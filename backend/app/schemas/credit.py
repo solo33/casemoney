@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 CreditKind = Literal["mortgage", "loan", "credit_card", "private_debt", "deposit"]
 CreditDirection = Literal["owe", "receivable"]
 InterestPayoutFrequency = Literal["monthly", "maturity"]
+EarlyRepaymentMode = Literal["reduce_term", "reduce_payment"]
 
 
 class CreditCreate(BaseModel):
@@ -20,6 +21,7 @@ class CreditCreate(BaseModel):
     credit_limit: Optional[float] = Field(None, ge=0)
     monthly_payment: Optional[float] = Field(None, gt=0)
     annual_interest_rate: Optional[float] = Field(None, ge=0, le=100)
+    early_repayment_mode: EarlyRepaymentMode = "reduce_term"
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: bool = False
     opened_at: Optional[date] = None
@@ -63,6 +65,7 @@ class CreditUpdate(BaseModel):
     credit_limit: Optional[float] = Field(None, ge=0)
     monthly_payment: Optional[float] = Field(None, gt=0)
     annual_interest_rate: Optional[float] = Field(None, ge=0, le=100)
+    early_repayment_mode: Optional[EarlyRepaymentMode] = None
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: Optional[bool] = None
     opened_at: Optional[date] = None
@@ -84,6 +87,7 @@ class CreditPaymentCreate(BaseModel):
     paid_at: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
     is_early_payment: bool = False
+    early_repayment_mode: Optional[EarlyRepaymentMode] = None
 
 
 class CreditPaymentResponse(BaseModel):
@@ -98,6 +102,7 @@ class CreditPaymentResponse(BaseModel):
     balance_after: Optional[float]
     notes: Optional[str]
     is_early_payment: bool = False
+    early_repayment_mode: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -115,6 +120,7 @@ class CreditResponse(BaseModel):
     credit_limit: Optional[float]
     monthly_payment: Optional[float]
     annual_interest_rate: Optional[float]
+    early_repayment_mode: str
     interest_payout_frequency: Optional[str]
     capitalization: bool
     opened_at: Optional[date]
@@ -144,3 +150,19 @@ class CreditSummary(BaseModel):
     total_active: int
     overdue_count: int
     upcoming: list[CreditResponse]
+
+
+class MortgageScheduleItem(BaseModel):
+    payment_date: date
+    payment_amount: float
+    principal_amount: float
+    interest_amount: float
+    balance_after: float
+
+
+class MortgageScheduleResponse(BaseModel):
+    credit_id: int
+    currency: str
+    monthly_payment: float
+    early_repayment_mode: str
+    items: list[MortgageScheduleItem]
