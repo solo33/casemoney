@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+backend/.pytest_tmp/
 
 # Переменные окружения - секреты не должны попасть в Git!
 # Покрываем подпапки (.env в корне, backend/.env, frontend/.env.local и т.д.)
@@ -46,6 +47,9 @@ CaseMoney_TestCases.docx
 backend/*.log
 backend/*.err.log
 backend/*.out.log
+
+# Приватные вложения чеков из локальной разработки.
+backend/uploads/
 
 # Локальный self-signed SSL для HTTPS-разработки (localhost/LAN)
 certs/

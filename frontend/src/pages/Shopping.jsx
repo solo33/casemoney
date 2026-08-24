@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import { formatMoney } from "../utils/money";
+import ReceiptSection from "../components/ReceiptSection";
 
 const blankItem = { name: "", quantity: "1", unit: "", planned_price: "", currency: "RUB", category_id: "", note: "" };
 
@@ -138,6 +139,7 @@ export default function Shopping() {
       </form>
       {history.length > 0 && <div className="shopping-suggestions"><span>Из прошлых покупок:</span>{history.slice(0, 8).map((item, index) => <button type="button" key={`${item.name}-${index}`} onClick={() => applySuggestion(item)}>{item.name}</button>)}</div>}
     </section>
+    <ReceiptSection categories={categories} accounts={accounts} />
     <section className="shopping-items-card">
       <h2>Купить ({planned.length})</h2>
       {planned.length === 0 ? <p className="empty-state">Список пуст. Добавьте первую покупку выше.</p> : planned.map(item => <ShoppingRow key={item.id} item={item} onBought={() => markBought(item)} onDelete={() => removeItem(item)} onExpense={() => openExpense(item)} />)}

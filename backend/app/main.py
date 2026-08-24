@@ -37,6 +37,7 @@ from app.models.push_subscription import PushSubscription  # noqa: F401
 from app.models.credit import CreditObligation, CreditPayment  # noqa: F401
 from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401
+from app.models.receipt import Receipt, ReceiptItem  # noqa: F401
 from app.models.transaction_template import TransactionTemplate  # noqa: F401
 from app.models.recurring_transaction import RecurringTransaction, RecurringTransactionRun  # noqa: F401
 from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision  # noqa: F401
@@ -61,6 +62,7 @@ from app.api.notifications import router as notifications_router
 from app.api.credits import router as credits_router
 from app.api.billing import router as billing_router
 from app.api.shopping import router as shopping_router
+from app.api.receipts import router as receipts_router
 from app.api.transaction_templates import router as transaction_templates_router
 from app.api.recurring_transactions import router as recurring_transactions_router
 from app.api.chat import router as chat_router
@@ -137,6 +139,7 @@ app.include_router(notifications_router)
 app.include_router(credits_router)
 app.include_router(billing_router)
 app.include_router(shopping_router)
+app.include_router(receipts_router)
 app.include_router(transaction_templates_router)
 app.include_router(recurring_transactions_router)
 app.include_router(chat_router)

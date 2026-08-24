@@ -37,6 +37,8 @@ import app.models.family          # noqa: F401
 import app.models.notification    # noqa: F401
 import app.models.push_subscription  # noqa: F401
 import app.models.credit          # noqa: F401
+import app.models.shopping         # noqa: F401
+import app.models.receipt          # noqa: F401
 
 test_engine = create_engine(
     "sqlite://",

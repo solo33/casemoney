@@ -1424,6 +1424,41 @@ hr {
 .shopping-toolbar, .shopping-add-card, .shopping-items-card {
   background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px;
 }
+.receipts-card { background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.receipts-heading { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+.receipts-heading h2 { margin: 0 0 4px; font-size: 17px; }
+.receipts-heading p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.receipt-upload-form { display: grid; grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 1fr) 140px 100px 82px minmax(180px, 1.2fr) auto; gap: 8px; align-items: end; padding: 12px; background: #f7f2e7; border: 1px solid #ead9a8; border-radius: 9px; }
+.receipt-file-label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; min-width: 0; }
+.receipt-file-label input { width: 100%; font-size: 12px; }
+.receipt-layout { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr); gap: 14px; margin-top: 14px; }
+.receipt-list { min-width: 0; }
+.receipt-row { display: flex; gap: 8px; align-items: center; border-top: 1px solid #eee8da; padding: 9px 0; }
+.receipt-row:first-child { border-top: 0; }
+.receipt-row.is-selected { margin: 0 -8px; padding: 9px 8px; background: #f3ecdc; border-radius: 8px; border-top-color: transparent; }
+.receipt-row-main { display: grid; gap: 3px; min-width: 0; flex: 1; text-align: left; padding: 0; border: 0; background: transparent; color: var(--text); }
+.receipt-row-main strong, .receipt-row-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.receipt-row-main span, .receipt-row-main small { color: var(--muted); font-size: 12px; }
+.receipt-row-main small { color: #7b816f; }
+.receipt-row-actions { display: flex; gap: 5px; align-items: center; }
+.receipt-row-actions button { padding: 5px 7px; font-size: 12px; }
+.receipt-editor { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; min-width: 0; }
+.receipt-editor-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 9px; }
+.receipt-editor-heading h3 { margin: 0 0 2px; font-size: 16px; }
+.receipt-editor-heading span { color: var(--muted); font-size: 12px; }
+.receipt-lines > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, auto) auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid #eee8da; }
+.receipt-lines > div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.receipt-lines small { color: var(--muted); }
+.receipt-line-form { display: grid; grid-template-columns: minmax(130px, 1.2fr) 70px 80px 85px minmax(120px, 1fr) auto; gap: 7px; margin-top: 10px; }
+.receipt-line-form input, .receipt-line-form select { min-width: 0; }
+.receipt-line-form button { white-space: nowrap; }
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .receipt-upload-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .receipt-file-label { grid-column: span 2; }
+  .receipt-upload-form button { grid-column: span 2; }
+  .receipt-layout { grid-template-columns: 1fr; }
+}
 .shopping-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
 .shopping-toolbar label, .shopping-expense-modal label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .shopping-toolbar select { min-width: 250px; }
@@ -1614,6 +1649,14 @@ hr {
   .shopping-add-form input:first-child { grid-column: 1 / -1; }
   .shopping-add-form input:nth-child(4) { grid-column: 1 / span 2; }
   .shopping-add-form button { grid-column: 3; }
+  .receipt-upload-form { grid-template-columns: 1fr 1fr; padding: 10px; }
+  .receipt-file-label { grid-column: 1 / -1; }
+  .receipt-upload-form select, .receipt-upload-form button { grid-column: 1 / -1; }
+  .receipt-layout { grid-template-columns: 1fr; }
+  .receipt-row { align-items: start; }
+  .receipt-row-actions { flex-wrap: wrap; justify-content: end; max-width: 115px; }
+  .receipt-line-form { grid-template-columns: 1fr 1fr; }
+  .receipt-line-form input:first-child, .receipt-line-form select, .receipt-line-form button { grid-column: 1 / -1; }
   .shopping-item-actions .btn-secondary { font-size: 0; padding: 7px; }
   .shopping-item-actions .btn-secondary::after { content: "₽"; font-size: 15px; }
   .mobile-shopping-button { position: fixed; display: inline-flex; align-items: center; gap: 6px; right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 98; padding: 10px 13px; background: #173a54; color: #fffdf7; text-decoration: none; border-radius: 999px; box-shadow: 0 8px 22px rgba(15,30,45,.26); font-size: 13px; font-weight: 700; }
