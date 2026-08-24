@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.services.recurring_transactions import _next_occurrence
+from app.services.recurring_transactions import _next_occurrence, next_occurrence
 
 
 @pytest.mark.parametrize(
@@ -17,3 +17,7 @@ from app.services.recurring_transactions import _next_occurrence
 )
 def test_next_occurrence_uses_expected_period(current, frequency, expected):
     assert _next_occurrence(current, frequency) == expected
+
+
+def test_custom_interval_uses_specified_days():
+    assert next_occurrence(date(2026, 8, 10), "custom", 17) == date(2026, 8, 27)

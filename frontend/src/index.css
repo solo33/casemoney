@@ -1481,6 +1481,8 @@ hr {
 .recurring-list > div > div:first-child { display: grid; gap: 3px; }
 .recurring-list span { color: var(--muted); font-size: 13px; }
 .recurring-list .is-inactive { opacity: .58; }
+.recurring-runs { display: grid; gap: 0; }
+.recurring-runs > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #eee7d9; }
 .danger { color: #c0432b !important; }
 .planning-modal-backdrop { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; padding: 16px; background: rgba(10,29,44,.58); }
 .planning-modal { width: min(420px, 100%); background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 14px; padding: 20px; box-shadow: 0 20px 50px rgba(10,29,44,.25); }
@@ -1567,6 +1569,7 @@ hr {
   .planning-row > b { text-align: left; }
   .planning-actions { grid-column: 1 / -1; }
   .recurring-list > div { display: grid; gap: 8px; }
+  .recurring-runs > div { font-size: 14px; }
 }
 .shopping-item-actions button { font-size: 12px; padding: 6px 9px; }
 .btn-icon-danger { border: 1px solid #f0d4cb; background: transparent; color: #c0432b; border-radius: 6px; }

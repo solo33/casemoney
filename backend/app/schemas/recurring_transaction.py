@@ -12,7 +12,11 @@ class RecurringTransactionCreate(BaseModel):
     account_id: Optional[int] = None
     category_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
-    frequency: str = Field("monthly", pattern="^(daily|weekly|biweekly|monthly|yearly)$")
+    frequency: str = Field("monthly", pattern="^(daily|weekly|biweekly|monthly|yearly|custom)$")
+    custom_interval_days: Optional[int] = Field(None, ge=1, le=365)
+    execution_mode: str = Field("planned", pattern="^(planned|automatic)$")
+    reminder_days: int = Field(0, ge=0, le=90)
+    end_date: Optional[date] = None
     next_date: date
 
 
@@ -23,7 +27,11 @@ class RecurringTransactionUpdate(BaseModel):
     account_id: Optional[int] = None
     category_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=500)
-    frequency: Optional[str] = Field(None, pattern="^(daily|weekly|biweekly|monthly|yearly)$")
+    frequency: Optional[str] = Field(None, pattern="^(daily|weekly|biweekly|monthly|yearly|custom)$")
+    custom_interval_days: Optional[int] = Field(None, ge=1, le=365)
+    execution_mode: Optional[str] = Field(None, pattern="^(planned|automatic)$")
+    reminder_days: Optional[int] = Field(None, ge=0, le=90)
+    end_date: Optional[date] = None
     next_date: Optional[date] = None
     is_active: Optional[bool] = None
 
@@ -34,6 +42,17 @@ class RecurringTransactionResponse(RecurringTransactionCreate):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RecurringTransactionRunResponse(BaseModel):
+    id: int
+    scheduled_for: date
+    status: str
+    transaction_id: Optional[int] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True

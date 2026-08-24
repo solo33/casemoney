@@ -4,7 +4,7 @@ import { formatMoney } from "../utils/money";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const blankForm = () => ({ type: "expense", amount: "", currency: "RUB", account_id: "", category_id: "", description: "", date: today() });
-const FREQUENCY_LABELS = { daily: "Ежедневно", weekly: "Еженедельно", biweekly: "Раз в 2 недели", monthly: "Ежемесячно", yearly: "Ежегодно" };
+const FREQUENCY_LABELS = { daily: "Ежедневно", weekly: "Еженедельно", biweekly: "Раз в 2 недели", monthly: "Ежемесячно", yearly: "Ежегодно", custom: "Свой интервал" };
 const MONTH_NAMES = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const isoDate = value => String(value || "").slice(0, 10);
 
@@ -20,6 +20,7 @@ export default function Planning() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [recurringRuns, setRecurringRuns] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -105,14 +106,16 @@ export default function Planning() {
   const openRecurringModal = () => {
     if (!form.amount || !form.account_id) { setError("Сначала заполните операцию, которую нужно повторять."); return; }
     setError("");
-    setModal({ mode: "recurring", name: defaultName(), frequency: "monthly", next_date: form.date });
+    setModal({ mode: "recurring", name: defaultName(), frequency: "monthly", next_date: form.date, custom_interval_days: 30, execution_mode: "planned", reminder_days: 0, end_date: "" });
   };
-  const submitRecurring = async ({ name, frequency, next_date }) => {
+  const submitRecurring = async ({ name, frequency, next_date, custom_interval_days, execution_mode, reminder_days, end_date }) => {
     try {
       const response = await api.post("/api/recurring-transactions/", {
         name, type: form.type, amount: Number(form.amount), currency: form.currency,
         account_id: Number(form.account_id), category_id: form.category_id ? Number(form.category_id) : null,
         description: form.description || null, frequency, next_date,
+        custom_interval_days: frequency === "custom" ? Number(custom_interval_days) : null,
+        execution_mode, reminder_days: Number(reminder_days || 0), end_date: end_date || null,
       });
       setRecurring(current => [...current, response.data].sort((a, b) => String(a.next_date).localeCompare(String(b.next_date))));
       setModal(null);
@@ -129,6 +132,24 @@ export default function Planning() {
     if (!window.confirm(`Удалить регулярную операцию «${item.name}»? Уже созданные плановые записи останутся.`)) return;
     try { await api.delete(`/api/recurring-transactions/${item.id}`); setRecurring(current => current.filter(entry => entry.id !== item.id)); }
     catch { setError("Не удалось удалить регулярную операцию."); }
+  };
+  const skipRecurring = async item => {
+    if (!window.confirm(`Пропустить ближайшее повторение «${item.name}»?`)) return;
+    try {
+      const response = await api.post(`/api/recurring-transactions/${item.id}/skip`);
+      setRecurring(current => current.map(entry => entry.id === item.id ? response.data : entry));
+    } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось пропустить повторение."); }
+  };
+  const finishRecurring = async item => {
+    if (!window.confirm(`Завершить «${item.name}»? Новых повторений больше не будет.`)) return;
+    try {
+      const response = await api.post(`/api/recurring-transactions/${item.id}/finish`);
+      setRecurring(current => current.map(entry => entry.id === item.id ? response.data : entry));
+    } catch { setError("Не удалось завершить регулярную операцию."); }
+  };
+  const showRecurringRuns = async item => {
+    try { const response = await api.get(`/api/recurring-transactions/${item.id}/runs`); setRecurringRuns({ name: item.name, items: response.data || [] }); }
+    catch { setError("Не удалось загрузить историю повторений."); }
   };
   const rotateCalendarLink = async () => {
     if (!window.confirm("Старая ссылка перестанет работать. Выпустить новую ссылку календаря?")) return;
@@ -163,13 +184,14 @@ export default function Planning() {
       <button type="button" className="btn-secondary" onClick={openTemplateModal}>В шаблоны</button><button type="button" className="btn-secondary" onClick={openRecurringModal}>Повторять</button><button type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Запланировать"}</button>
     </form></section>
     <section className="planning-templates-card"><h2>Шаблоны операций</h2><p>Сохраните регулярный платёж один раз, затем подставляйте его в план за один клик.</p>{templates.length === 0 ? <span className="empty-state">Шаблонов пока нет.</span> : <div className="planning-templates">{templates.map(template => <div key={template.id}><button type="button" onClick={() => applyTemplate(template)}><strong>{template.name}</strong><span>{template.type === "income" ? "Доход" : "Расход"} · {formatMoney(template.amount)} {template.currency}</span></button><button className="btn-ghost danger" type="button" onClick={() => removeTemplate(template)}>×</button></div>)}</div>}</section>
-    <section className="planning-templates-card"><h2>Повторяющиеся операции</h2><p>В дату операции система добавит её в план и пришлёт уведомление. Остатки счетов меняются только после нажатия «Учесть».</p>{recurring.length === 0 ? <span className="empty-state">Повторяющихся операций пока нет.</span> : <div className="recurring-list">{recurring.map(item => <div className={!item.is_active ? "is-inactive" : ""} key={item.id}><div><strong>{item.name}</strong><span>{FREQUENCY_LABELS[item.frequency] || item.frequency} · {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")} · {formatMoney(item.amount)} {item.currency}</span></div><div className="planning-actions"><button className="btn-secondary" type="button" onClick={() => toggleRecurring(item)}>{item.is_active ? "Пауза" : "Включить"}</button><button className="btn-ghost danger" type="button" onClick={() => removeRecurring(item)}>Удалить</button></div></div>)}</div>}</section>
+    <section className="planning-templates-card"><h2>Повторяющиеся операции</h2><p>Для каждого расписания можно создать черновик в плане или проводить его автоматически. Напоминание приходит заранее в центр уведомлений, а при включённом канале — и на email.</p>{recurring.length === 0 ? <span className="empty-state">Повторяющихся операций пока нет.</span> : <div className="recurring-list">{recurring.map(item => <div className={!item.is_active ? "is-inactive" : ""} key={item.id}><div><strong>{item.name}</strong><span>{FREQUENCY_LABELS[item.frequency] || item.frequency}{item.frequency === "custom" ? ` · каждые ${item.custom_interval_days} дн.` : ""} · {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")} · {formatMoney(item.amount)} {item.currency}</span><span>{item.execution_mode === "automatic" ? "Проводится автоматически" : "Попадает в план"}{item.reminder_days ? ` · напомнить за ${item.reminder_days} дн.` : ""}</span></div><div className="planning-actions"><button className="btn-secondary" type="button" onClick={() => showRecurringRuns(item)}>История</button>{item.is_active && <button className="btn-secondary" type="button" onClick={() => skipRecurring(item)}>Пропустить</button>}<button className="btn-secondary" type="button" onClick={() => toggleRecurring(item)}>{item.is_active ? "Пауза" : "Включить"}</button>{item.is_active && <button className="btn-ghost" type="button" onClick={() => finishRecurring(item)}>Завершить</button>}<button className="btn-ghost danger" type="button" onClick={() => removeRecurring(item)}>Удалить</button></div></div>)}</div>}</section>
     <section className="planning-list-card"><h2>Будущие операции ({transactions.length})</h2>
       {transactions.length === 0 ? <p className="empty-state">Добавьте предстоящий платёж, доход или напоминание о расходе.</p> : transactions.map(transaction => <article className="planning-row" key={transaction.id}>
         <time>{new Date(transaction.date).toLocaleDateString("ru-RU")}</time><div><strong>{transaction.description || (transaction.type === "income" ? "Плановый доход" : "Плановый расход")}</strong><span>{transaction.type === "income" ? "Доход" : "Расход"}</span></div><b className={transaction.type === "income" ? "income" : "expense"}>{transaction.type === "income" ? "+" : "−"}{formatMoney(transaction.amount)} {transaction.currency}</b><div className="planning-actions"><button className="btn-secondary" type="button" onClick={() => makeActual(transaction)}>Учесть</button><button className="btn-ghost danger" type="button" onClick={() => remove(transaction)}>Удалить</button></div>
       </article>)}
     </section>
     {modal && <PlanningActionModal modal={modal} setModal={setModal} onSaveTemplate={submitTemplate} onSaveRecurring={submitRecurring} />}
+    {recurringRuns && <RecurringRunsModal data={recurringRuns} onClose={() => setRecurringRuns(null)} />}
   </main>;
 }
 
@@ -211,7 +233,11 @@ function PlanningActionModal({ modal, setModal, onSaveTemplate, onSaveRecurring 
               {Object.entries(FREQUENCY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
+          {modal.frequency === "custom" && <label><span>Интервал, дней</span><input required type="number" min="1" max="365" value={modal.custom_interval_days || 30} onChange={event => setModal({ ...modal, custom_interval_days: event.target.value })} /></label>}
           <label><span>Первое повторение</span><input type="date" required value={modal.next_date} onChange={event => setModal({ ...modal, next_date: event.target.value })} /></label>
+          <label><span>Как выполнять</span><select value={modal.execution_mode || "planned"} onChange={event => setModal({ ...modal, execution_mode: event.target.value })}><option value="planned">Добавлять в план для подтверждения</option><option value="automatic">Проводить автоматически</option></select></label>
+          <label><span>Напомнить заранее, дней</span><input type="number" min="0" max="90" value={modal.reminder_days || 0} onChange={event => setModal({ ...modal, reminder_days: event.target.value })} /></label>
+          <label><span>Закончить после даты (необязательно)</span><input type="date" min={modal.next_date} value={modal.end_date || ""} onChange={event => setModal({ ...modal, end_date: event.target.value })} /></label>
         </>}
         <div className="planning-modal-actions">
           <button type="submit">Сохранить</button>
@@ -220,4 +246,9 @@ function PlanningActionModal({ modal, setModal, onSaveTemplate, onSaveRecurring 
       </form>
     </section>
   </div>;
+}
+
+function RecurringRunsModal({ data, onClose }) {
+  const labels = { planned: "Добавлено в план", posted: "Проведено", skipped: "Пропущено" };
+  return <div className="planning-modal-backdrop" onClick={onClose}><section className="planning-modal" onClick={event => event.stopPropagation()}><div className="planning-modal-head"><h2>История: {data.name}</h2><button type="button" className="btn-ghost" onClick={onClose}>×</button></div>{data.items.length === 0 ? <p className="empty-state">Запусков пока не было.</p> : <div className="recurring-runs">{data.items.map(item => <div key={item.id}><span>{new Date(`${item.scheduled_for}T12:00:00`).toLocaleDateString("ru-RU")}</span><strong>{labels[item.status] || item.status}</strong></div>)}</div>}</section></div>;
 }

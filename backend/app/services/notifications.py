@@ -27,7 +27,7 @@ NOTIFICATION_EVENTS = {
     "planned_operation": {
         "label": "Запланированные операции",
         "description": "Создана очередная операция из расписания.",
-        "default": {"in_app": True, "email": False},
+        "default": {"in_app": True, "email": True},
     },
     "budget_limit": {
         "label": "Бюджеты",
