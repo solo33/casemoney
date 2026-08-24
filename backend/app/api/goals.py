@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime, timezone
 
 from app.database import get_db
 from app.models.goal import Goal, GoalContribution
@@ -86,21 +86,25 @@ def _serialize(db: Session, user_id: int, goal: Goal) -> GoalResponse:
         is_shared=goal.family_id is not None,
         contributions_total=contribution_total,
         contributions=contributions,
+        is_archived=goal.is_archived,
+        archived_at=goal.archived_at,
     )
 
 
 @router.get("/", response_model=List[GoalResponse])
 def list_goals(
+    include_archived: bool = False,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     ensure_family_plan(db, user_id)
-    goals = (
-        db.query(Goal)
-        .filter((Goal.user_id == user_id) | (Goal.family_id == _membership(db, user_id).family_id if _membership(db, user_id) else -1))
-        .order_by(Goal.sort_order, Goal.id)
-        .all()
+    membership = _membership(db, user_id)
+    query = db.query(Goal).filter(
+        (Goal.user_id == user_id) | (Goal.family_id == (membership.family_id if membership else -1))
     )
+    if not include_archived:
+        query = query.filter(Goal.is_archived.is_(False))
+    goals = query.order_by(Goal.is_archived, Goal.sort_order, Goal.id).all()
     return [_serialize(db, user_id, g) for g in goals]
 
 
@@ -180,6 +184,40 @@ def delete_goal(
         raise HTTPException(status_code=404, detail="Goal not found")
     db.delete(goal)
     db.commit()
+
+
+@router.post("/{goal_id}/archive", response_model=GoalResponse)
+def archive_goal(
+    goal_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    ensure_family_plan(db, user_id)
+    goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    goal.is_archived = True
+    goal.archived_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(goal)
+    return _serialize(db, user_id, goal)
+
+
+@router.post("/{goal_id}/restore", response_model=GoalResponse)
+def restore_goal(
+    goal_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    ensure_family_plan(db, user_id)
+    goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    goal.is_archived = False
+    goal.archived_at = None
+    db.commit()
+    db.refresh(goal)
+    return _serialize(db, user_id, goal)
 
 
 class ContributionCreate(BaseModel):

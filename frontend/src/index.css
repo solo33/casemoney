@@ -935,6 +935,9 @@ hr {
   }
   .transactions-filters.is-open { display: flex !important; flex-direction: column; align-items: stretch !important; }
   .transactions-filters input, .transactions-filters select { width: 100%; }
+  .transactions-date-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; width: 100%; }
+  .transactions-date-presets button { min-height: 38px; padding: 7px 9px; background: #f6f2e9; border: 1px solid #e4ddcd; color: #425466; font-size: 12px; }
+  .transactions-date-presets button:first-child { grid-column: 1 / -1; }
   .transactions-filter-done { display: block; width: 100%; margin-top: 8px; }
   .transactions-desktop-table { display: none; }
   .transactions-mobile-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1290,6 +1293,8 @@ hr {
 }
 
 .pwa-update-prompt{position:fixed;z-index:1000;right:20px;bottom:20px;display:flex;align-items:center;gap:12px;max-width:min(440px,calc(100vw - 32px));padding:12px 12px 12px 15px;border:1px solid #d6c9ad;border-radius:12px;background:#fffdf7;box-shadow:0 15px 40px rgba(15,41,61,.22);color:#173a54}.pwa-update-prompt>div{display:grid;gap:2px;min-width:0}.pwa-update-prompt strong{font-size:14px}.pwa-update-prompt span{font-size:12px;line-height:1.35;color:#65717d}.pwa-update-prompt>button{flex:none;padding:8px 11px;font-size:13px;font-weight:700;background:#173a54;color:#fff}.pwa-update-prompt .pwa-update-later{width:28px;min-width:28px;height:28px;min-height:28px;padding:0;border-color:transparent;background:transparent;color:#7a8590;font-size:19px}.pwa-update-prompt .pwa-update-later:hover{background:#f2ede1;color:#173a54}@media(max-width:600px){.pwa-update-prompt{right:12px;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:12px;max-width:none}.pwa-update-prompt>button{padding:8px 10px}.pwa-update-prompt span{font-size:11px}}
+.balance-privacy-toggle{width:30px;min-width:30px;height:30px;min-height:30px;padding:0!important;border-radius:50%;font-size:19px;line-height:1;color:#65717d}.balance-privacy-toggle:hover{color:#173a54}
+.goals-archive{padding:14px;border:1px solid #e4ddcd;border-radius:10px;background:#f8f4ea}.goals-archive summary{cursor:pointer;font-weight:700;color:#173a54}.goals-archive>p{margin:8px 0 12px;color:#65717d;font-size:13px;line-height:1.4}
 .notification-settings-grid{display:grid;border:1px solid #e5dccb;border-radius:10px;overflow:hidden}.notification-settings-row{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #eee7da}.notification-settings-row:last-child{border-bottom:0}.notification-settings-row>div{display:grid;gap:3px}.notification-settings-row small{color:#73808d;line-height:1.35}.notification-settings-row label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:13px;color:#425466}@media(max-width:600px){.notification-settings-row{grid-template-columns:1fr 1fr;padding:12px}.notification-settings-row>div{grid-column:1/-1}.notification-settings-row label{font-size:12px}}
 .finance-ai-actions{display:grid;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e7dfd0}.finance-ai-actions>b{font-size:14px;color:#173a54}.finance-ai-actions>span,.finance-ai-actions small{font-size:12px;line-height:1.4;color:#65717d}.finance-ai-actions>div{display:flex;flex-wrap:wrap;gap:8px}.finance-ai-actions .btn-ghost{padding:7px 10px;font-size:12px}.finance-ai-error{color:#b42318!important}.finance-ai-result{display:grid;gap:6px;padding:10px 12px;border-radius:8px;background:#f6f2e9}.finance-ai-result p{margin:0;color:#283847;font-size:13px;line-height:1.45}.finance-ai-result p::before{content:'• ';color:#9c7b3c;font-weight:700}@media(max-width:600px){.finance-ai-actions>div{display:grid;grid-template-columns:1fr}.finance-ai-actions .btn-ghost{width:100%}}
 /* Локальные изменения: компактный индикатор поверх нижней навигации. */
@@ -1614,6 +1619,19 @@ hr {
   .mobile-shopping-button { position: fixed; display: inline-flex; align-items: center; gap: 6px; right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 98; padding: 10px 13px; background: #173a54; color: #fffdf7; text-decoration: none; border-radius: 999px; box-shadow: 0 8px 22px rgba(15,30,45,.26); font-size: 13px; font-weight: 700; }
   .finance-insights-card { grid-template-columns: 1fr; padding: 15px; margin-bottom: 16px; }
   .quick-category-pills { order: initial; }
+}
+
+/* В альбомной ориентации у телефона мало высоты: навигация должна остаться
+   доступной, а плавающая кнопка и страницы — не перекрывать нижнюю панель. */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 540px) {
+  body { padding-bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+  .mobile-bottom-nav { grid-template-columns: repeat(5, minmax(58px, 1fr)) !important; overflow-x: auto; }
+  .mobile-bottom-nav a, .mobile-bottom-nav button { min-height: 52px !important; padding: 4px 2px !important; }
+  .mobile-bottom-nav span { font-size: 18px !important; }
+  .mobile-bottom-nav small { font-size: 9px !important; }
+  .fab-add-btn { bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important; }
+  .quick-add-sheet { top: 8px !important; padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important; }
+  .page { padding-top: 14px; }
 }
 
 .landing-proof{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.landing-proof span,.roadmap-status{font-size:12px;font-weight:750;border-radius:999px;padding:6px 10px;background:#e9f2ed;color:#176d45}.landing-proof span:last-child{background:#fbefd0;color:#94671d}.landing-roadmap-link{display:inline-block;margin-top:22px;color:#9c6f1d;font-weight:750;text-decoration:none}.roadmap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.roadmap-card h2{margin:12px 0;font-size:22px;color:#173a54}.roadmap-card ul{margin:0;padding-left:20px;color:#515c68;line-height:1.65;font-size:14px}.roadmap-card li+li{margin-top:9px}.roadmap-card--next .roadmap-status{background:#fbefd0;color:#94671d}.roadmap-card--later .roadmap-status{background:#edf0f2;color:#5d6873}.roadmap-cta{margin-top:24px;padding:24px;display:flex;gap:24px;justify-content:space-between;align-items:center;background:#173a54;border-radius:12px;color:#fff}.roadmap-cta h2{margin:0 0 8px;font-size:24px}.roadmap-cta p{margin:0;line-height:1.55;color:#dce6ec}.roadmap-cta a{flex:0 0 auto;background:#fff;color:#173a54;text-decoration:none;font-weight:750;padding:11px 15px;border-radius:8px}@media(max-width:800px){.roadmap-grid{grid-template-columns:1fr}.roadmap-cta{align-items:flex-start;flex-direction:column}}

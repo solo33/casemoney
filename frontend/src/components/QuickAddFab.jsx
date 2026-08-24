@@ -32,13 +32,14 @@ const TYPE_OPTIONS = [
 export default function QuickAddFab() {
   const { user } = useUser();
   const hasFamilyPlan = Boolean(user?.family_access);
+  const defaultType = user?.default_quick_operation_type || "expense";
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]);
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
-    type: "expense",
+    type: defaultType,
     amount: "",
     account_id: "",
     currency: "",       // выбранная валюта (из balances счёта или COMMON)
@@ -59,6 +60,12 @@ export default function QuickAddFab() {
   const [retryable, setRetryable] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
   const requestRef = useRef(null);
+
+  // Применяем настройку после загрузки профиля, но не мешаем уже открытому
+  // пользователем окну и не сбрасываем выбранный им тип операции.
+  useEffect(() => {
+    if (!open) setForm(current => ({ ...current, type: defaultType, category_id: "" }));
+  }, [defaultType, open]);
 
   useEffect(() => {
     if (!open) return;

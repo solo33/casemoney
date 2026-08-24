@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Boolean
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -22,6 +22,9 @@ class Goal(Base):
     family_id = Column(Integer, ForeignKey("families.id", ondelete="CASCADE"), nullable=True, index=True)
     due_date = Column(Date, nullable=True)
     sort_order = Column(Integer, nullable=False, default=0)
+    # Архив не удаляет историю взносов и позволяет вернуть цель в работу.
+    is_archived = Column(Boolean, nullable=False, default=False)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -32,10 +32,11 @@ export default function QuickAddInline({
 }) {
   const { user } = useUser();
   const hasFamilyPlan = Boolean(user?.family_access);
+  const defaultType = user?.default_quick_operation_type || "expense";
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);
-  const [type, setType] = useState("expense");
+  const [type, setType] = useState(defaultType);
   const [internalDate, setInternalDate] = useState(isoToday());
   // Дата может управляться родителем (синхронизация с лентой за день)
   const dateVal = date !== undefined ? date : internalDate;
@@ -62,6 +63,11 @@ export default function QuickAddInline({
   const [savedLocally, setSavedLocally] = useState(false);
   const [retryable, setRetryable] = useState(false);
   const requestRef = useRef(null);
+
+  useEffect(() => {
+    setType(defaultType);
+    setForm(current => ({ ...current, category_id: "" }));
+  }, [defaultType]);
 
   const applyOptions = useCallback((buckets, cats) => {
     const visibleBuckets = entryAccountGroups(buckets);

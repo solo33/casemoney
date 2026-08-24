@@ -195,6 +195,19 @@ def _serialize(db: Session, budget: Budget, category: Category) -> BudgetRespons
     spent, carry_in, remaining = _budget_state(db, budget)
     effective_limit = round(budget.amount + carry_in, 2)
     percent = round(min(999, spent / effective_limit * 100), 1) if effective_limit > 0 else 999
+    expected_spent_to_date = None
+    daily_deviation = None
+    if budget.daily_amount is not None and budget.daily_amount > 0:
+        start, end = _period_range(budget.period_start, budget.period)
+        if date.today() < start:
+            elapsed_days = 0
+        elif date.today() > end:
+            elapsed_days = (end - start).days + 1
+        else:
+            elapsed_days = (date.today() - start).days + 1
+        expected_spent_to_date = round(budget.daily_amount * elapsed_days, 2)
+        # Положительное значение — уже потрачено больше дневного ориентира.
+        daily_deviation = round(spent - expected_spent_to_date, 2)
     return BudgetResponse(
         id=budget.id,
         category_id=budget.category_id,
@@ -212,6 +225,9 @@ def _serialize(db: Session, budget: Budget, category: Category) -> BudgetRespons
         rollover_mode=budget.rollover_mode,
         carry_in=carry_in,
         include_planned=budget.include_planned,
+        daily_amount=budget.daily_amount,
+        expected_spent_to_date=expected_spent_to_date,
+        daily_deviation=daily_deviation,
         scope=budget.scope,
         created_at=budget.created_at,
         updated_at=budget.updated_at,
@@ -304,6 +320,7 @@ def create_budget(data: BudgetCreate, db: Session = Depends(get_db), user_id: in
         user_id=user_id, category_id=data.category_id, period=data.period, period_start=start,
         amount=data.amount, currency=data.currency.upper(), rollover_mode=data.rollover_mode,
         include_planned=data.include_planned, scope=data.scope,
+        daily_amount=data.daily_amount,
     )
     db.add(budget)
     db.commit()

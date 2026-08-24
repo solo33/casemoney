@@ -56,12 +56,12 @@ export default function Budget() {
     period,
     period_start: anchor,
     rollover_mode: "none",
-    include_planned: false,
+    include_planned: false, daily_amount: "",
     scope: "personal",
   });
   const openAddManual = () => setAddForm({
     category_id: "", amount: "", currency: mainCurrency, period, period_start: anchor,
-    rollover_mode: "none", include_planned: false, scope: "personal",
+    rollover_mode: "none", include_planned: false, daily_amount: "", scope: "personal",
   });
 
   const submitAdd = async event => {
@@ -74,6 +74,7 @@ export default function Budget() {
         ...addForm,
         category_id: Number(addForm.category_id),
         amount: Number(addForm.amount),
+        daily_amount: addForm.daily_amount === "" ? null : Number(addForm.daily_amount),
       });
       setAddForm(null);
       setMessage("Лимит добавлен");
@@ -172,6 +173,12 @@ export default function Budget() {
                       {b.scope === "family" ? "Семейные" : b.scope === "mixed" ? "Общий" : ""}
                     </small>
                   )}
+                  {b.daily_amount != null && b.expected_spent_to_date != null && (
+                    <small className={`budget-row-meta ${b.daily_deviation > 0 ? "danger" : ""}`}>
+                      Ориентир {formatMoney(b.daily_amount)} {b.currency}/день · к сегодняшнему дню {formatMoney(b.expected_spent_to_date)} {b.currency}
+                      {b.daily_deviation !== 0 && ` · ${b.daily_deviation > 0 ? "выше" : "ниже"} плана на ${formatMoney(Math.abs(b.daily_deviation))} ${b.currency}`}
+                    </small>
+                  )}
                   {editingId === b.id ? (
                     <form onSubmit={event => submitEdit(event, b)} className="budget-edit-form">
                       <input type="number" min="0.01" step="0.01" value={editAmount} onChange={event => setEditAmount(event.target.value)} autoFocus />
@@ -220,6 +227,10 @@ export default function Budget() {
               </label>
               <label><span>Лимит, {addForm.currency}</span>
                 <input type="number" required min="0.01" step="0.01" value={addForm.amount} onChange={event => setAddForm({ ...addForm, amount: event.target.value })} autoFocus />
+              </label>
+              <label><span>Ориентир расходов в день (необязательно)</span>
+                <input type="number" min="0" step="0.01" value={addForm.daily_amount} onChange={event => setAddForm({ ...addForm, daily_amount: event.target.value })} placeholder="Например, 1 500" />
+                <small>Не заменяет лимит: показывает, идёте ли вы выше или ниже ежедневного темпа.</small>
               </label>
               <label><span>Перенос остатка на следующий период</span>
                 <select value={addForm.rollover_mode} onChange={event => setAddForm({ ...addForm, rollover_mode: event.target.value })}>

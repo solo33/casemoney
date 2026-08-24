@@ -30,7 +30,9 @@ class UserResponse(BaseModel):
     # regardless of `plan`. Use this for gating UI, not `plan == "family"`.
     family_access: bool = False
     show_shopping_button_mobile: bool = True
+    default_quick_operation_type: Literal["expense", "income", "transfer"] = "expense"
     hide_zero_balance_currencies: bool = False
+    hide_dashboard_balances: bool = False
     dashboard_widgets: dict[str, Any] = Field(default_factory=dict)
     notification_preferences: dict[str, Any] = Field(default_factory=dict)
     onboarding_completed: bool = False
@@ -46,7 +48,9 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     username: Optional[str] = Field(None, min_length=1, max_length=64)
     show_shopping_button_mobile: Optional[bool] = None
+    default_quick_operation_type: Optional[Literal["expense", "income", "transfer"]] = None
     hide_zero_balance_currencies: Optional[bool] = None
+    hide_dashboard_balances: Optional[bool] = None
     dashboard_widgets: Optional[dict[str, Any]] = None
     notification_preferences: Optional[dict[str, Any]] = None
     onboarding_completed: Optional[bool] = None

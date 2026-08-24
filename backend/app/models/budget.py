@@ -22,6 +22,10 @@ class Budget(Base):
     currency = Column(String(10), nullable=False)
     rollover_mode = Column(String(24), nullable=False, default="none")
     include_planned = Column(Boolean, nullable=False, default=False)
+    # Не заменяет лимит периода: это ориентир фактических трат по дням.
+    # Его удобно задавать, когда важно не «сэкономить к концу месяца», а
+    # равномерно расходовать деньги в течение периода.
+    daily_amount = Column(Float, nullable=True)
     scope = Column(String(16), nullable=False, default="personal")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

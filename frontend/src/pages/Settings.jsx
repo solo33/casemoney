@@ -203,6 +203,21 @@ export default function Settings() {
       <Section title="Отображение">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <label className="settings-checkbox-row">
+            <span>
+              <b>Начальная вкладка быстрой операции</b>
+              <small>Открывается первой на главной и в мобильной форме. При необходимости её можно сменить перед сохранением.</small>
+            </span>
+            <select
+              value={user.default_quick_operation_type || "expense"}
+              onChange={event => saveDisplayPreferences({ default_quick_operation_type: event.target.value })}
+              aria-label="Начальная вкладка быстрой операции"
+            >
+              <option value="expense">Расход</option>
+              <option value="income">Доход</option>
+              <option value="transfer">Перевод</option>
+            </select>
+          </label>
+          <label className="settings-checkbox-row">
             <input
               type="checkbox"
               checked={Boolean(user.hide_zero_balance_currencies)}
@@ -211,6 +226,17 @@ export default function Settings() {
             <span>
               <b>Скрывать нулевые валюты на главной</b>
               <small>Счёт без ненулевых остатков также не будет показан в блоке счетов.</small>
+            </span>
+          </label>
+          <label className="settings-checkbox-row">
+            <input
+              type="checkbox"
+              checked={Boolean(user.hide_dashboard_balances)}
+              onChange={event => saveDisplayPreferences({ hide_dashboard_balances: event.target.checked })}
+            />
+            <span>
+              <b>Скрывать суммы на главной</b>
+              <small>Удобно, если открываете приложение рядом с другими людьми. Настройку можно быстро изменить прямо в блоке «Баланс».</small>
             </span>
           </label>
         </div>

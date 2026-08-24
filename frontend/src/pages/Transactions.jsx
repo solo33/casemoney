@@ -28,6 +28,33 @@ function isoToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toLocalIsoDate(date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function dateRangeForPreset(preset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dayOfWeek = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dayOfWeek);
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  if (preset === "today") return { from: today, to: today };
+  if (preset === "this_week") return { from: monday, to: today };
+  if (preset === "last_week") {
+    const from = new Date(monday); from.setDate(monday.getDate() - 7);
+    const to = new Date(monday); to.setDate(monday.getDate() - 1);
+    return { from, to };
+  }
+  if (preset === "this_month") return { from: monthStart, to: today };
+
+  const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const to = new Date(today.getFullYear(), today.getMonth(), 0);
+  return { from, to };
+}
+
 export default function Transactions() {
   const { user } = useUser();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -294,6 +321,20 @@ export default function Transactions() {
     setSearchParams(params, { replace: true });
   };
 
+  const applyDatePreset = (preset) => {
+    const range = dateRangeForPreset(preset);
+    const next = {
+      ...filters,
+      date_from: toLocalIsoDate(range.from),
+      date_to: toLocalIsoDate(range.to),
+    };
+    setFilters(next);
+    setPage(0);
+    const params = {};
+    Object.entries(next).forEach(([key, value]) => { if (value) params[key] = value; });
+    setSearchParams(params, { replace: true });
+  };
+
   const resetFilters = () => {
     setFilters({ account_id: "", currency: "", category_id: "", type: "", date_from: "", date_to: "", q: "" });
     setPage(0);
@@ -443,6 +484,13 @@ export default function Transactions() {
           onChange={e => setFilter("date_to", e.target.value)}
           title="по"
         />
+        <div className="transactions-date-presets" aria-label="Быстрый выбор периода">
+          <button type="button" onClick={() => applyDatePreset("today")}>Сегодня</button>
+          <button type="button" onClick={() => applyDatePreset("this_week")}>Эта неделя</button>
+          <button type="button" onClick={() => applyDatePreset("last_week")}>Прошлая неделя</button>
+          <button type="button" onClick={() => applyDatePreset("this_month")}>Этот месяц</button>
+          <button type="button" onClick={() => applyDatePreset("last_month")}>Прошлый месяц</button>
+        </div>
         {filters.currency && (
           <span style={{
             display: "flex", alignItems: "center", gap: 6,

@@ -12,6 +12,7 @@ class BudgetCreate(BaseModel):
     period_start: Optional[date] = None
     rollover_mode: Literal["none", "carry_remaining", "carry_balance"] = "none"
     include_planned: bool = False
+    daily_amount: Optional[float] = Field(None, ge=0)
     scope: Literal["personal", "family", "mixed"] = "personal"
 
 
@@ -19,6 +20,7 @@ class BudgetUpdate(BaseModel):
     amount: Optional[float] = Field(None, gt=0)
     rollover_mode: Optional[Literal["none", "carry_remaining", "carry_balance"]] = None
     include_planned: Optional[bool] = None
+    daily_amount: Optional[float] = Field(None, ge=0)
     scope: Optional[Literal["personal", "family", "mixed"]] = None
 
 
@@ -39,6 +41,9 @@ class BudgetResponse(BaseModel):
     rollover_mode: str
     carry_in: float
     include_planned: bool
+    daily_amount: Optional[float]
+    expected_spent_to_date: Optional[float]
+    daily_deviation: Optional[float]
     scope: str
     created_at: datetime
     updated_at: datetime

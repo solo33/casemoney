@@ -21,7 +21,13 @@ class User(Base):
     plan_expires_at = Column(DateTime(timezone=True), nullable=True)
     family_upgrade_enabled = Column(Boolean, nullable=False, default=False)
     show_shopping_button_mobile = Column(Boolean, nullable=False, default=True)
+    # Тип операции, который открывается первым в быстрой форме на главной и в PWA.
+    # Пользователь всегда может переключиться прямо в форме.
+    default_quick_operation_type = Column(String(16), nullable=False, default="expense")
     hide_zero_balance_currencies = Column(Boolean, nullable=False, default=False)
+    # Не скрывает данные и не меняет расчёты — только маскирует суммы на главной
+    # странице, когда пользователь открывает сервис в общественном месте.
+    hide_dashboard_balances = Column(Boolean, nullable=False, default=False)
     dashboard_widgets = Column(JSON, nullable=False, default=dict)
     # Каналы уведомлений пользователь настраивает отдельно для каждого события.
     # Храним JSON, чтобы новые типы событий можно было добавлять без новой

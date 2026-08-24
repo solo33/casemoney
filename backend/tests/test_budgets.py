@@ -34,13 +34,15 @@ def test_create_budget_and_track_spending(client):
     category_id = get_category_id(client, auth, "Продукты")
 
     created = client.post("/api/budgets/", headers=auth, json={
-        "category_id": category_id, "amount": 10000, "currency": "RUB",
+        "category_id": category_id, "amount": 10000, "currency": "RUB", "daily_amount": 500,
     })
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["spent"] == 0
     assert body["remaining"] == 10000
     assert body["is_overspent"] is False
+    assert body["daily_amount"] == 500
+    assert body["expected_spent_to_date"] is not None
 
     duplicate = client.post("/api/budgets/", headers=auth, json={
         "category_id": category_id, "amount": 5000, "currency": "RUB",

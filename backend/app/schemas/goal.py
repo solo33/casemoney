@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 
 class GoalCreate(BaseModel):
@@ -44,6 +44,8 @@ class GoalResponse(BaseModel):
     is_shared: bool
     contributions_total: float
     contributions: list[dict]
+    is_archived: bool = False
+    archived_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

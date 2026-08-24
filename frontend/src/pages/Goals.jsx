@@ -24,7 +24,7 @@ export default function Goals() {
     setLoading(true);
     try {
       const [g, a] = await Promise.all([
-        api.get("/api/goals/"),
+        api.get("/api/goals/", { params: { include_archived: true } }),
         api.get("/api/accounts/"),
       ]);
       setGoals(g.data);
@@ -106,6 +106,28 @@ export default function Goals() {
     }
   };
 
+  const archive = async (g) => {
+    if (!confirm(`Убрать цель «${g.name}» в архив? Взносы и история сохранятся.`)) return;
+    try {
+      await api.post(`/api/goals/${g.id}/archive`);
+      load();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось архивировать цель");
+    }
+  };
+
+  const restore = async (g) => {
+    try {
+      await api.post(`/api/goals/${g.id}/restore`);
+      load();
+    } catch (e) {
+      setError(e.response?.data?.detail || "Не удалось вернуть цель");
+    }
+  };
+
+  const activeGoals = goals.filter(goal => !goal.is_archived);
+  const archivedGoals = goals.filter(goal => goal.is_archived);
+
   if (loading) return <div className="page">Загрузка...</div>;
 
   return (
@@ -132,7 +154,7 @@ export default function Goals() {
         />
       )}
 
-      {goals.length === 0 && !adding ? (
+      {activeGoals.length === 0 && !adding ? (
         <div style={{
           background: "#fffdf7", border: "1px dashed #c7cdd3", borderRadius: 10,
           padding: 32, textAlign: "center", color: "#a6afb8",
@@ -143,16 +165,25 @@ export default function Goals() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {goals.map(g => (
-            <GoalCard key={g.id} g={g} onEdit={() => startEdit(g)} onDelete={() => del(g)} />
+          {activeGoals.map(g => (
+            <GoalCard key={g.id} g={g} onEdit={() => startEdit(g)} onDelete={() => del(g)} onArchive={() => archive(g)} />
           ))}
         </div>
+      )}
+      {archivedGoals.length > 0 && (
+        <details className="goals-archive" style={{ marginTop: 18 }}>
+          <summary>Архив целей ({archivedGoals.length})</summary>
+          <p>Достигнутые и отложенные цели. Их можно вернуть без потери истории взносов.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {archivedGoals.map(g => <GoalCard key={g.id} g={g} archived onRestore={() => restore(g)} onDelete={() => del(g)} />)}
+          </div>
+        </details>
       )}
     </div>
   );
 }
 
-function GoalCard({ g, onEdit, onDelete }) {
+function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived = false }) {
   const sym = currencySymbol(g.currency);
   const pct = g.progress_percent;
   const reached = pct >= 100;
@@ -193,9 +224,16 @@ function GoalCard({ g, onEdit, onDelete }) {
             </div>
           )}
         </div>
-        <button className="btn-ghost" onClick={onEdit} style={{ padding: "4px 10px", fontSize: 13 }}>
-          ✎
-        </button>
+        {archived ? (
+          <button className="btn-ghost" onClick={onRestore} style={{ padding: "4px 10px", fontSize: 13 }}>Вернуть</button>
+        ) : <>
+          <button className="btn-ghost" onClick={onEdit} style={{ padding: "4px 10px", fontSize: 13 }}>
+            ✎
+          </button>
+          <button className="btn-ghost" onClick={onArchive} style={{ padding: "4px 10px", fontSize: 13 }}>
+            Архив
+          </button>
+        </>}
         <button className="btn-ghost" onClick={onDelete}
           style={{ padding: "4px 10px", fontSize: 13, color: "#c0432b" }}>
           ×

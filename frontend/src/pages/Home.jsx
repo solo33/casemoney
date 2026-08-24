@@ -301,6 +301,8 @@ export default function Home() {
 
   // breakdown сумм по валютам по всем счетам (только учитываемые в балансе)
   const byCurrency = useMemo(() => aggregateByCurrency(grouped), [grouped]);
+  const dashboardBalancesHidden = Boolean(user?.hide_dashboard_balances);
+  const toggleDashboardBalances = () => updateUser({ hide_dashboard_balances: !dashboardBalancesHidden });
 
   // Гистограмма движения денег: 3 месяца, свежие сверху (текущий — «Этот месяц»)
   const trendDesc = useMemo(() => [...monthlyTrend].reverse(), [monthlyTrend]);
@@ -404,10 +406,13 @@ export default function Home() {
             <h3 onClick={() => updateWidgetCollapsed("balance", !isWidgetCollapsed("balance"))} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
               <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{isWidgetCollapsed("balance") ? "▸" : "▾"}</span>Баланс
             </h3>
-            {!isWidgetCollapsed("balance") && dashboard?.forecast && (
-              <div style={{ display: "flex", gap: 4 }} aria-label="Баланс: фактический или с учётом плана">
-                <ToggleBtn active={balanceMode === "actual"} onClick={() => setBalanceMode("actual")}>Факт</ToggleBtn>
-                <ToggleBtn active={balanceMode === "planned"} onClick={() => setBalanceMode("planned")}>С планом</ToggleBtn>
+            {!isWidgetCollapsed("balance") && (
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                {dashboard?.forecast && <div style={{ display: "flex", gap: 4 }} aria-label="Баланс: фактический или с учётом плана">
+                  <ToggleBtn active={balanceMode === "actual"} onClick={() => setBalanceMode("actual")}>Факт</ToggleBtn>
+                  <ToggleBtn active={balanceMode === "planned"} onClick={() => setBalanceMode("planned")}>С планом</ToggleBtn>
+                </div>}
+                <button type="button" className="btn-ghost balance-privacy-toggle" onClick={toggleDashboardBalances} title={dashboardBalancesHidden ? "Показать суммы" : "Скрыть суммы"} aria-label={dashboardBalancesHidden ? "Показать суммы" : "Скрыть суммы"}>{dashboardBalancesHidden ? "◉" : "◌"}</button>
               </div>
             )}
           </div>
@@ -415,6 +420,8 @@ export default function Home() {
           <div className="money-hero tabular" style={{ fontSize: 34, color: "#1b2531", lineHeight: 1.05, marginTop: 10 }}>
             {balanceLoading || totalBalance == null ? (
               <BrandProgress label="Обновляем остатки…" size={38} style={{ minHeight: 40 }} />
+            ) : dashboardBalancesHidden ? (
+              <span aria-label="Сумма скрыта">••••••</span>
             ) : (
               <>{formatMoney(balanceMode === "planned" && dashboard?.forecast ? totalBalance + Number(dashboard.forecast.net || 0) : totalBalance)} <span style={{ fontSize: 16, color: "#a6afb8", fontWeight: 400 }}>{mainCurrency}</span></>
             )}
@@ -424,7 +431,7 @@ export default function Home() {
               С учётом плановых операций на {forecastDays} дн. Остатки счетов не меняются, пока операция не проведена.
             </p>
           )}
-          {byCurrency.length > 0 && (
+          {!dashboardBalancesHidden && byCurrency.length > 0 && (
             <div style={{ marginTop: 8 }}>
               {byCurrency.map(c => (
                 <div key={c.currency} style={{
