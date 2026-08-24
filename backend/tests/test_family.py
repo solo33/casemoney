@@ -54,8 +54,48 @@ def test_family_features_are_free_when_billing_disabled(client):
     assert created.status_code == 201, created.text
 
 
+def test_registration_saves_selected_mode_and_mode_can_be_changed(client):
+    response = client.post("/api/auth/register", json={
+        "email": "chosen-family@test.com",
+        "username": "chosen-family",
+        "password": "secret123",
+        "preferred_mode": "family",
+    })
+    assert response.status_code == 200, response.text
+    auth = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    assert client.get("/api/me/", headers=auth).json()["preferred_mode"] == "family"
+
+    changed = client.put("/api/me/", headers=auth, json={"preferred_mode": "personal"})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["preferred_mode"] == "personal"
+
+
+def test_free_launch_has_no_family_member_cap(client):
+    owner = register_and_login(client, "unlimited-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Без лимита"})
+    for i in range(5):
+        result = client.post("/api/family/invite", headers=owner, json={"email": f"unlimited-{i}@test.com"})
+        assert result.status_code == 201, result.text
+
+
+def test_paid_owner_subscription_grants_family_access_to_invitee(client):
+    enable_billing()
+    owner = register_and_login(client, "paid-owner@test.com")
+    member = register_and_login(client, "paid-member@test.com")
+    enable_family_plan("paid-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Оплаченная семья"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "paid-member@test.com"}
+    ).json()
+    accepted = client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member)
+    assert accepted.status_code == 200, accepted.text
+    assert client.get("/api/me/", headers=member).json()["family_access"] is True
+
+
 def test_family_invite_respects_member_cap(client):
+    enable_billing()
     owner = register_and_login(client, "cap-owner@test.com")
+    enable_family_plan("cap-owner@test.com")
     client.post("/api/family/", headers=owner, json={"name": "Семья"})
     for i in range(2):
         r = client.post("/api/family/invite", headers=owner, json={"email": f"cap-member-{i}@test.com"})

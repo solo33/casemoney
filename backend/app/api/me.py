@@ -13,6 +13,7 @@ from app.models.category import Category
 from app.models.account_group import AccountGroup
 from app.models.user_currency import UserCurrency
 from app.models.shopping import ShoppingList
+from app.models.family import Family, FamilyMember
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.services.auth import decode_token, hash_password, normalize_email, verify_password
 from app.services import limits as limits_svc
@@ -61,6 +62,27 @@ def update_me(
 ):
     user = _get_user(db, user_id)
     update_fields = data.model_dump(exclude_unset=True)
+    confirm_family_data_cleanup = update_fields.pop("confirm_family_data_cleanup", False)
+    requested_mode = update_fields.get("preferred_mode")
+    if requested_mode == "personal" and user.preferred_mode != "personal":
+        membership = db.query(FamilyMember).filter(
+            FamilyMember.user_id == user_id,
+            FamilyMember.status == "active",
+        ).first()
+        if membership:
+            if not confirm_family_data_cleanup:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Подтвердите выход из Family: общие данные этого пространства будут недоступны",
+                )
+            if membership.role == "owner":
+                family = db.query(Family).filter(Family.id == membership.family_id).first()
+                if family:
+                    # Общие списки, цели и взаиморасчёты каскадно удаляются;
+                    # личные операции сохраняются, их family_id станет NULL.
+                    db.delete(family)
+            else:
+                db.delete(membership)
     if "main_currency" in update_fields and update_fields["main_currency"]:
         update_fields["main_currency"] = update_fields["main_currency"].upper()
     if "email" in update_fields and update_fields["email"]:

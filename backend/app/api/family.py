@@ -24,6 +24,7 @@ from app.services.email import app_url, send_email
 from app.services.notifications import notify_user
 from app.services.plans import ensure_family_plan
 from app.services import accounts as accounts_svc
+from app.services import app_config as app_config_svc
 from app.services import exchange as exchange_svc
 from app.services.family_recurring import find_family_recurring_suggestions
 
@@ -52,7 +53,7 @@ router = APIRouter(
     dependencies=[Depends(require_family_plan)],
 )
 
-# Family plan is priced per account, up to this many members (owner included).
+# После включения оплаты Family оплачивается для трёх адресов вместе с владельцем.
 FAMILY_MAX_MEMBERS = 3
 
 
@@ -166,6 +167,11 @@ def create_family(
     if active_membership(db, user_id):
         raise HTTPException(status_code=409, detail="Вы уже состоите в семье")
     user = db.query(User).filter(User.id == user_id).first()
+    if db.query(FamilyMember).filter(
+        FamilyMember.status == "pending",
+        func.lower(FamilyMember.email) == user.email.lower(),
+    ).first():
+        raise HTTPException(status_code=409, detail="Сначала примите или отклоните приглашение в семью")
     family = Family(name=data.name.strip(), owner_user_id=user_id)
     db.add(family)
     db.flush()
@@ -203,7 +209,7 @@ def invite_member(
     if user and active_membership(db, user.id):
         raise HTTPException(status_code=409, detail="Пользователь уже состоит в другой семье")
     member_count = db.query(FamilyMember).filter(FamilyMember.family_id == membership.family_id).count()
-    if member_count >= FAMILY_MAX_MEMBERS:
+    if app_config_svc.is_billing_enabled(db) and member_count >= FAMILY_MAX_MEMBERS:
         raise HTTPException(
             status_code=400,
             detail=f"В семейном пространстве уже максимум участников ({FAMILY_MAX_MEMBERS})",

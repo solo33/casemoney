@@ -48,6 +48,7 @@ class BillingOverview(BaseModel):
     subscription: Optional[SubscriptionResponse]
     payments: list[BillingPaymentResponse]
     family_upgrade_enabled: bool
+    billing_enabled: bool
     test_mode: bool = True
     trial_days: int = 7
     test_month_price: float

@@ -11,7 +11,7 @@ function markRealLogin(token) {
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: "", username: "", password: "" });
+  const [form, setForm] = useState({ email: "", username: "", password: "", preferred_mode: "personal" });
   const [consent, setConsent] = useState(false);
   const [regEnabled, setRegEnabled] = useState(true);
   const [error, setError] = useState("");
@@ -171,9 +171,14 @@ export default function Register() {
             <h2 style={{ fontFamily: "var(--serif)", fontWeight: 500, fontSize: 24, margin: "0 0 4px" }}>
               Регистрация
             </h2>
-            <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 20px" }}>
-              Personal: счета, категории, валюты, импорт и отчеты
+            <p style={{ color: "#7a8590", fontSize: 13, margin: "0 0 14px" }}>
+              Выберите формат: его можно поменять в настройках в любой момент.
             </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginBottom: 18 }}>
+              <ModeOption active={form.preferred_mode === "personal"} title="Personal" text="Упрощённый личный учёт" onClick={() => setForm({ ...form, preferred_mode: "personal" })} />
+              <ModeOption active={form.preferred_mode === "family"} title="Family" text="Семейные финансы и планы" onClick={() => setForm({ ...form, preferred_mode: "family" })} />
+            </div>
 
             <div style={{
               background: "#f6f2e9",
@@ -262,6 +267,14 @@ export default function Register() {
       </div>
     </div>
   );
+}
+
+function ModeOption({ active, title, text, onClick }) {
+  return <button type="button" onClick={onClick} style={{
+    textAlign: "left", padding: 12, borderRadius: 9, cursor: "pointer",
+    border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
+    background: active ? "#eef4f7" : "#fffdf7", color: "#1b2531",
+  }}><strong style={{ display: "block", marginBottom: 4 }}>{title}</strong><span style={{ fontSize: 12, color: "#687582" }}>{text}</span></button>;
 }
 
 const lbl = { display: "block", marginBottom: 14 };

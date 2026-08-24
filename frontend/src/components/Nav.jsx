@@ -69,7 +69,9 @@ export default function Nav() {
   const [lastSyncedAt, setLastSyncedAt] = useState(() => localStorage.getItem("casemoney:last-successful-sync"));
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
-  const hasFamilyPlan = Boolean(user?.family_access);
+  // Personal остаётся упрощённым интерфейсом даже во время бесплатного
+  // запуска. Переключение на Family не требует оплаты, пока она выключена.
+  const hasFamilyPlan = Boolean(user?.family_access) && user?.preferred_mode === "family";
   const links = BASE_LINKS.filter(link => link.to !== "/goals" || hasFamilyPlan);
   const visibleSettingsLinks = SETTINGS_LINKS.filter(
     link => link.to !== "/settings/family" || hasFamilyPlan

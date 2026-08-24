@@ -61,6 +61,18 @@ export default function Settings() {
     }
   };
 
+  const changeMode = async (mode) => {
+    const isPersonal = mode === "personal";
+    if (isPersonal && !confirm("Перейти на Personal? Если вы состоите в семейном пространстве, доступ к общим данным будет прекращён. Владелец семейного пространства удалит его вместе с общими списками, целями и взаиморасчётами. Личные счета и операции сохранятся.")) return;
+    try {
+      await updateUser({ preferred_mode: mode, ...(isPersonal ? { confirm_family_data_cleanup: true } : {}) });
+      flash(mode === "family" ? "Выбран режим Family" : "Выбран режим Personal");
+      if (isPersonal) navigate("/settings/personal");
+    } catch (e) {
+      flash(e.response?.data?.detail || "Не удалось изменить режим", true);
+    }
+  };
+
   const saveWidgetSettings = async (next) => saveDisplayPreferences({ dashboard_widgets: next });
   const updateWidget = async (id, changes) => {
     const current = normalizedWidgetSettings(user.dashboard_widgets);
@@ -125,9 +137,9 @@ export default function Settings() {
       {/* Тариф */}
       <PlanCard
         limits={limits}
-        plan={user?.plan || "personal"}
-        familyUpgradeEnabled={Boolean(user?.family_upgrade_enabled)}
+        selectedMode={user?.preferred_mode || "personal"}
         familyAccess={Boolean(user?.family_access)}
+        onModeChange={changeMode}
       />
 
       {/* Профиль */}
@@ -467,7 +479,7 @@ function FlashBox({ color, bg, border, children }) {
 const muted = { color: "#7a8590", fontSize: 13, margin: 0 };
 
 
-function PlanCard({ limits, plan, familyUpgradeEnabled, familyAccess }) {
+function PlanCard({ limits, selectedMode, familyAccess, onModeChange }) {
   const u = limits?.usage || {};
   const items = [
     { key: "accounts", label: "Счета" },
@@ -485,27 +497,27 @@ function PlanCard({ limits, plan, familyUpgradeEnabled, familyAccess }) {
           margin: 0, fontFamily: "var(--serif)", fontSize: 20,
           fontWeight: 600, color: "#1b2531",
         }}>
-          {plan === "family" ? "Family" : "Personal"}
+          {selectedMode === "family" ? "Family" : "Personal"}
         </h3>
       </div>
 
       <p style={{ ...muted, marginBottom: 12 }}>
-        {plan === "family"
+        {selectedMode === "family"
           ? "Family включает все возможности Personal и семейные финансы."
           : "Personal включает личные счета, категории, валюты, импорт, экспорт и отчеты."}
       </p>
 
-      {plan === "personal" && familyAccess && (
+      {selectedMode === "personal" && familyAccess && (
         <p style={{ ...muted, marginBottom: 12, color: "#167a4a", fontWeight: 600 }}>
           🎉 Пока идёт бесплатный запуск, вам уже доступны все функции Family — платить не нужно.
         </p>
       )}
 
-      {plan === "personal" && !familyAccess && familyUpgradeEnabled && (
-        <Link to="/settings/billing" style={{ display: "inline-block", marginBottom: 14, fontWeight: 700 }}>
-          Перейти на Family →
-        </Link>
-      )}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+        {selectedMode !== "family" && <button type="button" onClick={() => onModeChange("family")}>Выбрать Family</button>}
+        {selectedMode !== "personal" && <button type="button" className="btn-secondary" onClick={() => onModeChange("personal")}>Перейти на Personal</button>}
+        {!familyAccess && <Link to="/settings/billing" style={{ display: "inline-block", paddingTop: 8, fontWeight: 700 }}>Оплатить Family →</Link>}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
         {items.map(it => {

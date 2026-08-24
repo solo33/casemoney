@@ -13,6 +13,10 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     main_currency = Column(String(10), nullable=False, default="RUB")
     plan = Column(String(16), nullable=False, default="personal")
+    # Выбранный пользователем интерфейсный режим. Не является оплатой: во время
+    # бесплатного запуска оба режима доступны, а после включения биллинга право
+    # на Family определяется подпиской владельца семейного пространства.
+    preferred_mode = Column(String(16), nullable=False, default="personal")
     plan_source = Column(String(16), nullable=False, default="default")  # default, admin, billing
     plan_expires_at = Column(DateTime(timezone=True), nullable=True)
     family_upgrade_enabled = Column(Boolean, nullable=False, default=False)

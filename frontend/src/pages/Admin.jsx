@@ -631,8 +631,8 @@ function StatsTab() {
                 Стартовый тариф нового пользователя
               </div>
               <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
-                <strong style={{ color: "#167a4a" }}>Personal.</strong> Новые пользователи получают
-                личные финансы. Семейное пространство доступно после назначения тарифа Family.
+                При регистрации пользователь сам выбирает <strong style={{ color: "#167a4a" }}>Personal</strong> или <strong>Family</strong>.
+                Во время бесплатного запуска оба режима доступны без оплаты.
               </div>
             </div>
           </div>
@@ -675,14 +675,18 @@ function StatsTab() {
               </div>
               <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
                 {config.billing_enabled ? (
-                  <><strong style={{ color: "#c0432b" }}>Включена.</strong> Семейные функции доступны только на тарифе Family — по подписке или тестовой оплате.</>
+                  <><strong style={{ color: "#c0432b" }}>Включена.</strong> Family доступен по подписке владельца; в неё входят он сам и ещё до двух участников.</>
                 ) : (
                   <><strong style={{ color: "#167a4a" }}>Отключена (бесплатный запуск).</strong> Семейные функции бесплатны для всех пользователей, независимо от их тарифа. Включите после набора базы пользователей, чтобы вернуть реальную оплату.</>
                 )}
               </div>
             </div>
             <button
-              onClick={() => patchConfig({ billing_enabled: !config.billing_enabled })}
+              onClick={() => {
+                const next = !config.billing_enabled;
+                if (next && !confirm("Включить оплату Family? После этого расширенные возможности будут доступны только владельцам активной Family-подписки и приглашённым ими участникам (до трёх адресов вместе с владельцем).")) return;
+                patchConfig({ billing_enabled: next });
+              }}
               disabled={savingConfig}
               className={!config.billing_enabled ? "" : "btn-danger"}
               style={{ whiteSpace: "nowrap" }}

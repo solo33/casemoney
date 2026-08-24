@@ -98,6 +98,7 @@ def _create_user(
     hashed_password: str,
     *,
     email_verified: bool = True,
+    preferred_mode: str = "personal",
 ) -> User:
     """Создаёт пользователя + дефолтные валюту/категории/счета."""
     user = User(
@@ -105,6 +106,7 @@ def _create_user(
         username=username,
         hashed_password=hashed_password,
         email_verified=email_verified,
+        preferred_mode=preferred_mode,
     )
     db.add(user)
     db.commit()
@@ -205,6 +207,7 @@ def register(
             data.username,
             hashed,
             email_verified=not cfg.require_email_verification,
+            preferred_mode=data.preferred_mode,
         )
     except IntegrityError:
         db.rollback()

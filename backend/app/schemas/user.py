@@ -7,6 +7,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     username: str
     password: str
+    preferred_mode: Literal["personal", "family"] = "personal"
 
 
 class UserLogin(BaseModel):
@@ -20,6 +21,7 @@ class UserResponse(BaseModel):
     username: str
     main_currency: str = "RUB"
     plan: Literal["personal", "family"] = "personal"
+    preferred_mode: Literal["personal", "family"] = "personal"
     plan_source: str = "default"
     plan_expires_at: Optional[datetime] = None
     family_upgrade_enabled: bool = False
@@ -48,6 +50,10 @@ class UserUpdate(BaseModel):
     dashboard_widgets: Optional[dict[str, Any]] = None
     notification_preferences: Optional[dict[str, Any]] = None
     onboarding_completed: Optional[bool] = None
+    preferred_mode: Optional[Literal["personal", "family"]] = None
+    # Нужен отдельный явный флаг: переход владельца в Personal может удалить
+    # общее пространство, но никогда не должен происходить случайно.
+    confirm_family_data_cleanup: bool = False
 
 
 class PasswordChange(BaseModel):

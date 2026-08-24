@@ -1,5 +1,5 @@
 from app.models.user import User
-from tests.conftest import TestingSessionLocal, register_and_login
+from tests.conftest import TestingSessionLocal, enable_billing, register_and_login
 
 
 def test_billing_overview_is_available_for_personal(client):
@@ -11,16 +11,17 @@ def test_billing_overview_is_available_for_personal(client):
     assert response.json()["family_upgrade_enabled"] is False
 
 
-def test_family_test_upgrade_requires_admin_permission(client):
+def test_test_family_checkout_is_disabled_during_free_launch(client):
     auth = register_and_login(client, "billing-locked@test.com")
     response = client.post("/api/billing/test-family", headers=auth, json={
         "period": "trial",
         "acknowledge_family_data_cleanup": True,
     })
-    assert response.status_code == 403
+    assert response.status_code == 409
 
 
 def test_admin_can_enable_trial_and_user_activates_family(client):
+    enable_billing()
     admin_auth = register_and_login(client, "billing-admin@test.com")
     user_auth = register_and_login(client, "billing-trial@test.com")
     db = TestingSessionLocal()
@@ -56,6 +57,7 @@ def test_admin_can_enable_trial_and_user_activates_family(client):
 
 
 def test_test_month_payment_activates_family_without_card_data(client):
+    enable_billing()
     auth = register_and_login(client, "billing-month@test.com")
     db = TestingSessionLocal()
     try:
@@ -76,6 +78,7 @@ def test_test_month_payment_activates_family_without_card_data(client):
 
 
 def test_successful_checkout_activates_family(client, monkeypatch):
+    enable_billing()
     auth = register_and_login(client, "billing-success@test.com")
     monkeypatch.setattr("app.services.yookassa.billing_configured", lambda: True)
     monkeypatch.setattr("app.services.yookassa.family_price", lambda: __import__("decimal").Decimal("299.00"))
@@ -114,6 +117,7 @@ def test_successful_checkout_activates_family(client, monkeypatch):
 
 
 def test_subscription_can_be_canceled_and_resumed(client, monkeypatch):
+    enable_billing()
     auth = register_and_login(client, "billing-cancel@test.com")
     monkeypatch.setattr("app.services.yookassa.billing_configured", lambda: True)
     monkeypatch.setattr("app.services.yookassa.family_price", lambda: __import__("decimal").Decimal("299.00"))

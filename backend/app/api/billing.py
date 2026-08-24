@@ -21,6 +21,8 @@ from app.schemas.billing import (
 from app.services.auth import decode_token
 from app.services.billing import add_month, apply_provider_payment, get_or_create_subscription, utcnow
 from app.services import yookassa
+from app.services import app_config as app_config_svc
+from app.models.family import FamilyMember
 
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -34,6 +36,16 @@ def _test_price(period: str) -> Decimal:
         return max(Decimal("0"), Decimal(os.getenv(variable, default))).quantize(Decimal("0.01"))
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Некорректно задана тестовая стоимость Family") from exc
+
+
+def _ensure_user_can_purchase_family(db: Session, user: User) -> None:
+    """Family оплачивает только владелец общего пространства."""
+    membership = db.query(FamilyMember).filter(
+        FamilyMember.user_id == user.id,
+        FamilyMember.status == "active",
+    ).first()
+    if membership and membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Оплату Family оформляет владелец семейного пространства")
 
 
 def current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
@@ -60,6 +72,7 @@ def overview(db: Session = Depends(get_db), user: User = Depends(current_user)):
         configured=yookassa.billing_configured(), plan=user.plan, plan_source=user.plan_source,
         plan_expires_at=user.plan_expires_at, family_price=float(yookassa.family_price()), subscription=subscription,
         payments=payments, family_upgrade_enabled=user.family_upgrade_enabled,
+        billing_enabled=app_config_svc.is_billing_enabled(db),
         test_month_price=float(_test_price("month")), test_year_price=float(_test_price("year")),
     )
 
@@ -70,10 +83,11 @@ def activate_test_family(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    if not app_config_svc.is_billing_enabled(db):
+        raise HTTPException(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
+    _ensure_user_can_purchase_family(db, user)
     if user.plan == "family":
         raise HTTPException(status_code=409, detail="Family уже активирован")
-    if not user.family_upgrade_enabled:
-        raise HTTPException(status_code=403, detail="Подключение Family для аккаунта пока недоступно")
     if data.period == "trial" and not data.acknowledge_family_data_cleanup:
         raise HTTPException(status_code=400, detail="Подтвердите предупреждение о данных Family")
     if data.period in {"month", "year"} and not data.accept_test_payment:
@@ -137,6 +151,9 @@ def activate_test_family(
 
 @router.post("/checkout", response_model=CheckoutResponse)
 def checkout(data: CheckoutRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if not app_config_svc.is_billing_enabled(db):
+        raise HTTPException(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
+    _ensure_user_can_purchase_family(db, user)
     if not data.accept_recurring:
         raise HTTPException(status_code=400, detail="Подтвердите согласие на автоматическое продление")
     if not yookassa.billing_configured():
