@@ -52,6 +52,9 @@ router = APIRouter(
     dependencies=[Depends(require_family_plan)],
 )
 
+# Family plan is priced per account, up to this many members (owner included).
+FAMILY_MAX_MEMBERS = 3
+
 
 def active_membership(db: Session, user_id: int) -> Optional[FamilyMember]:
     return db.query(FamilyMember).filter(
@@ -199,6 +202,12 @@ def invite_member(
         raise HTTPException(status_code=409, detail="Пользователь уже приглашён")
     if user and active_membership(db, user.id):
         raise HTTPException(status_code=409, detail="Пользователь уже состоит в другой семье")
+    member_count = db.query(FamilyMember).filter(FamilyMember.family_id == membership.family_id).count()
+    if member_count >= FAMILY_MAX_MEMBERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"В семейном пространстве уже максимум участников ({FAMILY_MAX_MEMBERS})",
+        )
     invitation = FamilyMember(
         family_id=membership.family_id,
         user_id=user.id if user else None,

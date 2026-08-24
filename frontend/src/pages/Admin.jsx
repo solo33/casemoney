@@ -663,6 +663,33 @@ function StatsTab() {
               {savingConfig ? "..." : config.registration_enabled ? "Закрыть" : "Открыть"}
             </button>
           </div>
+
+          {/* Оплата Family */}
+          <div style={{
+            display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+            gap: 16, padding: "12px 0", borderTop: "1px solid #ece6d8",
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1b2531", marginBottom: 4 }}>
+                Оплата Family
+              </div>
+              <div style={{ fontSize: 12.5, color: "#7a8590", lineHeight: 1.5 }}>
+                {config.billing_enabled ? (
+                  <><strong style={{ color: "#c0432b" }}>Включена.</strong> Семейные функции доступны только на тарифе Family — по подписке или тестовой оплате.</>
+                ) : (
+                  <><strong style={{ color: "#167a4a" }}>Отключена (бесплатный запуск).</strong> Семейные функции бесплатны для всех пользователей, независимо от их тарифа. Включите после набора базы пользователей, чтобы вернуть реальную оплату.</>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => patchConfig({ billing_enabled: !config.billing_enabled })}
+              disabled={savingConfig}
+              className={!config.billing_enabled ? "" : "btn-danger"}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {savingConfig ? "..." : config.billing_enabled ? "Сделать бесплатным" : "Включить оплату"}
+            </button>
+          </div>
         </div>
       )}
     </div>

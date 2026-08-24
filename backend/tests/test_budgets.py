@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from tests.conftest import TestingSessionLocal, make_account, register_and_login
+from tests.conftest import TestingSessionLocal, enable_billing, make_account, register_and_login
 from app.models.user import User
 
 
@@ -21,6 +21,7 @@ def get_category_id(client, auth, name, type_="expense"):
 
 
 def test_personal_plan_cannot_use_budgets(client):
+    enable_billing()
     auth = register_and_login(client, "personal-budget@test.com")
     response = client.get("/api/budgets/", headers=auth)
     assert response.status_code == 403

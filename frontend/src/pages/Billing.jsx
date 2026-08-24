@@ -16,7 +16,7 @@ export default function Billing() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const { refresh } = useUser();
+  const { user, refresh } = useUser();
 
   const load = useCallback(async () => {
     const response = await api.get("/api/billing/overview");
@@ -49,9 +49,15 @@ export default function Billing() {
     {error && <div className="billing-alert billing-error">{error}</div>}
     {message && <div className="billing-alert billing-success">{message}</div>}
     {loading ? <p>Загружаем данные…</p> : <>
-      {data.plan === "personal" && !data.family_upgrade_enabled && <section className="billing-locked"><h2>Сейчас доступен Personal</h2><p>Самостоятельное подключение Family пока закрыто. Когда администратор откроет его для вашего аккаунта, здесь появится выбор тарифа.</p></section>}
+      {data.plan === "personal" && user?.family_access && <section className="family-welcome">
+        <span className="billing-badge">Бесплатный запуск</span>
+        <h2>Family уже доступен вам бесплатно</h2>
+        <p>Пока идёт запуск, все функции Family (семейное пространство, бюджеты, кредиты и вклады) открыты без оплаты и без подписки — ничего подключать не нужно.</p>
+      </section>}
 
-      {data.plan === "personal" && data.family_upgrade_enabled && <section className="family-welcome">
+      {data.plan === "personal" && !user?.family_access && !data.family_upgrade_enabled && <section className="billing-locked"><h2>Сейчас доступен Personal</h2><p>Самостоятельное подключение Family пока закрыто. Когда администратор откроет его для вашего аккаунта, здесь появится выбор тарифа.</p></section>}
+
+      {data.plan === "personal" && !user?.family_access && data.family_upgrade_enabled && <section className="family-welcome">
         <span className="billing-badge">Добро пожаловать</span>
         <h2>Попробуйте CaseMoney Family</h2>
         <p>Выберите период. Сейчас используется тестовая оплата: деньги не списываются и настоящие данные карты не запрашиваются.</p>

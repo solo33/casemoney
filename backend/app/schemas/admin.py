@@ -42,11 +42,13 @@ class AdminConfig(BaseModel):
     require_email_verification: bool
     smtp_configured: bool
     registration_enabled: bool
+    billing_enabled: bool
 
 
 class AdminConfigUpdate(BaseModel):
     require_email_verification: Optional[bool] = None
     registration_enabled: Optional[bool] = None
+    billing_enabled: Optional[bool] = None
 
 
 class AdminStats(BaseModel):

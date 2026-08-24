@@ -11,7 +11,7 @@ const TABS = [
 
 export default function AnalysisNav() {
   const { user } = useUser();
-  const tabs = TABS.filter(tab => !["/reports/balances", "/reports/yoy"].includes(tab.to) || user?.plan === "family");
+  const tabs = TABS.filter(tab => !["/reports/balances", "/reports/yoy"].includes(tab.to) || user?.family_access);
   return (
     <div className="analysis-nav" style={{
       display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16,

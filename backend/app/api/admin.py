@@ -220,6 +220,7 @@ def _config_out(cfg) -> AdminConfig:
         require_email_verification=cfg.require_email_verification,
         smtp_configured=is_smtp_configured(),
         registration_enabled=cfg.registration_enabled,
+        billing_enabled=cfg.billing_enabled,
     )
 
 

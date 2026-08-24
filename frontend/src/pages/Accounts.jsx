@@ -344,7 +344,7 @@ export default function Accounts() {
           <button type="submit">+ Группа</button>
         </form>
 
-        {user?.plan === "family" && (
+        {user?.family_access && (
           <button
             type="button"
             className="btn-ghost"

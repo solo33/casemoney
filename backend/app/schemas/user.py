@@ -23,6 +23,10 @@ class UserResponse(BaseModel):
     plan_source: str = "default"
     plan_expires_at: Optional[datetime] = None
     family_upgrade_enabled: bool = False
+    # Whether Family features are actually unlocked right now — true for every
+    # user during the free launch period (app_config.billing_enabled = False),
+    # regardless of `plan`. Use this for gating UI, not `plan == "family"`.
+    family_access: bool = False
     show_shopping_button_mobile: bool = True
     hide_zero_balance_currencies: bool = False
     dashboard_widgets: dict[str, Any] = Field(default_factory=dict)

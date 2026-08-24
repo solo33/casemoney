@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 
 from app.models.user import User
-from tests.conftest import TestingSessionLocal, account_balance, make_account, register_and_login
+from tests.conftest import TestingSessionLocal, account_balance, enable_billing, make_account, register_and_login
 
 
 def enable_family(email: str) -> None:
@@ -15,6 +15,7 @@ def enable_family(email: str) -> None:
 
 
 def test_personal_plan_cannot_use_credits(client):
+    enable_billing()
     auth = register_and_login(client, "credit-personal@test.com")
     response = client.get("/api/credits/", headers=auth)
     assert response.status_code == 403

@@ -31,7 +31,7 @@ export default function QuickAddInline({
   categories: externalCategories,
 }) {
   const { user } = useUser();
-  const hasFamilyPlan = user?.plan === "family";
+  const hasFamilyPlan = Boolean(user?.family_access);
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]); // [{group, accounts}] для optgroup
   const [categories, setCategories] = useState([]);

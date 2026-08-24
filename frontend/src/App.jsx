@@ -88,7 +88,7 @@ function PublicContentRoute({ children }) {
 function FamilyPlanRoute({ children }) {
   const { user, loading } = useUser()
   if (loading) return <div className="page">Загрузка...</div>
-  if (user?.plan !== 'family') return <Navigate to="/settings/billing" replace />
+  if (!user?.family_access) return <Navigate to="/settings/billing" replace />
   return children
 }
 

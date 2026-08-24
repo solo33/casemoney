@@ -31,7 +31,7 @@ const TYPE_OPTIONS = [
 
 export default function QuickAddFab() {
   const { user } = useUser();
-  const hasFamilyPlan = user?.plan === "family";
+  const hasFamilyPlan = Boolean(user?.family_access);
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [accounts, setAccounts] = useState([]);

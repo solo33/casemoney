@@ -387,7 +387,7 @@ export default function Transactions() {
                   ))}
                 </div>
               )}
-              {user?.plan === "family" && <Link className="quick-template-link" to="/settings/templates">Шаблоны</Link>}
+              {user?.family_access && <Link className="quick-template-link" to="/settings/templates">Шаблоны</Link>}
             </>
           )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />

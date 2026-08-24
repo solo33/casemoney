@@ -69,7 +69,7 @@ export default function Nav() {
   const [lastSyncedAt, setLastSyncedAt] = useState(() => localStorage.getItem("casemoney:last-successful-sync"));
   const { user, mainCurrency } = useUser();
   const accountLabel = user?.username?.trim() || user?.email || "Аккаунт";
-  const hasFamilyPlan = user?.plan === "family";
+  const hasFamilyPlan = Boolean(user?.family_access);
   const links = BASE_LINKS.filter(link => link.to !== "/goals" || hasFamilyPlan);
   const visibleSettingsLinks = SETTINGS_LINKS.filter(
     link => link.to !== "/settings/family" || hasFamilyPlan

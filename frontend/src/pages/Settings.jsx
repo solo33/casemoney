@@ -127,6 +127,7 @@ export default function Settings() {
         limits={limits}
         plan={user?.plan || "personal"}
         familyUpgradeEnabled={Boolean(user?.family_upgrade_enabled)}
+        familyAccess={Boolean(user?.family_access)}
       />
 
       {/* Профиль */}
@@ -466,7 +467,7 @@ function FlashBox({ color, bg, border, children }) {
 const muted = { color: "#7a8590", fontSize: 13, margin: 0 };
 
 
-function PlanCard({ limits, plan, familyUpgradeEnabled }) {
+function PlanCard({ limits, plan, familyUpgradeEnabled, familyAccess }) {
   const u = limits?.usage || {};
   const items = [
     { key: "accounts", label: "Счета" },
@@ -494,7 +495,13 @@ function PlanCard({ limits, plan, familyUpgradeEnabled }) {
           : "Personal включает личные счета, категории, валюты, импорт, экспорт и отчеты."}
       </p>
 
-      {plan === "personal" && familyUpgradeEnabled && (
+      {plan === "personal" && familyAccess && (
+        <p style={{ ...muted, marginBottom: 12, color: "#167a4a", fontWeight: 600 }}>
+          🎉 Пока идёт бесплатный запуск, вам уже доступны все функции Family — платить не нужно.
+        </p>
+      )}
+
+      {plan === "personal" && !familyAccess && familyUpgradeEnabled && (
         <Link to="/settings/billing" style={{ display: "inline-block", marginBottom: 14, fontWeight: 700 }}>
           Перейти на Family →
         </Link>

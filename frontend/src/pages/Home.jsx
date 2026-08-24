@@ -640,7 +640,7 @@ export default function Home() {
           )}
         </Card>}
 
-        {user?.plan === "family" && widgetSettings.budget.visible && (
+        {user?.family_access && widgetSettings.budget.visible && (
           <BudgetWidget
             collapsed={isWidgetCollapsed("budget")}
             order={widgetSettings.budget.order}
@@ -648,7 +648,7 @@ export default function Home() {
           />
         )}
 
-        {user?.plan === "family" && widgetSettings.goals.visible && (
+        {user?.family_access && widgetSettings.goals.visible && (
           <GoalsWidget
             collapsed={isWidgetCollapsed("goals")}
             order={widgetSettings.goals.order}

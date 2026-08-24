@@ -14,7 +14,7 @@ export default function SettingsTabs() {
   const { pathname } = useLocation();
   const { user } = useUser();
   const visibleTabs = tabs.filter(
-    tab => tab.to !== "/settings/family" || user?.plan === "family"
+    tab => tab.to !== "/settings/family" || user?.family_access
   );
 
   return (

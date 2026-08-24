@@ -121,6 +121,21 @@ def auth(client):
     return register_and_login(client)
 
 
+def enable_billing() -> None:
+    """Turn on the real Family paywall for a test — default is free-for-all."""
+    from app.models.app_config import AppConfig
+    from app.services import app_config as app_config_svc
+
+    db = TestingSessionLocal()
+    try:
+        cfg = app_config_svc.get_config(db)
+        cfg.billing_enabled = True
+        db.commit()
+    finally:
+        app_config_svc.invalidate_cache()
+        db.close()
+
+
 def make_account(client, auth, name="Кошелёк", balance=0.0, currency="RUB", include_in_balance=True):
     r = client.post("/api/accounts/", headers=auth, json={
         "name": name, "type": "cash",

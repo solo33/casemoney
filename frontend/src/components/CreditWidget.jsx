@@ -10,8 +10,8 @@ export default function CreditWidget({ collapsed = false, onCollapseChange }) {
   const { user } = useUser();
   const [summary, setSummary] = useState(null);
   const [expanded, setExpanded] = useState(false);
-  useEffect(() => { if (user?.plan === "family" && navigator.onLine !== false) api.get("/api/credits/summary").then(response => setSummary(response.data)).catch(() => {}); }, [user?.plan]);
-  if (user?.plan !== "family" || !summary?.upcoming?.length) return null;
+  useEffect(() => { if (user?.family_access && navigator.onLine !== false) api.get("/api/credits/summary").then(response => setSummary(response.data)).catch(() => {}); }, [user?.family_access]);
+  if (!user?.family_access || !summary?.upcoming?.length) return null;
   const items = summary.upcoming;
   const visible = expanded ? items : items.slice(0, COLLAPSED_COUNT);
   const hiddenCount = items.length - visible.length;

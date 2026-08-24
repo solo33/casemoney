@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from tests.conftest import TestingSessionLocal, make_account, register_and_login
+from tests.conftest import TestingSessionLocal, enable_billing, make_account, register_and_login
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.recurring_transactions import process_recurring_transactions
@@ -17,6 +17,7 @@ def enable_family_plan(email: str) -> None:
 
 
 def test_personal_plan_cannot_use_family_features(client):
+    enable_billing()
     auth = register_and_login(client, "personal-family@test.com")
 
     response = client.post(
@@ -39,6 +40,29 @@ def test_personal_plan_cannot_use_family_features(client):
         },
     )
     assert transaction.status_code == 403
+
+
+def test_family_features_are_free_when_billing_disabled(client):
+    """Launch mode (default): a plain personal-plan user still gets Family for free."""
+    auth = register_and_login(client, "free-launch@test.com")
+
+    me = client.get("/api/me/", headers=auth).json()
+    assert me["plan"] == "personal"
+    assert me["family_access"] is True
+
+    created = client.post("/api/family/", headers=auth, json={"name": "Бесплатная семья"})
+    assert created.status_code == 201, created.text
+
+
+def test_family_invite_respects_member_cap(client):
+    owner = register_and_login(client, "cap-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Семья"})
+    for i in range(2):
+        r = client.post("/api/family/invite", headers=owner, json={"email": f"cap-member-{i}@test.com"})
+        assert r.status_code == 201, r.text
+    over_cap = client.post("/api/family/invite", headers=owner, json={"email": "cap-member-3@test.com"})
+    assert over_cap.status_code == 400
+    assert "максимум" in over_cap.json()["detail"]
 
 
 def test_family_expense_is_shared_without_exposing_personal_transactions(client):

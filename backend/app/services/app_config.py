@@ -32,3 +32,8 @@ def invalidate_cache():
 
 def is_email_verification_required(db: Session) -> bool:
     return get_config(db).require_email_verification
+
+
+def is_billing_enabled(db: Session) -> bool:
+    """False = launch mode: Family is free for every user, no payment required."""
+    return get_config(db).billing_enabled

@@ -79,7 +79,7 @@ export default function Reports() {
   const [breakdownType, setBreakdownType] = useState("expense");
   const [trendMonths, setTrendMonths] = useState(6);
   const [includePlanned, setIncludePlanned] = useState(false);
-  const hasFamilyPlan = user?.plan === "family";
+  const hasFamilyPlan = Boolean(user?.family_access);
 
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);

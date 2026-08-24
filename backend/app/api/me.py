@@ -16,6 +16,7 @@ from app.models.shopping import ShoppingList
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.services.auth import decode_token, hash_password, normalize_email, verify_password
 from app.services import limits as limits_svc
+from app.services import plans as plans_svc
 from app.services.notifications import normalized_preferences
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -38,12 +39,18 @@ def _get_user(db: Session, user_id: int) -> User:
     return user
 
 
+def _serialize(db: Session, user: User) -> UserResponse:
+    data = UserResponse.model_validate(user)
+    data.family_access = plans_svc.has_family_plan(db, user.id)
+    return data
+
+
 @router.get("/", response_model=UserResponse)
 def get_me(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return _get_user(db, user_id)
+    return _serialize(db, _get_user(db, user_id))
 
 
 @router.put("/", response_model=UserResponse)
@@ -82,7 +89,7 @@ def update_me(
     if "main_currency" in update_fields:
         from app.services import exchange as exchange_svc
         exchange_svc.invalidate_user_rates(user_id)
-    return user
+    return _serialize(db, user)
 
 
 @router.post("/password", status_code=204)
