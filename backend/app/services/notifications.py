@@ -13,46 +13,47 @@ from sqlalchemy.orm import Session
 from app.models.notification import Notification
 from app.models.user import User
 from app.services.email import send_financial_notification
+from app.services.web_push import send_web_pushes
 
 
-Channel = Literal["in_app", "email"]
+Channel = Literal["in_app", "email", "push"]
 
 
 NOTIFICATION_EVENTS = {
     "credit_due": {
         "label": "Платежи по обязательствам и поступления по депозитам",
         "description": "Напоминание о ближайшем или просроченном платеже.",
-        "default": {"in_app": True, "email": True},
+        "default": {"in_app": True, "email": True, "push": True},
     },
     "planned_operation": {
         "label": "Запланированные операции",
         "description": "Создана очередная операция из расписания.",
-        "default": {"in_app": True, "email": True},
+        "default": {"in_app": True, "email": True, "push": True},
     },
     "budget_limit": {
         "label": "Бюджеты",
         "description": "Приближение к лимиту или превышение бюджета.",
-        "default": {"in_app": True, "email": False},
+        "default": {"in_app": True, "email": False, "push": True},
     },
     "large_expense": {
         "label": "Крупные расходы",
         "description": "Расход заметно выше обычного уровня.",
-        "default": {"in_app": True, "email": False},
+        "default": {"in_app": True, "email": False, "push": True},
     },
     "family_expense": {
         "label": "Семейные расходы",
         "description": "Новая общая покупка другого участника семьи.",
-        "default": {"in_app": True, "email": False},
+        "default": {"in_app": True, "email": False, "push": True},
     },
     "goal_progress": {
         "label": "Финансовые цели",
         "description": "Изменение общей цели или достижение этапа.",
-        "default": {"in_app": True, "email": False},
+        "default": {"in_app": True, "email": False, "push": True},
     },
     "subscription": {
         "label": "Подписка",
         "description": "Окончание пробного периода или изменение тарифа.",
-        "default": {"in_app": True, "email": True},
+        "default": {"in_app": True, "email": True, "push": True},
     },
 }
 
@@ -67,6 +68,7 @@ def normalized_preferences(value: dict | None) -> dict[str, dict[str, bool]]:
         result[event] = {
             "in_app": bool(selected.get("in_app", defaults["in_app"])),
             "email": bool(selected.get("email", defaults["email"])),
+            "push": bool(selected.get("push", defaults["push"])),
         }
     return result
 
@@ -104,6 +106,8 @@ def notify_user(
             message=message,
             link=link,
         )
+    if is_enabled(user, event, "push"):
+        send_web_pushes(db, user, title=title, link=link)
     return sent_in_app, sent_email
 
 

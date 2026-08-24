@@ -28,6 +28,8 @@ from app.services.auth import decode_token, hash_password
 from app.services.user_cleanup import delete_user_completely
 from app.services import app_config as app_config_svc
 from app.services.email import is_smtp_configured, send_email
+from app.services.notifications import is_enabled
+from app.services.web_push import send_web_pushes
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 security = HTTPBearer()
@@ -69,6 +71,9 @@ def create_notification(
         for user in recipients
     ]
     db.add_all(notifications)
+    for user in recipients:
+        if is_enabled(user, "subscription", "push"):
+            send_web_pushes(db, user, title=data.title.strip(), link=data.link)
     db.commit()
     return {"recipients_count": len(notifications)}
 

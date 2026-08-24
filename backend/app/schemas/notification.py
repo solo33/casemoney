@@ -22,8 +22,9 @@ class NotificationsPage(BaseModel):
 
 
 class NotificationChannelSettings(BaseModel):
-    in_app: bool
-    email: bool
+    in_app: bool = True
+    email: bool = False
+    push: bool = True
 
 
 class NotificationSettingsResponse(BaseModel):

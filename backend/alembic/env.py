@@ -52,6 +52,7 @@ from app.models.bank_import_mapping import (
 )
 from app.models.family import Family, FamilyMember, FamilySettlement
 from app.models.notification import Notification
+from app.models.push_subscription import PushSubscription
 from app.models.credit import CreditObligation, CreditPayment
 from app.models.billing import Subscription, BillingPayment
 from app.models.shopping import ShoppingList, ShoppingItem

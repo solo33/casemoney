@@ -35,6 +35,7 @@ import app.models.app_config      # noqa: F401
 import app.models.bank_import_mapping  # noqa: F401
 import app.models.family          # noqa: F401
 import app.models.notification    # noqa: F401
+import app.models.push_subscription  # noqa: F401
 import app.models.credit          # noqa: F401
 
 test_engine = create_engine(

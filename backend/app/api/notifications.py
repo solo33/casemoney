@@ -12,10 +12,53 @@ from app.schemas.notification import (
     NotificationsPage,
 )
 from app.models.user import User
+from app.models.push_subscription import PushSubscription
 from app.services.notifications import NOTIFICATION_EVENTS, normalized_preferences
+from app.services.web_push import is_web_push_configured, vapid_public_key
+from app.schemas.push_subscription import PushConfigResponse, PushSubscriptionCreate, PushSubscriptionDelete
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+
+
+@router.get("/push/config", response_model=PushConfigResponse)
+def get_push_config(
+    _: int = Depends(get_current_user_id),
+):
+    public_key = vapid_public_key()
+    return {"enabled": is_web_push_configured(), "public_key": public_key}
+
+
+@router.post("/push/subscribe", status_code=201)
+def subscribe_push(
+    data: PushSubscriptionCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    subscription = db.query(PushSubscription).filter(PushSubscription.endpoint == data.endpoint).first()
+    if subscription is None:
+        subscription = PushSubscription(user_id=user_id, **data.model_dump())
+        db.add(subscription)
+    else:
+        subscription.user_id = user_id
+        subscription.p256dh = data.p256dh
+        subscription.auth = data.auth
+        subscription.user_agent = data.user_agent
+    db.commit()
+    return {"subscribed": True}
+
+
+@router.delete("/push/subscribe", status_code=204)
+def unsubscribe_push(
+    data: PushSubscriptionDelete,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    db.query(PushSubscription).filter(
+        PushSubscription.user_id == user_id,
+        PushSubscription.endpoint == data.endpoint,
+    ).delete(synchronize_session=False)
+    db.commit()
 
 
 @router.get("/settings", response_model=NotificationSettingsResponse)

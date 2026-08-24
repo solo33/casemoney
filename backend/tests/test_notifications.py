@@ -70,13 +70,13 @@ def test_user_can_choose_notification_channels(client):
     auth = register_and_login(client, "notification-settings@test.com")
     initial = client.get("/api/notifications/settings", headers=auth)
     assert initial.status_code == 200, initial.text
-    assert initial.json()["preferences"]["credit_due"] == {"in_app": True, "email": True}
+    assert initial.json()["preferences"]["credit_due"] == {"in_app": True, "email": True, "push": True}
 
     preferences = initial.json()["preferences"]
-    preferences["credit_due"] = {"in_app": False, "email": False}
+    preferences["credit_due"] = {"in_app": False, "email": False, "push": False}
     saved = client.put("/api/notifications/settings", headers=auth, json={"preferences": preferences})
     assert saved.status_code == 200, saved.text
-    assert saved.json()["preferences"]["credit_due"] == {"in_app": False, "email": False}
+    assert saved.json()["preferences"]["credit_due"] == {"in_app": False, "email": False, "push": False}
 
     loaded = client.get("/api/notifications/settings", headers=auth)
-    assert loaded.json()["preferences"]["credit_due"] == {"in_app": False, "email": False}
+    assert loaded.json()["preferences"]["credit_due"] == {"in_app": False, "email": False, "push": False}

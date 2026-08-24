@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import WebPushControl from "../components/WebPushControl";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
@@ -391,16 +392,18 @@ function NotificationSettings({ flash }) {
 
   return (
     <Section title="Уведомления">
-      <p style={muted}>Выберите, о каких событиях CaseMoney будет сообщать в колокольчике и на email. Email включён по умолчанию только для важных платежей и подписки.</p>
+      <p style={muted}>Выберите, о каких событиях CaseMoney будет сообщать в колокольчике, по email и через push. Push приходит только на устройства, где вы отдельно дали разрешение.</p>
+      <WebPushControl flash={flash} />
       {!settings ? <p style={muted}>Загружаем настройки…</p> : (
         <>
           <div className="notification-settings-grid">
             {Object.entries(settings.events || {}).map(([key, event]) => {
-              const choice = settings.preferences?.[key] || { in_app: true, email: false };
+              const choice = settings.preferences?.[key] || { in_app: true, email: false, push: true };
               return <div className="notification-settings-row" key={key}>
                 <div><b>{event.label}</b><small>{event.description}</small></div>
                 <label><input type="checkbox" checked={choice.in_app} onChange={item => setChannel(key, "in_app", item.target.checked)} /> В приложении</label>
                 <label><input type="checkbox" checked={choice.email} onChange={item => setChannel(key, "email", item.target.checked)} /> Email</label>
+                <label><input type="checkbox" checked={choice.push} onChange={item => setChannel(key, "push", item.target.checked)} /> Push</label>
               </div>;
             })}
           </div>

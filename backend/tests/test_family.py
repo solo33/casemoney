@@ -486,6 +486,6 @@ def test_me_update_sanitizes_notification_preferences(client):
     assert response.status_code == 200, response.text
     saved = response.json()["notification_preferences"]
     assert "not_a_real_event" not in saved
-    assert saved["planned_operation"] == {"in_app": False, "email": True}
+    assert saved["planned_operation"] == {"in_app": False, "email": True, "push": True}
     # Untouched events keep their documented defaults rather than being dropped.
-    assert saved["credit_due"] == {"in_app": True, "email": True}
+    assert saved["credit_due"] == {"in_app": True, "email": True, "push": True}

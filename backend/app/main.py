@@ -33,6 +33,7 @@ from app.models.bank_import_mapping import (  # noqa: F401
 )
 from app.models.family import Family, FamilyMember, FamilySettlement  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
+from app.models.push_subscription import PushSubscription  # noqa: F401
 from app.models.credit import CreditObligation, CreditPayment  # noqa: F401
 from app.models.billing import Subscription, BillingPayment  # noqa: F401
 from app.models.shopping import ShoppingList, ShoppingItem  # noqa: F401

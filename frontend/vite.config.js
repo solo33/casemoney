@@ -22,6 +22,9 @@ export default defineConfig({
     react(),
     versionAssetPlugin(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'service-worker.js',
       // Новая сборка ждёт явного подтверждения пользователя. Это защищает
       // незавершённый ввод операции от неожиданной перезагрузки PWA.
       registerType: 'prompt',
@@ -51,30 +54,7 @@ export default defineConfig({
           { src: '/icon.svg',           sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
         ],
       },
-      workbox: {
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: false,
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
-        runtimeCaching: [
-          // /api/ НЕ кэшируем: ответы привязаны к JWT, а cache SW общий на
-          // origin — после смены аккаунта офлайн-режим мог отдать чужие данные.
-          {
-            // Иконки/изображения
-            urlPattern: ({ request }) => request.destination === 'image',
-            handler: 'CacheFirst',
-            options: {
-              cacheName: `images-cache-${APP_FULL_VERSION}`,
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 дней
-              },
-            },
-          },
-        ],
-      },
+      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'] },
       devOptions: {
         enabled: false, // включить только если нужно тестировать SW в dev
       },
