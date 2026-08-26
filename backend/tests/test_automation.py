@@ -1,4 +1,4 @@
-from app.models.transaction import Transaction
+from datetime import datetime, timedelta, timezone
 
 from .conftest import make_account
 
@@ -71,3 +71,25 @@ def test_automation_settings_can_disable_rules_and_duplicate_review(client, auth
     assert response.status_code == 201, response.text
     assert response.json()["category_id"] is None
     assert client.get("/api/automation/duplicates", headers=auth).json() == []
+
+
+def test_regular_payment_suggestions_are_read_only(client, auth):
+    account = make_account(client, auth)
+    food = _expense_category(client, auth)
+    first = datetime(2026, 5, 3, tzinfo=timezone.utc)
+    for index in range(3):
+        response = client.post("/api/transactions/", headers=auth, json={
+            "type": "expense", "amount": 799, "currency": "RUB",
+            "account_id": account["id"], "category_id": food["id"],
+            "description": "Музыкальная подписка",
+            "date": (first + timedelta(days=index * 30)).isoformat(),
+        })
+        assert response.status_code == 201, response.text
+
+    response = client.get("/api/automation/regular-payments", headers=auth)
+    assert response.status_code == 200, response.text
+    assert len(response.json()) == 1
+    item = response.json()[0]
+    assert item["cadence"] == "ежемесячно"
+    assert item["category_name"] == "Продукты"
+    assert client.get("/api/transactions/", headers=auth).json()["total"] == 3

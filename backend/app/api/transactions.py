@@ -18,7 +18,13 @@ from app.models.category import Category
 from app.models.transaction_history import TransactionHistory
 from app.models.family import FamilyMember
 from app.models.user import User
-from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionResponse
+from app.schemas.transaction import (
+    TransactionCreate,
+    TransactionUpdate,
+    TransactionResponse,
+    TransactionBulkCategoryUpdate,
+    TransactionBulkUpdateResult,
+)
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
@@ -555,6 +561,58 @@ def create_transaction(
         raise
     db.refresh(transaction)
     return transaction
+
+
+@router.patch("/bulk/category", response_model=TransactionBulkUpdateResult)
+def bulk_update_category(
+    data: TransactionBulkCategoryUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Categorise a selection of historic income or expense rows.
+
+    Transfers are deliberately excluded: a transfer has no category and changing
+    it here would make the ledger misleading.  The selected rows must have one
+    type, because an income category cannot be applied to an expense (and vice
+    versa).
+    """
+    ids = list(dict.fromkeys(data.transaction_ids))
+    rows = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.id.in_(ids))
+        .all()
+    )
+    if len(rows) != len(ids):
+        raise HTTPException(status_code=404, detail="Часть выбранных записей не найдена.")
+    types = {row.type for row in rows}
+    if len(types) != 1 or TransactionType.transfer in types:
+        raise HTTPException(
+            status_code=400,
+            detail="Можно изменить категорию только у записей одного типа: доходов или расходов.",
+        )
+
+    category = None
+    if data.category_id is not None:
+        category = db.query(Category).filter(
+            Category.id == data.category_id,
+            Category.user_id == user_id,
+        ).first()
+        if not category:
+            raise HTTPException(status_code=404, detail="Категория не найдена.")
+        if category.type != next(iter(types)).value:
+            raise HTTPException(status_code=400, detail="Тип категории не совпадает с выбранными записями.")
+
+    for row in rows:
+        if row.category_id == data.category_id:
+            continue
+        prev_amount, prev_currency = row.amount, row.currency
+        row.category_id = data.category_id
+        _write_history(
+            db, user_id, row, "edited",
+            prev_amount=prev_amount, prev_currency=prev_currency,
+        )
+    db.commit()
+    return TransactionBulkUpdateResult(updated=len(rows))
 
 
 @router.patch("/{transaction_id}", response_model=TransactionResponse)

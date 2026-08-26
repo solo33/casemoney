@@ -39,3 +39,20 @@ class DuplicateTransactionItem(BaseModel):
 class DuplicateGroupResponse(BaseModel):
     key: str
     transactions: List[DuplicateTransactionItem]
+
+
+class RegularPaymentSuggestion(BaseModel):
+    """A non-binding recurring-payment candidate built from past operations."""
+    key: str
+    transaction_type: str
+    description: str
+    account_id: int
+    account_name: str
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    amount: float
+    currency: str
+    cadence: str
+    occurrences: int
+    last_date: str
+    next_date: str

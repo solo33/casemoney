@@ -65,8 +65,12 @@ export default function Transactions() {
   const [frequentCategories, setFrequentCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
   const createRequestRef = useRef(null);
 
   // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
@@ -159,6 +163,7 @@ export default function Transactions() {
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  useEffect(() => { setSelectedIds([]); setBulkCategoryId(""); }, [filters, page]);
   useEffect(() => {
     if (newTx.type === "transfer") { setFrequentCategories([]); return; }
     api.get("/api/transactions/frequent-categories", { params: { tx_type: newTx.type } })
@@ -293,6 +298,37 @@ export default function Transactions() {
     }
   };
 
+  const selectedTransactions = data.items.filter(item => selectedIds.includes(item.id));
+  const selectedType = selectedTransactions.length ? selectedTransactions[0].type : null;
+  const canBulkCategorize = selectedTransactions.length > 0
+    && selectedTransactions.every(item => item.type === selectedType)
+    && selectedType !== "transfer";
+  const bulkCategories = selectedType ? categories.filter(item => item.type === selectedType) : [];
+  const toggleSelection = (id) => setSelectedIds(current => current.includes(id)
+    ? current.filter(item => item !== id)
+    : [...current, id]);
+  const toggleAllPage = () => setSelectedIds(current => {
+    const ids = data.items.map(item => item.id);
+    return ids.length > 0 && ids.every(id => current.includes(id)) ? [] : ids;
+  });
+  const applyBulkCategory = async () => {
+    if (!canBulkCategorize || !bulkCategoryId) return;
+    setBulkSaving(true);
+    setError(null);
+    try {
+      const response = await api.patch("/api/transactions/bulk/category", {
+        transaction_ids: selectedIds,
+        category_id: Number(bulkCategoryId),
+      });
+      setSelectedIds([]);
+      setBulkCategoryId("");
+      setNotice(`Категория обновлена у ${response.data.updated} ${response.data.updated === 1 ? "записи" : "записей"}.`);
+      loadTransactions();
+    } catch (requestError) {
+      setError(requestError.response?.data?.detail || "Не удалось изменить категории.");
+    } finally { setBulkSaving(false); }
+  };
+
   const accountName = (id) => accounts.find(a => a.id === id)?.name || id;
   const categoryNameFor = (id) => {
     const c = categories.find(c => c.id === id);
@@ -367,6 +403,14 @@ export default function Transactions() {
         }}>
           {error}{" "}
           <button onClick={() => setError(null)} className="btn-ghost" style={{ padding: "2px 8px", marginLeft: "auto" }}>×</button>
+        </div>
+      )}
+      {notice && (
+        <div role="status" style={{
+          color: "#167a4a", padding: "8px 12px", display: "flex", alignItems: "center",
+          background: "#edf8f0", border: "1px solid #bde5c8", borderRadius: 8, marginBottom: 12,
+        }}>
+          {notice}<button onClick={() => setNotice(null)} className="btn-ghost" style={{ padding: "2px 8px", marginLeft: "auto" }}>×</button>
         </div>
       )}
 
@@ -528,6 +572,20 @@ export default function Transactions() {
         )}
       </div>
 
+      {selectedIds.length > 0 && (
+        <div className="transactions-bulk-bar">
+          <span>Выбрано: <b>{selectedIds.length}</b></span>
+          {canBulkCategorize ? <>
+            <select value={bulkCategoryId} onChange={event => setBulkCategoryId(event.target.value)} aria-label="Новая категория для выбранных записей">
+              <option value="">Выберите категорию</option>
+              {bulkCategories.map(category => <option key={category.id} value={category.id}>{category.parent_id ? "↳ " : ""}{category.name}</option>)}
+            </select>
+            <button type="button" disabled={!bulkCategoryId || bulkSaving} onClick={applyBulkCategory}>{bulkSaving ? "Меняем…" : "Изменить категорию"}</button>
+          </> : <small>Выберите только доходы или только расходы — переводы не категоризируются.</small>}
+          <button type="button" className="btn-ghost" onClick={() => setSelectedIds([])}>Снять выбор</button>
+        </div>
+      )}
+
       {/* Таблица */}
       {data.items.length > 0 && (
         <div className="table-wrap transactions-desktop-table" style={{
@@ -536,6 +594,7 @@ export default function Transactions() {
           <table>
             <thead>
               <tr>
+                <Th><input type="checkbox" aria-label="Выбрать все записи на странице" checked={data.items.length > 0 && data.items.every(item => selectedIds.includes(item.id))} onChange={toggleAllPage} /></Th>
                 <Th>Дата</Th>
                 <Th>Тип</Th>
                 <Th align="right">Сумма</Th>
@@ -561,6 +620,8 @@ export default function Transactions() {
                       formatDate={formatDate}
                       onEdit={() => setEditing(tx.id)}
                       onDelete={() => handleDelete(tx.id)}
+                      checked={selectedIds.includes(tx.id)}
+                      onToggle={() => toggleSelection(tx.id)}
                     />
               ))}
             </tbody>
@@ -579,6 +640,8 @@ export default function Transactions() {
                 formatDate={formatDate}
                 onEdit={() => setEditing(editing === tx.id ? null : tx.id)}
                 onDelete={() => handleDelete(tx.id)}
+                checked={selectedIds.includes(tx.id)}
+                onToggle={() => toggleSelection(tx.id)}
               />
               {editing === tx.id && (
                 <table className="transactions-mobile-edit"><tbody><EditRow
@@ -615,9 +678,10 @@ function Th({ children, align = "left" }) {
   );
 }
 
-function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
+function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete, checked, onToggle }) {
   return (
     <tr style={{ borderTop: "1px solid #ece6d8" }}>
+      <td style={{ padding: "8px 4px 8px 10px" }}><input type="checkbox" checked={checked} onChange={onToggle} aria-label={`Выбрать запись ${tx.id}`} /></td>
       <td style={{ padding: "8px 12px", color: "#7a8590", fontSize: 13, whiteSpace: "nowrap" }}>
         {formatDate(tx.date)}
       </td>
@@ -654,13 +718,14 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
   );
 }
 
-function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEdit, onDelete }) {
+function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEdit, onDelete, checked, onToggle }) {
   const category = tx.type === "transfer"
     ? `→ ${accountName(tx.to_account_id)}`
     : (tx.category_id ? categoryName(tx.category_id) : "Без категории");
   const title = tx.description || category || TYPE_LABEL[tx.type];
   return (
     <article className="mobile-transaction-card">
+      <label className="mobile-transaction-select"><input type="checkbox" checked={checked} onChange={onToggle} aria-label={`Выбрать запись ${tx.id}`} /></label>
       <button type="button" className="mobile-transaction-main" onClick={onEdit} aria-label={`Изменить запись ${title}`}>
         <span className="mobile-transaction-icon" style={{ color: TYPE_COLOR[tx.type] }}>{TYPE_ICON[tx.type]}</span>
         <span className="mobile-transaction-copy">

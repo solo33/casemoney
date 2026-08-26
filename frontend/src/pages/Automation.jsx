@@ -7,6 +7,7 @@ export default function Automation() {
   const [rules, setRules] = useState([]);
   const [categories, setCategories] = useState([]);
   const [duplicates, setDuplicates] = useState([]);
+  const [regularPayments, setRegularPayments] = useState([]);
   const [settings, setSettings] = useState({ rules_enabled: true, duplicates_enabled: true });
   const [pattern, setPattern] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -15,16 +16,18 @@ export default function Automation() {
 
   const load = useCallback(async () => {
     try {
-      const [rulesResponse, categoriesResponse, duplicatesResponse, settingsResponse] = await Promise.all([
+      const [rulesResponse, categoriesResponse, duplicatesResponse, settingsResponse, regularResponse] = await Promise.all([
         api.get("/api/automation/rules"),
         api.get("/api/categories/"),
         api.get("/api/automation/duplicates"),
         api.get("/api/automation/settings"),
+        api.get("/api/automation/regular-payments"),
       ]);
       setRules(rulesResponse.data || []);
       setCategories(categoriesResponse.data || []);
       setDuplicates(duplicatesResponse.data || []);
       setSettings(settingsResponse.data || { rules_enabled: true, duplicates_enabled: true });
+      setRegularPayments(regularResponse.data || []);
     } catch (requestError) {
       setError(requestError.response?.data?.detail || "Не удалось загрузить автоматизацию.");
     }
@@ -104,5 +107,12 @@ export default function Automation() {
       <div className="automation-card-head"><div><h2>Возможные дубли</h2><p>Операции с одинаковыми счётом, датой, суммой и комментарием за последний год. Ничего не удаляем автоматически.</p></div><button type="button" className="btn-secondary" onClick={load}>Проверить снова</button></div>
       {duplicates.length === 0 ? <p className="empty-state">Потенциальных дублей не найдено.</p> : <div className="automation-duplicates">{duplicates.map(group => <article key={group.key}><strong>Проверьте {group.transactions.length} похожие операции</strong>{group.transactions.map(item => <div key={item.id}><time>{new Date(`${item.date}T12:00:00`).toLocaleDateString("ru-RU")}</time><span>{item.account_name} · {item.description}</span><b>{formatMoney(item.amount)} {item.currency}</b></div>)}</article>)}</div>}
     </section>}
+    <section className="automation-card">
+      <div className="automation-card-head"><div><h2>Похожие на регулярные операции</h2><p>Подсказки строятся только по трём и более одинаковым операциям с регулярным интервалом. Ничего не создаётся автоматически.</p></div><button type="button" className="btn-secondary" onClick={load}>Обновить</button></div>
+      {regularPayments.length === 0 ? <p className="empty-state">Пока не найдено повторяющихся операций.</p> : <div className="automation-regular-list">{regularPayments.map(item => <article key={item.key}>
+        <div><strong>{item.description}</strong><span>{item.transaction_type === "expense" ? "Расход" : "Доход"} · {item.account_name}{item.category_name ? ` · ${item.category_name}` : ""}</span><small>{item.cadence} · {item.occurrences} операций · следующее ориентировочно {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")}</small></div>
+        <b className={item.transaction_type === "expense" ? "is-expense" : "is-income"}>{formatMoney(item.amount)} {item.currency}</b>
+      </article>)}</div>}
+    </section>
   </main>;
 }

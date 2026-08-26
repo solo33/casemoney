@@ -5,8 +5,13 @@ category, so the user remains in full control of historic data.
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import timedelta
+
+from app.models.account import Account
 from app.models.category import Category
 from app.models.category_rule import CategoryRule
+from app.models.transaction import Transaction, TransactionType
 
 
 def normalize_rule_pattern(value: str) -> str:
@@ -39,3 +44,73 @@ def matched_category_id(
     if not matches:
         return None
     return max(matches, key=lambda item: len(item.pattern)).category_id
+
+
+def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]:
+    """Find conservative weekly/monthly payment candidates without creating anything.
+
+    A candidate needs at least three real, non-financing income/expense
+    operations with the same account, currency, rounded amount and note.  The
+    intervals must be consistently weekly or monthly.  This intentionally
+    favours a short, trustworthy list over speculative suggestions.
+    """
+    rows = (
+        db.query(Transaction, Account)
+        .join(Account, Account.id == Transaction.account_id)
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type.in_([TransactionType.income, TransactionType.expense]),
+            Transaction.is_planned.is_(False),
+            Transaction.is_financing.is_(False),
+        )
+        .order_by(Transaction.date.asc(), Transaction.id.asc())
+        .all()
+    )
+    buckets: dict[tuple, list[tuple[Transaction, Account]]] = defaultdict(list)
+    for transaction, account in rows:
+        note = normalize_rule_pattern(transaction.description or "")
+        if len(note) < 2:
+            continue
+        key = (
+            transaction.type.value,
+            transaction.account_id,
+            transaction.currency,
+            round(float(transaction.amount), 2),
+            transaction.category_id,
+            note,
+        )
+        buckets[key].append((transaction, account))
+
+    result: list[dict] = []
+    for key, values in buckets.items():
+        if len(values) < 3:
+            continue
+        transactions = [value[0] for value in values]
+        intervals = [
+            (later.date.date() - earlier.date.date()).days
+            for earlier, later in zip(transactions, transactions[1:])
+        ]
+        cadence = None
+        if intervals and all(5 <= interval <= 9 for interval in intervals):
+            cadence, delta = "еженедельно", 7
+        elif intervals and all(26 <= interval <= 35 for interval in intervals):
+            cadence, delta = "ежемесячно", 30
+        else:
+            continue
+        last = transactions[-1]
+        account = values[-1][1]
+        result.append({
+            "key": "|".join(map(str, key)),
+            "transaction_type": last.type.value,
+            "description": last.description or "Регулярная операция",
+            "account_id": account.id,
+            "account_name": account.name,
+            "category_id": last.category_id,
+            "amount": last.amount,
+            "currency": last.currency,
+            "cadence": cadence,
+            "occurrences": len(transactions),
+            "last_date": last.date.date().isoformat(),
+            "next_date": (last.date.date() + timedelta(days=delta)).isoformat(),
+        })
+    return sorted(result, key=lambda item: (-item["occurrences"], item["next_date"]))[:limit]

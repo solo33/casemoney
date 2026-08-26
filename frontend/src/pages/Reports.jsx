@@ -84,6 +84,7 @@ export default function Reports() {
   const [summary, setSummary] = useState(null);
   const [trend, setTrend] = useState(null);
   const [insights, setInsights] = useState(null);
+  const [regularPayments, setRegularPayments] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -108,8 +109,11 @@ export default function Reports() {
       hasFamilyPlan
         ? api.post("/api/finance-insights/summary", { period_days: 30 })
         : Promise.resolve({ data: null }),
+      hasFamilyPlan
+        ? api.get("/api/automation/regular-payments")
+        : Promise.resolve({ data: [] }),
     ])
-      .then(([s, t, i]) => { setSummary(s.data); setTrend(t.data); setInsights(i.data); })
+      .then(([s, t, i, regular]) => { setSummary(s.data); setTrend(t.data); setInsights(i.data); setRegularPayments(regular.data || []); })
       .catch(() => setError("Ошибка загрузки анализа"))
       .finally(() => setLoading(false));
   }, [gran, anchor, breakdownType, trendMonths, trendEndDate, includePlanned, hasFamilyPlan]);
@@ -331,6 +335,16 @@ export default function Reports() {
                   <small>{aiInsight.source_note} Осталось подсказок в этом месяце: {aiInsight.remaining_requests}.</small>
                 </div>}
               </div>
+            </section>
+          )}
+
+          {hasFamilyPlan && regularPayments.length > 0 && (
+            <section className="report-regular-card">
+              <div><p className="finance-insights-eyebrow">ФИНАНСОВАЯ КАРТИНА</p><h2>Регулярные платежи и поступления</h2><p>Найдены по истории операций. Это подсказки: они не создают записи и не меняют план без вашего решения.</p></div>
+              <div className="report-regular-grid">{regularPayments.map(item => <article key={item.key}>
+                <div><strong>{item.description}</strong><span>{item.transaction_type === "expense" ? "Расход" : "Доход"} · {item.cadence} · {item.account_name}</span><small>Следующее ориентировочно {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")}</small></div>
+                <b className={item.transaction_type === "expense" ? "is-expense" : "is-income"}>{item.transaction_type === "expense" ? "−" : "+"}{formatMoney(item.amount)} {item.currency}</b>
+              </article>)}</div>
             </section>
           )}
 

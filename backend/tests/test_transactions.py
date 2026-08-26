@@ -64,6 +64,27 @@ def test_delete_reverts_balance(client, auth):
     assert account_balance(client, auth, acc["id"]) == 1000
 
 
+def test_bulk_category_update_changes_only_selected_expenses(client, auth):
+    acc = make_account(client, auth, balance=1000)
+    category = client.post("/api/categories/", headers=auth, json={
+        "name": "Продукты", "type": "expense",
+    }).json()
+    first = _add(client, auth, acc["id"], 100, "expense")
+    second = _add(client, auth, acc["id"], 200, "expense")
+
+    response = client.patch("/api/transactions/bulk/category", headers=auth, json={
+        "transaction_ids": [first["id"], second["id"]],
+        "category_id": category["id"],
+    })
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"updated": 2}
+    rows = {item["id"]: item for item in client.get("/api/transactions/", headers=auth).json()["items"]}
+    assert rows[first["id"]]["category_id"] == category["id"]
+    assert rows[second["id"]]["category_id"] == category["id"]
+    assert account_balance(client, auth, acc["id"]) == 700
+
+
 def test_cross_currency_transfer_uses_explicit_destination_amount(client, auth):
     source = make_account(client, auth, name="Source", balance=1000, currency="RUB")
     target = make_account(client, auth, name="Target", balance=20, currency="EUR")

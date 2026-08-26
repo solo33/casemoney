@@ -40,6 +40,16 @@ class TransactionUpdate(BaseModel):
     is_planned: Optional[bool] = None
 
 
+class TransactionBulkCategoryUpdate(BaseModel):
+    """One deliberate category change for several historic income/expense rows."""
+    transaction_ids: list[int] = Field(min_length=1, max_length=100)
+    category_id: Optional[int] = None
+
+
+class TransactionBulkUpdateResult(BaseModel):
+    updated: int
+
+
 class TransactionResponse(BaseModel):
     id: int
     amount: float

@@ -14,9 +14,9 @@ from app.models.category import Category
 from app.models.category_rule import CategoryRule
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
-from app.schemas.automation import (AutomationSettings, AutomationSettingsUpdate, CategoryRuleCreate, CategoryRuleResponse, DuplicateGroupResponse, DuplicateTransactionItem)
+from app.schemas.automation import (AutomationSettings, AutomationSettingsUpdate, CategoryRuleCreate, CategoryRuleResponse, DuplicateGroupResponse, DuplicateTransactionItem, RegularPaymentSuggestion)
 from app.services.auth import decode_token
-from app.services.automation import normalize_rule_pattern
+from app.services.automation import normalize_rule_pattern, regular_payment_suggestions
 
 
 router = APIRouter(prefix="/api/automation", tags=["automation"])
@@ -158,3 +158,20 @@ def possible_duplicates(db: Session = Depends(get_db), user_id: int = Depends(_c
             ) for transaction, account in values],
         ))
     return result[:30]
+
+
+@router.get("/regular-payments", response_model=list[RegularPaymentSuggestion])
+def regular_payments(db: Session = Depends(get_db), user_id: int = Depends(_current_user_id)):
+    """Suggestions only: the user decides whether to create a schedule."""
+    suggestions = regular_payment_suggestions(db, user_id)
+    category_ids = {item["category_id"] for item in suggestions if item["category_id"] is not None}
+    categories = {
+        category.id: category.name
+        for category in db.query(Category).filter(
+            Category.user_id == user_id,
+            Category.id.in_(category_ids),
+        ).all()
+    } if category_ids else {}
+    for item in suggestions:
+        item["category_name"] = categories.get(item["category_id"])
+    return suggestions
