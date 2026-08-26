@@ -6,7 +6,7 @@ Google и Яндекс Календарь умеют подписываться 
 from __future__ import annotations
 
 import secrets
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -14,12 +14,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.recurring_transaction import RecurringTransaction
-from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
 from app.services.email import app_url
 from app.services.plans import ensure_family_plan
+from app.services.upcoming_events import list_upcoming_events
 
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
@@ -103,6 +102,19 @@ def rotate_calendar_subscription(db: Session = Depends(get_db), user_id: int = D
     return {"url": _subscription_url(user.calendar_token)}
 
 
+@router.get("/events")
+def calendar_events(
+    days: int = 366,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(_current_user_id),
+):
+    """Canonical upcoming events used by the planning screen and dashboard."""
+    ensure_family_plan(db, user_id)
+    days = max(1, min(days, 730))
+    start = date.today()
+    return list_upcoming_events(db, user_id, start, start + timedelta(days=days))
+
+
 @router.get("/feed/{token}.ics", include_in_schema=False)
 def calendar_feed(token: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.calendar_token == token).first()
@@ -111,21 +123,7 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
 
     start = date.today()
     end = start + timedelta(days=366)
-    # ``transactions.date`` is timezone-aware DateTime.  Comparing it with a
-    # plain date works in SQLite but is ambiguous for PostgreSQL, which powers
-    # production.  Use explicit UTC boundaries for a predictable feed.
-    start_at = datetime.combine(start, time.min, tzinfo=timezone.utc)
-    end_at = datetime.combine(end, time.min, tzinfo=timezone.utc)
-    planned = db.query(Transaction).filter(
-        Transaction.user_id == user.id,
-        Transaction.is_planned.is_(True),
-        Transaction.date >= start_at,
-        Transaction.date < end_at,
-    ).order_by(Transaction.date.asc()).all()
-    schedules = db.query(RecurringTransaction).filter(
-        RecurringTransaction.user_id == user.id,
-        RecurringTransaction.is_active.is_(True),
-    ).all()
+    events = list_upcoming_events(db, user.id, start, end)
 
     lines = [
         "BEGIN:VCALENDAR",
@@ -134,18 +132,13 @@ def calendar_feed(token: str, db: Session = Depends(get_db)):
         "CALSCALE:GREGORIAN",
         "X-WR-CALNAME:CaseMoney — Расписание",
     ]
-    for transaction in planned:
-        is_income = transaction.type == TransactionType.income
-        prefix = "Доход" if is_income else "Расход"
-        title = f"{prefix}: {transaction.description or 'Плановая операция'} — {transaction.amount:g} {transaction.currency}"
-        lines.extend(_event(title, transaction.date.date(), f"planned-{transaction.id}", "Плановая операция CaseMoney"))
-    for schedule in schedules:
-        prefix = "Доход" if schedule.type == TransactionType.income else "Расход"
-        title = f"{prefix}: {schedule.name} — {schedule.amount:g} {schedule.currency}"
+    for item in events:
+        prefix = "Доход" if item["type"] == "income" else "Расход"
+        title = f"{prefix}: {item['title']} — {item['amount']:g} {item['currency']}"
+        rrule = _rrule(item.get("frequency", "monthly")) if item["source"] == "recurring" else None
         lines.extend(_event(
-            title, schedule.next_date, f"recurring-{schedule.id}",
-            schedule.description or "Повторяющаяся операция CaseMoney",
-            rrule=_rrule(schedule.frequency),
+            title, item["date"], item["id"],
+            item.get("description") or "Будущая операция CaseMoney", rrule=rrule,
         ))
     lines.append("END:VCALENDAR")
     return Response("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8", headers={"Cache-Control": "private, max-age=300"})

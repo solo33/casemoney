@@ -8,11 +8,15 @@ const COLLAPSED_COUNT = 2;
 
 export default function CreditWidget({ collapsed = false, onCollapseChange }) {
   const { user } = useUser();
-  const [summary, setSummary] = useState(null);
+  const [items, setItems] = useState([]);
   const [expanded, setExpanded] = useState(false);
-  useEffect(() => { if (user?.family_access && navigator.onLine !== false) api.get("/api/credits/summary").then(response => setSummary(response.data)).catch(() => {}); }, [user?.family_access]);
-  if (!user?.family_access || !summary?.upcoming?.length) return null;
-  const items = summary.upcoming;
+  useEffect(() => {
+    if (!user?.family_access || navigator.onLine === false) return;
+    api.get("/api/calendar/events", { params: { days: 120 } })
+      .then(response => setItems(response.data || []))
+      .catch(() => setItems([]));
+  }, [user?.family_access]);
+  if (!user?.family_access || !items.length) return null;
   const visible = expanded ? items : items.slice(0, COLLAPSED_COUNT);
   const hiddenCount = items.length - visible.length;
   return <section className="credit-widget">
@@ -27,9 +31,9 @@ export default function CreditWidget({ collapsed = false, onCollapseChange }) {
         }
       }}
       className={onCollapseChange ? "credit-widget-title" : undefined}
-    >{onCollapseChange && <span className="widget-chevron">{collapsed ? "▸" : "▾"}</span>}Платежи и поступления</strong><Link to="/credits">Все →</Link></div>
+    >{onCollapseChange && <span className="widget-chevron">{collapsed ? "▸" : "▾"}</span>}Ближайшие операции</strong><Link to="/planning">Все →</Link></div>
     {!collapsed && <>
-    {visible.map(item => <Link to="/credits" key={item.id} className={item.is_overdue ? "overdue" : ""}><span>{item.name}<small>{item.kind === "deposit" ? "Доход · " : "Платёж · "}{new Date(`${item.next_payment_date}T12:00:00`).toLocaleDateString("ru-RU")}</small></span><strong>{item.monthly_payment ? formatMoneyWithCurrency(item.monthly_payment, item.currency) : "—"}</strong></Link>)}
+    {visible.map(item => <Link to={item.source === "obligation" ? "/credits" : "/planning"} key={item.id} className={item.is_overdue ? "overdue" : ""}><span>{item.title}<small>{item.type === "income" ? "Доход" : "Расход"}{item.recurring ? " · повторяется" : ""} · {new Date(`${item.date}T12:00:00`).toLocaleDateString("ru-RU")}</small></span><strong>{item.amount ? formatMoneyWithCurrency(item.amount, item.currency) : "—"}</strong></Link>)}
     {hiddenCount > 0 && <button type="button" className="credit-widget-toggle" onClick={() => setExpanded(true)}>Ещё {hiddenCount} →</button>}
     {expanded && items.length > COLLAPSED_COUNT && <button type="button" className="credit-widget-toggle" onClick={() => setExpanded(false)}>Свернуть</button>}
     </>}
