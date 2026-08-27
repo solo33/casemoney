@@ -46,6 +46,17 @@ class Transaction(Base):
     to_amount = Column(Float, nullable=True)
     to_currency = Column(String(10), nullable=True)
 
+    # Снимок курса на момент записи. Храним коэффициент перевода одной
+    # единицы валюты операции в ``valuation_currency`` (обычно основную
+    # валюту пользователя). Это защищает историю и отчёты от переоценки при
+    # следующем обновлении внешнего курса. Для перевода есть второй снимок —
+    # у стороны зачисления может быть другая валюта.
+    valuation_currency = Column(String(10), nullable=True)
+    exchange_rate = Column(Float, nullable=True)
+    exchange_rate_source = Column(String(24), nullable=True)
+    to_exchange_rate = Column(Float, nullable=True)
+    to_exchange_rate_source = Column(String(24), nullable=True)
+
     # Commission input stays with the transfer; the ledger also contains a
     # linked expense row so that reports include it by category.
     fee_amount = Column(Float, nullable=True)

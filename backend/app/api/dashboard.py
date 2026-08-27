@@ -101,8 +101,18 @@ class DashboardResponse(BaseModel):
     forecast: ForecastSummary
 
 
-def _to_main(db: Session, user_id: int, amount: float, currency: str, main: str) -> float:
-    """Безопасная конверсия с учётом ручных курсов пользователя."""
+def _to_main(
+    db: Session,
+    user_id: int,
+    amount: float,
+    currency: str,
+    main: str,
+    *,
+    transaction: Optional[Transaction] = None,
+) -> float:
+    """Безопасная конверсия; для истории — по снимку курса операции."""
+    if transaction is not None:
+        return exchange_svc.convert_transaction_for_user(db, user_id, transaction, main)
     try:
         return exchange_svc.convert_for_user(db, user_id, amount, currency, main)
     except exchange_svc.ExchangeError:
@@ -163,11 +173,11 @@ def get_dashboard(
     )
 
     month_income = sum(
-        _to_main(db, user_id, t.amount, t.currency, main)
+        _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         for t in month_transactions if t.type == TransactionType.income and not t.is_financing
     )
     month_expense = sum(
-        _to_main(db, user_id, t.amount, t.currency, main)
+        _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         for t in month_transactions if t.type == TransactionType.expense
     )
 

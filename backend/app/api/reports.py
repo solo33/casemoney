@@ -126,7 +126,26 @@ RU_MONTHS = ["", "январь", "февраль", "март", "апрель", "
              "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
 
 
-def _to_main(db: Session, user_id: int, amount: float, currency: str, main: str) -> float:
+def _to_main(
+    db: Session,
+    user_id: int,
+    amount: float,
+    currency: str,
+    main: str,
+    *,
+    transaction: Optional[Transaction] = None,
+    destination: bool = False,
+) -> float:
+    """Оценка суммы в основной валюте.
+
+    У фактической операции всегда предпочитаем сохранённый снимок курса.
+    Голая сумма используется только там, где операции ещё нет (например,
+    текущий баланс счёта) или для старой совместимости.
+    """
+    if transaction is not None:
+        return exchange_svc.convert_transaction_for_user(
+            db, user_id, transaction, main, destination=destination
+        )
     try:
         return exchange_svc.convert_for_user(db, user_id, amount, currency, main)
     except exchange_svc.ExchangeError:
@@ -218,7 +237,7 @@ def get_summary(
     for t in transactions:
         if t.is_financing:
             continue
-        amount_main = _to_main(db, user_id, t.amount, t.currency, main)
+        amount_main = _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         if t.type == TransactionType.income:
             total_income += amount_main
         elif t.type == TransactionType.expense:
@@ -334,7 +353,7 @@ def get_annual(
         if t.type not in (TransactionType.income, TransactionType.expense):
             continue
         m_idx = t.date.month - 1
-        amount = _to_main(db, user_id, t.amount, t.currency, main)
+        amount = _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         bucket = inc_buckets if t.type == TransactionType.income else exp_buckets
         if t.category_id not in bucket:
             bucket[t.category_id] = [0.0] * 12
@@ -474,18 +493,20 @@ def get_annual_balances(
 
     account_ids = [a.id for a in accounts]
 
-    # Текущие балансы по (account_id, currency)
+    # Текущие балансы по (account_id, currency). Базовый остаток в текущей
+    # оценке нужен только как точка отсчёта; изменения назад во времени
+    # вычитаем по снимкам курсов самих операций.
     balances = db.query(AccountBalance).filter(AccountBalance.account_id.in_(account_ids)).all()
-    current: dict[tuple[int, str], float] = {}
-    currencies_by_acc: dict[int, set[str]] = {}
+    current_main: dict[int, float] = {}
     for b in balances:
-        current[(b.account_id, b.currency)] = b.balance
-        currencies_by_acc.setdefault(b.account_id, set()).add(b.currency)
+        current_main[b.account_id] = current_main.get(b.account_id, 0.0) + _to_main(
+            db, user_id, b.balance, b.currency, main
+        )
 
     # Эффекты операций: помесячно внутри года + суммарно «после года».
     # У перевода две стороны: −amount на источнике и +to_amount на получателе.
-    month_eff: dict[tuple[int, str], list[float]] = {}   # (acc,cur) -> [12]
-    future_eff: dict[tuple[int, str], float] = {}        # (acc,cur) -> сумма после 31.12.year
+    month_eff: dict[int, list[float]] = {}   # account -> [12] в основной валюте
+    future_eff: dict[int, float] = {}        # сумма после 31.12.year
 
     year_start = date(year, 1, 1)
     txs = (
@@ -498,31 +519,33 @@ def get_annual_balances(
         .all()
     )
 
-    def add_effect(account_id: int, currency: str, effect: float, occurred_at: datetime) -> None:
+    def add_effect(account_id: int, effect: float, occurred_at: datetime) -> None:
         """Сохраняет изменение одного баланса в нужном месяце или будущем периоде."""
-        key = (account_id, currency)
-        currencies_by_acc.setdefault(account_id, set()).add(currency)
         if occurred_at.year == year:
-            arr = month_eff.setdefault(key, [0.0] * 12)
+            arr = month_eff.setdefault(account_id, [0.0] * 12)
             arr[occurred_at.month - 1] += effect
         else:  # год больше запрошенного → «будущее» относительно конца года
-            future_eff[key] = future_eff.get(key, 0.0) + effect
+            future_eff[account_id] = future_eff.get(account_id, 0.0) + effect
 
     for t in txs:
         if t.type == TransactionType.income:
-            add_effect(t.account_id, t.currency, t.amount, t.date)
+            add_effect(t.account_id, _to_main(db, user_id, t.amount, t.currency, main, transaction=t), t.date)
         elif t.type == TransactionType.expense:
-            add_effect(t.account_id, t.currency, -t.amount, t.date)
+            add_effect(t.account_id, -_to_main(db, user_id, t.amount, t.currency, main, transaction=t), t.date)
         elif t.type == TransactionType.transfer:
-            add_effect(t.account_id, t.currency, -t.amount, t.date)
+            add_effect(t.account_id, -_to_main(db, user_id, t.amount, t.currency, main, transaction=t), t.date)
             if t.to_account_id and t.to_currency and t.to_amount is not None:
-                add_effect(t.to_account_id, t.to_currency, t.to_amount, t.date)
+                add_effect(
+                    t.to_account_id,
+                    _to_main(db, user_id, t.to_amount, t.to_currency, main, transaction=t, destination=True),
+                    t.date,
+                )
 
-    def eom_series_in_currency(acc_id: int, cur: str) -> list[float]:
-        """12 значений остатка (в валюте cur) на конец каждого месяца."""
-        cur_balance = current.get((acc_id, cur), 0.0)
-        meff = month_eff.get((acc_id, cur), [0.0] * 12)
-        feff = future_eff.get((acc_id, cur), 0.0)
+    def eom_series(acc_id: int) -> list[float]:
+        """12 значений остатка на конец каждого месяца в основной валюте."""
+        cur_balance = current_main.get(acc_id, 0.0)
+        meff = month_eff.get(acc_id, [0.0] * 12)
+        feff = future_eff.get(acc_id, 0.0)
         out = [0.0] * 12
         out[11] = cur_balance - feff               # конец декабря
         for m in range(10, -1, -1):                # ноябрь ... январь
@@ -553,12 +576,7 @@ def get_annual_balances(
         acc_rows: list[BalanceAccountRow] = []
         group_monthly = [0.0] * 12
         for a in bucket:
-            monthly_main = [0.0] * 12
-            for cur in currencies_by_acc.get(a.id, set()):
-                series = eom_series_in_currency(a.id, cur)
-                for m in range(12):
-                    monthly_main[m] += _to_main(db, user_id, series[m], cur, main)
-            monthly_main = [round(v, 2) for v in monthly_main]
+            monthly_main = [round(v, 2) for v in eom_series(a.id)]
             acc_rows.append(BalanceAccountRow(
                 account_id=a.id, name=a.name, icon=a.icon, monthly=monthly_main,
             ))
@@ -642,7 +660,7 @@ def get_monthly_trend(
         key = f"{t.date.year:04d}-{t.date.month:02d}"
         if key not in points_map:
             continue
-        amt = _to_main(db, user_id, t.amount, t.currency, main)
+        amt = _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         if t.type == TransactionType.income:
             points_map[key]["income"] += amt
         elif t.type == TransactionType.expense:
@@ -729,7 +747,7 @@ def get_yoy(
     agg: dict[tuple[int, int], float] = {}
     for t in query.all():
         key = (t.date.year, t.date.month)
-        agg[key] = agg.get(key, 0.0) + _to_main(db, user_id, t.amount, t.currency, main)
+        agg[key] = agg.get(key, 0.0) + _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
 
     years = sorted({y for y, _ in agg})
     rows = [

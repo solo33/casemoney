@@ -133,7 +133,10 @@ def test_annual_balances_use_destination_currency_and_amount_for_transfer(client
     source = make_account(client, auth, name="RUB", balance=1000, currency="RUB")
     target = make_account(client, auth, name="USD", balance=0, currency="USD")
     # Для теста истории счёта важны сама валюта и сумма зачисления, а не внешний курс.
-    monkeypatch.setattr("app.api.reports._to_main", lambda _db, _uid, amount, *_args: amount)
+    monkeypatch.setattr(
+        "app.api.reports._to_main",
+        lambda _db, _uid, amount, *_args, **_kwargs: amount,
+    )
 
     response = client.post("/api/transactions/", headers=auth, json={
         "amount": 500, "type": "transfer", "currency": "RUB",

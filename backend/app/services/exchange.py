@@ -201,7 +201,11 @@ def get_rate_to_rub(db: Session, currency: str) -> float:
         for code, rate in rates.items():
             if code != "RUB":
                 _save_rate(db, code, "RUB", rate, source)
-        db.commit()
+        # Не коммитим из сервиса курса: он может вызываться внутри создания
+        # операции. Окончательный commit сделает обработчик запроса, сохранив
+        # операцию, её курс и изменение остатка атомарно.
+        db.flush()
+        db.info["exchange_rates_dirty"] = True
 
         if currency in rates:
             return rates[currency]
@@ -295,6 +299,98 @@ def convert_for_user(
     """Конверсия с учётом ручных курсов пользователя."""
     rate, _ = get_rate_for_user(db, user_id, from_currency, to_currency)
     return round(amount * rate, 2)
+
+
+def snapshot_transaction_rates(db: Session, user_id: int, transaction, *, force: bool = False) -> bool:
+    """Сохраняет оценку сторон операции в основной валюте пользователя.
+
+    Снимок намеренно лежит в самой операции: одна и та же историческая
+    операция не должна менять сумму в отчёте из-за сегодняшнего курса. Если
+    внешний источник временно недоступен, поле остаётся пустым — следующий
+    отчёт повторит попытку и сохранит первый доступный курс.
+    """
+    from app.models.user import User
+
+    user = db.query(User).filter(User.id == user_id).first()
+    main = (user.main_currency if user and user.main_currency else "RUB").upper()
+    changed = False
+    valuation_changed = (transaction.valuation_currency or "").upper() != main
+
+    def capture(currency: str):
+        try:
+            return get_rate_for_user(db, user_id, currency, main)
+        except ExchangeError:
+            return None
+
+    if force or transaction.exchange_rate is None or valuation_changed:
+        source = capture(transaction.currency)
+        if source is not None:
+            rate, rate_source = source
+            transaction.valuation_currency = main
+            transaction.exchange_rate = rate
+            transaction.exchange_rate_source = rate_source
+            changed = True
+
+    if transaction.type.value == "transfer" and transaction.to_currency:
+        if force or transaction.to_exchange_rate is None or valuation_changed:
+            destination = capture(transaction.to_currency)
+            if destination is not None:
+                rate, rate_source = destination
+                transaction.valuation_currency = main
+                transaction.to_exchange_rate = rate
+                transaction.to_exchange_rate_source = rate_source
+                changed = True
+    elif transaction.to_exchange_rate is not None or transaction.to_exchange_rate_source is not None:
+        transaction.to_exchange_rate = None
+        transaction.to_exchange_rate_source = None
+        changed = True
+
+    if changed:
+        # GET-отчёты делают ленивую миграцию старых строк. Флаг позволяет
+        # закоммитить все заполненные снимки одной транзакцией в get_db().
+        db.info["transaction_exchange_snapshots_dirty"] = True
+    return changed
+
+
+def convert_transaction_for_user(
+    db: Session,
+    user_id: int,
+    transaction,
+    to_currency: str,
+    *,
+    destination: bool = False,
+) -> float:
+    """Конвертирует сторону операции по сохранённому снимку курса.
+
+    Для старых строк без снимка курс определяется единожды и сохраняется.
+    При смене основной валюты после операции используем сохранённую оценку
+    как промежуточную валюту и конвертируем её в новую основную валюту.
+    """
+    target = to_currency.upper()
+    amount = transaction.to_amount if destination else transaction.amount
+    currency = transaction.to_currency if destination else transaction.currency
+    rate = transaction.to_exchange_rate if destination else transaction.exchange_rate
+    valuation = (transaction.valuation_currency or "").upper()
+
+    if amount is None or not currency:
+        return 0.0
+    if rate is None or not valuation:
+        snapshot_transaction_rates(db, user_id, transaction)
+        rate = transaction.to_exchange_rate if destination else transaction.exchange_rate
+        valuation = (transaction.valuation_currency or "").upper()
+
+    if rate is not None and valuation:
+        valued = float(amount) * float(rate)
+        if valuation == target:
+            return round(valued, 2)
+        try:
+            return convert_for_user(db, user_id, valued, valuation, target)
+        except ExchangeError:
+            return 0.0
+    try:
+        return convert_for_user(db, user_id, float(amount), currency, target)
+    except ExchangeError:
+        return 0.0
 
 
 def prime_user_rates(
@@ -395,5 +491,6 @@ def refresh_all_rates(db: Session) -> dict[str, int]:
     for code, rate in crypto.items():
         _save_rate(db, code, "RUB", rate, "coingecko")
         saved += 1
-    db.commit()
+    db.flush()
+    db.info["exchange_rates_dirty"] = True
     return {"fiat": len(fiat) - 1, "crypto": len(crypto), "saved": saved}

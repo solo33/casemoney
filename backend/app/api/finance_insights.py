@@ -65,7 +65,7 @@ def _totals(db: Session, user_id: int, start: datetime, end: datetime, currency:
     categories: dict[int | None, float] = {}
     for item in rows:
         try:
-            amount = exchange_svc.convert_for_user(db, user_id, item.amount, item.currency, currency)
+            amount = exchange_svc.convert_transaction_for_user(db, user_id, item, currency)
         except exchange_svc.ExchangeError:
             continue
         if item.type == TransactionType.income:

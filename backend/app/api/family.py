@@ -398,10 +398,12 @@ def family_report(
 
 
 def _convert_or_skip(
-    db: Session, user_id: int, amount: float, currency: str, main_currency: str, skipped_currencies: set[str],
+    db: Session, user_id: int, amount: float, currency: str, main_currency: str, skipped_currencies: set[str], *, transaction=None,
 ) -> Optional[float]:
     """Конвертирует сумму, а при недоступном курсе — запоминает валюту и возвращает None."""
     try:
+        if transaction is not None:
+            return exchange_svc.convert_transaction_for_user(db, user_id, transaction, main_currency)
         return exchange_svc.convert_for_user(db, user_id, amount, currency, main_currency)
     except exchange_svc.ExchangeError:
         skipped_currencies.add(currency)
@@ -468,7 +470,7 @@ def family_analytics(
     converted_amounts: dict[int, float] = {}
 
     for item in transactions:
-        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies, transaction=item)
         if amount is None:
             continue
         converted_amounts[item.id] = amount
@@ -503,7 +505,7 @@ def family_analytics(
     for item in previous_transactions:
         if item.is_planned or item.type not in {TransactionType.expense, TransactionType.income}:
             continue
-        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies)
+        amount = _convert_or_skip(db, item.user_id, item.amount, item.currency, main_currency, skipped_currencies, transaction=item)
         if amount is None:
             continue
         if item.type == TransactionType.expense:

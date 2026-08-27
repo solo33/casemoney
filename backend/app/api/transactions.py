@@ -171,6 +171,9 @@ def _sync_transfer_fee(
         fee.date = transfer.date
         fee.account_id = transfer.account_id
         fee.is_planned = transfer.is_planned
+        exchange_svc.snapshot_transaction_rates(
+            db, transfer.user_id, fee, force=True
+        )
         _apply_tx_effect(db, fee)
         _write_history(db, transfer.user_id, fee, "edited")
         return
@@ -185,6 +188,7 @@ def _sync_transfer_fee(
         )
         db.add(fee)
         db.flush()
+        exchange_svc.snapshot_transaction_rates(db, transfer.user_id, fee)
         _apply_tx_effect(db, fee)
         _write_history(db, transfer.user_id, fee, "created")
 
@@ -539,6 +543,7 @@ def create_transaction(
         is_planned=data.is_planned,
     )
     db.add(transaction)
+    exchange_svc.snapshot_transaction_rates(db, user_id, transaction)
     try:
         db.flush()
         _apply_tx_effect(db, transaction, reverse=False)
@@ -631,6 +636,11 @@ def update_transaction(
         raise HTTPException(status_code=404, detail="Transaction not found")
 
     update = data.model_dump(exclude_unset=True)
+    rate_relevant_fields = {
+        "amount", "currency", "date", "type", "account_id",
+        "to_account_id", "to_amount", "to_currency",
+    }
+    refresh_rate_snapshot = bool(rate_relevant_fields & set(update))
     fee_amount_supplied = "fee_amount" in update
     fee_category_supplied = "fee_category_id" in update
     fee_supplied = fee_amount_supplied or fee_category_supplied
@@ -689,6 +699,9 @@ def update_transaction(
         tx.amount,
         bool(tx.is_family_expense),
         tx.reimbursement_amount,
+    )
+    exchange_svc.snapshot_transaction_rates(
+        db, user_id, tx, force=refresh_rate_snapshot
     )
 
     # Применяем новый эффект

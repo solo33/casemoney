@@ -14,7 +14,7 @@ from app.models.transaction import Transaction, TransactionType
 from app.schemas.budget import BudgetCreate, BudgetResponse, BudgetSuggestion, BudgetUpdate
 from app.services import accounts as accounts_svc
 from app.services.auth import decode_token
-from app.services.exchange import convert_for_user
+from app.services.exchange import convert_for_user, convert_transaction_for_user
 from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/budgets", tags=["budgets"])
@@ -141,7 +141,7 @@ def _spent_for_category(
     scope: str,
 ) -> float:
     category_ids = _category_tree_ids(db, user_id, category_id)
-    query = db.query(Transaction.amount, Transaction.currency).filter(
+    query = db.query(Transaction).filter(
         _transaction_scope_filter(db, user_id, scope),
         Transaction.category_id.in_(category_ids),
         Transaction.type == TransactionType.expense,
@@ -151,7 +151,7 @@ def _spent_for_category(
     if not include_planned:
         query = query.filter(Transaction.is_planned.is_(False))
     rows = query.all()
-    return round(sum(convert_for_user(db, user_id, amount, tx_currency, currency) for amount, tx_currency in rows), 2)
+    return round(sum(convert_transaction_for_user(db, user_id, row, currency) for row in rows), 2)
 
 
 def _budget_state(db: Session, budget: Budget) -> tuple[float, float, float]:
@@ -272,7 +272,7 @@ def budget_suggestions(
     already_budgeted = {row[0] for row in db.query(Budget.category_id).filter(
         Budget.user_id == user_id, Budget.period == period, Budget.period_start == selected_start,
     ).all()}
-    rows = db.query(Transaction.category_id, Transaction.amount, Transaction.currency, Transaction.date).filter(
+    rows = db.query(Transaction).filter(
         Transaction.user_id == user_id,
         Transaction.type == TransactionType.expense,
         Transaction.is_planned.is_(False),
@@ -281,12 +281,13 @@ def budget_suggestions(
         func.date(Transaction.date) <= previous_end,
     ).all()
     by_category: dict[int, dict] = {}
-    for category_id, amount, currency, tx_date in rows:
+    for row in rows:
+        category_id = row.category_id
         if category_id in already_budgeted:
             continue
         bucket = by_category.setdefault(category_id, {"total": 0.0, "months": set()})
-        bucket["total"] += convert_for_user(db, user_id, amount, currency, main_currency)
-        bucket["months"].add((tx_date.year, tx_date.month))
+        bucket["total"] += convert_transaction_for_user(db, user_id, row, main_currency)
+        bucket["months"].add((row.date.year, row.date.month))
     categories = {c.id: c for c in db.query(Category).filter(Category.id.in_(by_category.keys())).all()}
     result = []
     for category_id, bucket in by_category.items():

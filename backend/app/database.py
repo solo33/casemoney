@@ -26,5 +26,16 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+        # Отчёты лениво фиксируют курс старых операций. Сохраняем все такие
+        # снимки одним commit в конце успешного запроса, а не по одному на
+        # каждую строку истории.
+        if (
+            db.info.pop("transaction_exchange_snapshots_dirty", False)
+            or db.info.pop("exchange_rates_dirty", False)
+        ):
+            db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
