@@ -50,12 +50,16 @@ export default function Planning() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const summary = useMemo(() => transactions.reduce((result, transaction) => {
-    const item = result[transaction.currency] || { income: 0, expense: 0 };
-    item[transaction.type] = (item[transaction.type] || 0) + Number(transaction.amount);
-    result[transaction.currency] = item;
+  // Верхняя сводка и календарь обязаны опираться на один источник.  В
+  // calendarEvents уже входят ручные планы, регулярные операции, кредиты и
+  // депозиты; раньше сводка смотрела только на ручные планы и могла сообщать,
+  // что будущих операций нет, при заполненном календаре.
+  const summary = useMemo(() => calendarEvents.reduce((result, event) => {
+    const item = result[event.currency] || { income: 0, expense: 0 };
+    item[event.type] = (item[event.type] || 0) + Number(event.amount || 0);
+    result[event.currency] = item;
     return result;
-  }, {}), [transactions]);
+  }, {}), [calendarEvents]);
   const currencies = useMemo(() => [...new Set(accounts.flatMap(account => (account.balances || []).map(balance => balance.currency)))].sort(), [accounts]);
   const calendarEntries = useMemo(() => calendarEvents.map(item => ({ ...item, date: isoDate(item.date) })), [calendarEvents]);
   const change = (field, value) => setForm(current => ({ ...current, [field]: value }));

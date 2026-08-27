@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, extract
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from app.models.category import Category
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.upcoming_events import list_upcoming_events
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 security = HTTPBearer()
@@ -66,7 +67,7 @@ class RecentTransaction(BaseModel):
 
 
 class ForecastItem(BaseModel):
-    id: int
+    id: str
     date: datetime
     type: str
     amount: float
@@ -228,45 +229,36 @@ def get_dashboard(
     # План на сегодня тоже должен быть виден весь день: операции нередко
     # сохраняются с полуденным временем, а дашборд может открыться вечером.
     forecast_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    forecast_end = now + timedelta(days=forecast_days)
-    planned_rows = (
-        db.query(Transaction)
-        .filter(
-            Transaction.user_id == user_id,
-            Transaction.is_planned.is_(True),
-            Transaction.date >= forecast_start,
-            Transaction.date < forecast_end,
-        )
-        .order_by(Transaction.date.asc(), Transaction.id.asc())
-        .all()
-    )
+    forecast_end = forecast_start + timedelta(days=forecast_days)
+    # Одна лента будущего для главной и календаря.  Раньше дашборд считал
+    # только Transaction.is_planned и терял платежи по обязательствам,
+    # депозитам и регулярным операциям, которые показывал отдельный виджет.
+    upcoming = list_upcoming_events(db, user_id, forecast_start.date(), forecast_end.date())
     exchange_svc.prime_user_rates(
-        db, user_id, {item.currency for item in planned_rows}, main,
+        db, user_id, {item["currency"] for item in upcoming}, main,
     )
     forecast_income = 0.0
     forecast_expense = 0.0
     forecast_events = []
-    for item in planned_rows:
-        converted = _to_main(db, user_id, item.amount, item.currency, main)
+    for item in upcoming:
+        converted = _to_main(db, user_id, item["amount"], item["currency"], main)
         impact = 0.0
-        if item.type == TransactionType.income:
+        if item["type"] == TransactionType.income.value:
             impact = converted
-            # Финансирование (например, выдача кредита) влияет на остаток,
-            # поэтому в прогнозе учитывается, хотя не считается доходом отчёта.
             forecast_income += converted
-        elif item.type == TransactionType.expense:
+        elif item["type"] == TransactionType.expense.value:
             impact = -converted
             forecast_expense += converted
-        acc = accounts_map.get(item.account_id)
-        cat = categories_map.get(item.category_id) if item.category_id else None
+        acc = accounts_map.get(item.get("account_id"))
+        cat = categories_map.get(item.get("category_id")) if item.get("category_id") else None
         forecast_events.append(ForecastItem(
-            id=item.id,
-            date=item.date,
-            type=item.type.value,
-            amount=item.amount,
-            currency=item.currency,
+            id=item["id"],
+            date=datetime.combine(item["date"], time.min, tzinfo=timezone.utc),
+            type=item["type"],
+            amount=item["amount"],
+            currency=item["currency"],
             impact_in_main=round(impact, 2),
-            description=item.description,
+            description=item["title"],
             account_name=acc.name if acc else "—",
             category_name=cat.name if cat else None,
         ))

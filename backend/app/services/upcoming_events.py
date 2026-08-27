@@ -58,6 +58,7 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
             "id": f"planned-{item.id}", "source": "planned", "date": item.date.date(),
             "type": event_type, "title": item.description or ("Плановый доход" if event_type == "income" else "Плановый расход"),
             "amount": float(item.amount), "currency": item.currency, "recurring": False,
+            "account_id": item.account_id, "category_id": item.category_id,
         })
 
     generated_occurrences = {
@@ -82,6 +83,7 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
             "id": f"recurring-{item.id}-{item.next_date.isoformat()}", "source": "recurring", "date": item.next_date,
             "type": event_type, "title": item.name, "amount": float(item.amount), "currency": item.currency,
             "recurring": True, "frequency": item.frequency, "description": item.description or "",
+            "account_id": item.account_id, "category_id": item.category_id,
         })
 
     obligations = db.query(CreditObligation).filter(
@@ -98,6 +100,8 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
             "id": f"obligation-{item.id}-{item.next_payment_date.isoformat()}", "source": "obligation", "date": item.next_payment_date,
             "type": "income" if is_income else "expense", "title": item.name, "amount": float(amount or 0),
             "currency": item.currency, "recurring": False, "kind": item.kind,
+            "account_id": item.linked_account_id if is_income else item.source_account_id,
+            "category_id": item.category_id,
             "description": "Поступление по депозиту" if item.kind == "deposit" else "Ближайший платёж по обязательству",
         })
 

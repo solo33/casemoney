@@ -96,3 +96,28 @@ def test_upcoming_events_deduplicate_generated_recurrence_and_include_obligation
     assert [item["source"] for item in events].count("planned") == 1
     assert not any(item["source"] == "recurring" and item["title"] == "Интернет" for item in events)
     assert any(item["source"] == "obligation" and item["title"] == "Кредит" for item in events)
+
+
+def test_dashboard_forecast_uses_the_same_upcoming_events_as_calendar(client):
+    email = "dashboard-upcoming@test.com"
+    auth = register_and_login(client, email)
+    _enable_family(email)
+    account = make_account(client, auth)
+    future = date.today() + timedelta(days=5)
+
+    planned = client.post("/api/transactions/", headers=auth, json={
+        "type": "expense", "amount": 900, "currency": "RUB", "account_id": account["id"],
+        "description": "Аренда", "date": f"{future.isoformat()}T12:00:00", "is_planned": True,
+    })
+    assert planned.status_code == 201, planned.text
+    credit = client.post("/api/credits/", headers=auth, json={
+        "name": "Ипотека", "kind": "mortgage", "currency": "RUB", "current_balance": 1_000_000,
+        "monthly_payment": 50_000, "next_payment_date": future.isoformat(), "source_account_id": account["id"],
+    })
+    assert credit.status_code == 201, credit.text
+
+    response = client.get("/api/dashboard/?forecast_days=30", headers=auth)
+    assert response.status_code == 200, response.text
+    forecast = response.json()["forecast"]
+    assert {item["description"] for item in forecast["events"]} >= {"Аренда", "Ипотека"}
+    assert forecast["expense"] == 50_900
