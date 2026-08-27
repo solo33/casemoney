@@ -5,8 +5,7 @@
 // «Расходы и доходы» и «Бюджет» — переключатель в настройках был неактуален.
 export const DASHBOARD_WIDGETS = [
   { id: "balance", label: "Баланс", collapsedOnMobile: false },
-  { id: "credits", label: "Платежи и поступления", collapsedOnMobile: false },
-  { id: "forecast", label: "Ближайшие события", collapsedOnMobile: true },
+  { id: "forecast", label: "Ближайшие операции", collapsedOnMobile: true },
   { id: "accounts", label: "Счета", collapsedOnMobile: false },
   { id: "records", label: "Последние записи", collapsedOnMobile: false },
   { id: "breakdown", label: "Расходы и доходы", collapsedOnMobile: true },

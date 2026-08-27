@@ -15,7 +15,6 @@ import {
 import { BalanceActionRow, BalanceAdjustmentModal } from "../components/BalanceActions";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 import { useUser } from "../contexts/UserContext";
-import CreditWidget from "../components/CreditWidget";
 import AmountInput from "../components/AmountInput";
 import CurrencyField from "../components/CurrencyField";
 import useTransferQuote from "../hooks/useTransferQuote";
@@ -459,11 +458,6 @@ export default function Home() {
           </>}
         </Card>}
 
-        {widgetSettings.credits.visible && <div style={{ order: widgetSettings.credits.order }}><CreditWidget
-          collapsed={isWidgetCollapsed("credits")}
-          onCollapseChange={collapsed => updateWidgetCollapsed("credits", collapsed)}
-        /></div>}
-
         {widgetSettings.forecast.visible && <ForecastWidget
           forecast={dashboard?.forecast}
           mainCurrency={mainCurrency}
@@ -797,7 +791,7 @@ function ForecastWidget({ forecast, mainCurrency, days, collapsed, loading, onDa
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <h3 onClick={() => onCollapseChange(!collapsed)} style={{ ...sectionTitle, marginBottom: 0, cursor: "pointer", userSelect: "none" }}>
           <span style={{ display: "inline-block", width: 12, color: "#a6afb8", fontSize: 10 }}>{collapsed ? "▸" : "▾"}</span>
-          Ближайшие события
+          Ближайшие операции
         </h3>
         <Link to="/planning" style={{ color: "#9c7b3c", fontSize: 12, textDecoration: "none" }}>Все →</Link>
       </div>
