@@ -221,6 +221,19 @@ function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived = false 
           {g.monthly_contribution != null && (
             <div style={{ fontSize: 12, color: "#a06b18" }}>
               нужно откладывать {formatMoney(g.monthly_contribution)} {sym} в месяц
+              {g.weekly_contribution != null && ` · ${formatMoney(g.weekly_contribution)} ${sym} в неделю`}
+            </div>
+          )}
+          {g.forecast_date && (
+            <div style={{ fontSize: 12, color: g.schedule_deviation_days > 0 ? "#c0432b" : "#167a4a" }}>
+              при текущем темпе — {new Date(g.forecast_date).toLocaleDateString("ru-RU")}
+              {g.schedule_deviation_days != null && (
+                g.schedule_deviation_days > 0
+                  ? `, позже срока на ${g.schedule_deviation_days} дн.`
+                  : g.schedule_deviation_days < 0
+                    ? `, раньше срока на ${Math.abs(g.schedule_deviation_days)} дн.`
+                    : ", в срок"
+              )}
             </div>
           )}
         </div>
@@ -269,6 +282,13 @@ function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived = false 
           {reached ? "✓ 100%" : `${pct}%`}
         </span>
       </div>
+      {!archived && g.priority_allocation_amount != null && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#515c68" }}>
+          По порядку целей доступно: <strong>{formatMoney(g.priority_allocation_amount)} {sym}</strong>
+          {g.priority_shortfall_amount > 0 && <> · не хватает {formatMoney(g.priority_shortfall_amount)} {sym}</>}
+          {g.priority_shortfall_amount === 0 && <> · цель полностью покрыта</>}
+        </div>
+      )}
       {g.is_shared && <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}><button type="button" className="btn-secondary" onClick={addContribution}>+ Мой взнос</button><span style={{ fontSize: 12, color: "#a6afb8" }}>Взносы: {formatMoney(g.contributions_total)} {sym}</span>{g.contributions.map(item => <span key={item.id} style={{ fontSize: 12, color: "#515c68" }}>{item.name}: {formatMoney(item.amount)} {sym}</span>)}</div>}
     </div>
   );

@@ -40,6 +40,14 @@ class GoalResponse(BaseModel):
     sort_order: int
     remaining_amount: float
     monthly_contribution: Optional[float]
+    weekly_contribution: Optional[float]
+    forecast_date: Optional[date]
+    schedule_deviation_days: Optional[int]
+    # Порядок целей используется не только для сортировки: доступный общий
+    # остаток распределяется последовательно и показывает, что реально уже
+    # можно направить на каждую цель.
+    priority_allocation_amount: Optional[float]
+    priority_shortfall_amount: Optional[float]
     family_id: Optional[int]
     is_shared: bool
     contributions_total: float
