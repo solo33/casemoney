@@ -44,6 +44,28 @@ class FamilyMember(Base):
     accepted_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class AccountFamilyAccess(Base):
+    """Явный доступ участника к общему счёту.
+
+    Сам факт участия в Family не открывает личные счета. Владелец счёта сам
+    включает общий режим и выбирает, кто может только смотреть счёт, а кто —
+    также добавлять операции и корректировать остаток.
+    """
+
+    __tablename__ = "account_family_access"
+    __table_args__ = (
+        UniqueConstraint("account_id", "user_id", name="uq_account_family_access_user"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    account_id = Column(
+        Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    permission = Column(String(16), nullable=False, default="viewer")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class FamilySettlement(Base):
     __tablename__ = "family_settlements"
 

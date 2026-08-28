@@ -71,6 +71,9 @@ class AccountResponse(AccountBase):
     user_id: int
     balances: List[AccountBalanceResponse] = []
     total_in_main: float = 0.0  # сумма всех балансов в main_currency пользователя
+    family_id: Optional[int] = None
+    is_shared: bool = False
+    access_level: Optional[str] = None
 
     class Config:
         from_attributes = True

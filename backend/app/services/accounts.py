@@ -38,6 +38,9 @@ def serialize_account(
     account: Account,
     main_currency: str,
     convert_balances: bool = True,
+    *,
+    access_level: Optional[str] = None,
+    conversion_user_id: Optional[int] = None,
 ) -> AccountResponse:
     """Готовит AccountResponse со списком balances и total_in_main.
 
@@ -58,7 +61,8 @@ def serialize_account(
         if convert_balances:
             try:
                 in_main = exchange_svc.convert_for_user(
-                    db, account.user_id, b.balance, b.currency, main_currency,
+                    db, conversion_user_id or account.user_id,
+                    b.balance, b.currency, main_currency,
                 )
             except exchange_svc.ExchangeError:
                 in_main = 0.0
@@ -86,6 +90,9 @@ def serialize_account(
         include_in_balance=account.include_in_balance,
         show_for_entries=account.show_for_entries,
         note=account.note,
+        family_id=account.family_id,
+        is_shared=account.is_shared,
+        access_level=access_level,
         balances=balances_out,
         total_in_main=round(total_in_main, 2),
     )
@@ -95,13 +102,15 @@ def prime_account_rates(
     db: Session,
     accounts: list[Account],
     main_currency: str,
+    *,
+    user_id: Optional[int] = None,
 ) -> None:
     """Prime balance conversion rates for an account collection at once."""
     if not accounts:
         return
     exchange_svc.prime_user_rates(
         db,
-        accounts[0].user_id,
+        user_id or accounts[0].user_id,
         {
             balance.currency
             for account in accounts

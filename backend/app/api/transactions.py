@@ -28,6 +28,7 @@ from app.schemas.transaction import (
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services import family_accounts as family_accounts_svc
 from app.services.plans import ensure_family_plan
 from app.services.automation import matched_category_id
 
@@ -148,7 +149,6 @@ def _sync_transfer_fee(
     """Create/update the expense row that represents a bank transfer fee."""
     fees = db.query(Transaction).filter(
         Transaction.linked_transfer_id == transfer.id,
-        Transaction.user_id == transfer.user_id,
     ).all()
     fee = fees[0] if fees else None
     active = fee_amount is not None and float(fee_amount) > 0
@@ -207,9 +207,7 @@ def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amo
     """
     if not to_account_id:
         raise HTTPException(status_code=400, detail="Для перевода укажите счёт-получатель")
-    dst = db.query(Account).filter(Account.id == to_account_id, Account.user_id == user_id).first()
-    if not dst:
-        raise HTTPException(status_code=404, detail="Счёт-получатель не найден")
+    dst = family_accounts_svc.require_write_access(db, to_account_id, user_id)
     cur = (to_currency or src_currency).upper()
     if to_amount is None:
         if cur == src_currency.upper():
@@ -411,7 +409,17 @@ def get_transactions(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Transaction).filter(Transaction.user_id == user_id)
+    shared_account_ids = [
+        account.id for account in family_accounts_svc.accessible_accounts(db, user_id).all()
+        if account.user_id != user_id or account.is_shared
+    ]
+    visibility_filters = [Transaction.user_id == user_id]
+    if shared_account_ids:
+        visibility_filters.extend([
+            Transaction.account_id.in_(shared_account_ids),
+            Transaction.to_account_id.in_(shared_account_ids),
+        ])
+    query = db.query(Transaction).filter(or_(*visibility_filters))
     normalized_currency = currency.upper() if currency else None
     if account_id and normalized_currency:
         # Перевод хранится одной записью: исходная сторона в account/currency,
@@ -478,11 +486,7 @@ def create_transaction(
         if existing:
             return existing
 
-    account = db.query(Account).filter(
-        Account.id == data.account_id, Account.user_id == user_id
-    ).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    account = family_accounts_svc.require_write_access(db, data.account_id, user_id)
 
     try:
         tx_type = TransactionType[data.type]
@@ -629,11 +633,10 @@ def update_transaction(
 ):
     """Редактирование транзакции. Балансы пересчитываются корректно:
     откат старого эффекта → применение нового."""
-    tx = db.query(Transaction).filter(
-        Transaction.id == transaction_id, Transaction.user_id == user_id
-    ).first()
+    tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    family_accounts_svc.require_write_access(db, tx.account_id, user_id)
 
     update = data.model_dump(exclude_unset=True)
     rate_relevant_fields = {
@@ -655,11 +658,7 @@ def update_transaction(
 
     # Если меняется счёт — проверим, что он принадлежит пользователю
     if "account_id" in update and update["account_id"] is not None:
-        acc = db.query(Account).filter(
-            Account.id == update["account_id"], Account.user_id == user_id
-        ).first()
-        if not acc:
-            raise HTTPException(status_code=404, detail="Account not found")
+        family_accounts_svc.require_write_access(db, update["account_id"], user_id)
 
     # То же для категории — иначе можно привязаться к чужой категории
     if "category_id" in update and update["category_id"] is not None:
@@ -745,11 +744,10 @@ def delete_transaction(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    tx = db.query(Transaction).filter(
-        Transaction.id == transaction_id, Transaction.user_id == user_id
-    ).first()
+    tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    family_accounts_svc.require_write_access(db, tx.account_id, user_id)
 
     linked_fees = db.query(Transaction).filter(
         Transaction.linked_transfer_id == tx.id,

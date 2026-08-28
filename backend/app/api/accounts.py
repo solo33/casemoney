@@ -26,6 +26,7 @@ from app.schemas.account import (
 )
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
+from app.services import family_accounts as family_accounts_svc
 from app.services import limits as limits_svc
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
@@ -53,6 +54,10 @@ def _validate_group(db: Session, user_id: int, group_id: Optional[int]) -> None:
 
 
 def _get_account(db: Session, account_id: int, user_id: int) -> Account:
+    return family_accounts_svc.require_read_access(db, account_id, user_id)
+
+
+def _get_owned_account(db: Session, account_id: int, user_id: int) -> Account:
     account = db.query(Account).filter(
         Account.id == account_id,
         Account.user_id == user_id,
@@ -72,13 +77,17 @@ def get_accounts(
     """Плоский список со всеми балансами и total_in_main."""
     main = accounts_svc.get_user_main_currency(db, user_id)
     accounts = (
-        db.query(Account)
+        family_accounts_svc.accessible_accounts(db, user_id)
         .options(selectinload(Account.balances))
-        .filter(Account.user_id == user_id)
         .all()
     )
-    accounts_svc.prime_account_rates(db, accounts, main)
-    return [accounts_svc.serialize_account(db, a, main) for a in accounts]
+    accounts_svc.prime_account_rates(db, accounts, main, user_id=user_id)
+    return [
+        accounts_svc.serialize_account(
+            db, a, main, access_level=family_accounts_svc.access_level(db, a, user_id), conversion_user_id=user_id
+        )
+        for a in accounts
+    ]
 
 
 @router.get("/grouped", response_model=List[AccountGroupBucket])
@@ -96,14 +105,13 @@ def get_accounts_grouped(
         .all()
     )
     accounts = (
-        db.query(Account)
+        family_accounts_svc.accessible_accounts(db, user_id)
         .options(selectinload(Account.balances))
-        .filter(Account.user_id == user_id)
         .order_by(Account.sort_order, Account.id)
         .all()
     )
     if convert_balances:
-        accounts_svc.prime_account_rates(db, accounts, main)
+        accounts_svc.prime_account_rates(db, accounts, main, user_id=user_id)
 
     by_group: dict[Optional[int], list[Account]] = {}
     for a in accounts:
@@ -111,9 +119,12 @@ def get_accounts_grouped(
 
     result: list[AccountGroupBucket] = []
     for g in groups:
-        bucket_accounts = by_group.get(g.id, [])
+        bucket_accounts = [a for a in by_group.get(g.id, []) if a.user_id == user_id]
         serialized = [
-            accounts_svc.serialize_account(db, a, main, convert_balances=convert_balances)
+            accounts_svc.serialize_account(
+                db, a, main, convert_balances=convert_balances,
+                access_level=family_accounts_svc.access_level(db, a, user_id), conversion_user_id=user_id,
+            )
             for a in bucket_accounts
         ]
         result.append(AccountGroupBucket(
@@ -125,14 +136,32 @@ def get_accounts_grouped(
             total_in_main=round(sum(a.total_in_main for a in serialized), 2),
         ))
 
-    ungrouped = by_group.get(None, [])
+    ungrouped = [a for a in by_group.get(None, []) if a.user_id == user_id]
     if ungrouped:
         serialized = [
-            accounts_svc.serialize_account(db, a, main, convert_balances=convert_balances)
+            accounts_svc.serialize_account(
+                db, a, main, convert_balances=convert_balances,
+                access_level=family_accounts_svc.access_level(db, a, user_id), conversion_user_id=user_id,
+            )
             for a in ungrouped
         ]
         result.append(AccountGroupBucket(
             group=GroupSummary(id=None, name="Без группы", sort_order=10_000),
+            accounts=serialized,
+            total_in_main=round(sum(a.total_in_main for a in serialized), 2),
+        ))
+
+    shared = [a for a in accounts if a.user_id != user_id]
+    if shared:
+        serialized = [
+            accounts_svc.serialize_account(
+                db, a, main, convert_balances=convert_balances,
+                access_level=family_accounts_svc.access_level(db, a, user_id), conversion_user_id=user_id,
+            )
+            for a in shared
+        ]
+        result.append(AccountGroupBucket(
+            group=GroupSummary(id=None, name="Общие семейные счета", sort_order=9_999),
             accounts=serialized,
             total_in_main=round(sum(a.total_in_main for a in serialized), 2),
         ))
@@ -222,7 +251,7 @@ def update_account(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    account = _get_account(db, account_id, user_id)
+    account = _get_owned_account(db, account_id, user_id)
     update_fields = data.model_dump(exclude_unset=True)
     if "group_id" in update_fields:
         _validate_group(db, user_id, update_fields["group_id"])
@@ -240,7 +269,7 @@ def delete_account(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    account = _get_account(db, account_id, user_id)
+    account = _get_owned_account(db, account_id, user_id)
     db.delete(account)
     db.commit()
 
@@ -254,6 +283,7 @@ def list_balances(
     user_id: int = Depends(get_current_user_id),
 ):
     account = _get_account(db, account_id, user_id)
+    family_accounts_svc.require_write_access(db, account_id, user_id)
     main = accounts_svc.get_user_main_currency(db, user_id)
     serialized = accounts_svc.serialize_account(db, account, main)
     return serialized.balances
@@ -267,6 +297,7 @@ def add_balance(
     user_id: int = Depends(get_current_user_id),
 ):
     account = _get_account(db, account_id, user_id)
+    family_accounts_svc.require_write_access(db, account_id, user_id)
     currency = data.currency.upper()
 
     exists = db.query(AccountBalance).filter(
@@ -337,12 +368,7 @@ def adjust_balance(
     if not isfinite(data.balance):
         raise HTTPException(status_code=400, detail="Некорректный остаток")
 
-    account = db.query(Account).filter(
-        Account.id == account_id,
-        Account.user_id == user_id,
-    ).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    account = family_accounts_svc.require_write_access(db, account_id, user_id)
 
     normalized_currency = currency.upper()
     balance = db.query(AccountBalance).filter(
@@ -426,6 +452,7 @@ def delete_balance(
     user_id: int = Depends(get_current_user_id),
 ):
     account = _get_account(db, account_id, user_id)
+    family_accounts_svc.require_write_access(db, account_id, user_id)
     currency = currency.upper()
     bal = db.query(AccountBalance).filter(
         AccountBalance.account_id == account.id,

@@ -105,6 +105,55 @@ def test_family_invite_respects_member_cap(client):
     assert "максимум" in over_cap.json()["detail"]
 
 
+def test_shared_family_account_requires_explicit_access_and_honours_role(client):
+    owner = register_and_login(client, "shared-owner@test.com")
+    member = register_and_login(client, "shared-member@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Общий доступ"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner,
+        json={"email": "shared-member@test.com", "role": "viewer"},
+    ).json()
+    accepted = client.post(
+        f"/api/family/invitations/{invitation['id']}/accept", headers=member
+    ).json()
+    member_id = next(item["id"] for item in accepted["members"] if item["email"] == "shared-member@test.com")
+    account = make_account(client, owner, name="Общая карта", balance=1000)
+
+    shared = client.put(
+        f"/api/family/accounts/{account['id']}/access", headers=owner,
+        json={"is_shared": True, "members": [{"user_id": accepted["current_user_id"], "permission": "viewer"}]},
+    )
+    # current_user_id in accepted response is the member, exactly what the
+    # account access endpoint expects.
+    assert shared.status_code == 200, shared.text
+    visible = client.get("/api/accounts/", headers=member).json()
+    shown = next(item for item in visible if item["id"] == account["id"])
+    assert shown["access_level"] == "viewer"
+
+    denied = client.post("/api/transactions/", headers=member, json={
+        "type": "expense", "amount": 10, "currency": "RUB", "account_id": account["id"],
+    })
+    assert denied.status_code == 403
+
+    changed = client.patch(
+        f"/api/family/members/{member_id}/role", headers=owner, json={"role": "editor"}
+    )
+    assert changed.status_code == 200, changed.text
+    editor_access = client.put(
+        f"/api/family/accounts/{account['id']}/access", headers=owner,
+        json={"is_shared": True, "members": [{"user_id": accepted["current_user_id"], "permission": "editor"}]},
+    )
+    assert editor_access.status_code == 200, editor_access.text
+    created = client.post("/api/transactions/", headers=member, json={
+        "type": "expense", "amount": 10, "currency": "RUB", "account_id": account["id"],
+    })
+    assert created.status_code == 201, created.text
+
+    # The owner sees edits made by an editor on a shared account.
+    owner_transactions = client.get("/api/transactions/", headers=owner).json()
+    assert any(item["id"] == created.json()["id"] for item in owner_transactions["items"])
+
+
 def test_family_expense_is_shared_without_exposing_personal_transactions(client):
     owner = register_and_login(client, "owner-family@test.com")
     member = register_and_login(client, "member-family@test.com")

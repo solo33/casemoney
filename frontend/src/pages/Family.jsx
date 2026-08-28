@@ -10,6 +10,9 @@ export default function Family() {
   const [report, setReport] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [recurringSuggestions, setRecurringSuggestions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [familyAccounts, setFamilyAccounts] = useState({ accounts: [], members: [] });
+  const [shareDraft, setShareDraft] = useState({ account_id: "", members: {} });
   const [analyticsPeriod, setAnalyticsPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [familyName, setFamilyName] = useState("Наша семья");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -30,18 +33,24 @@ export default function Family() {
       const familyResponse = await api.get("/api/family/");
       setState(familyResponse.data);
       if (familyResponse.data.family) {
-        const [reportResponse, analyticsResponse, suggestionsResponse] = await Promise.all([
+        const [reportResponse, analyticsResponse, suggestionsResponse, accountsResponse, familyAccountsResponse] = await Promise.all([
           api.get("/api/family/report"),
           api.get("/api/family/analytics", { params: analyticsPeriod }),
           api.get("/api/family/recurring-suggestions"),
+          api.get("/api/accounts/"),
+          api.get("/api/family/accounts"),
         ]);
         setReport(reportResponse.data);
         setAnalytics(analyticsResponse.data);
         setRecurringSuggestions(suggestionsResponse.data.items || []);
+        setAccounts(accountsResponse.data || []);
+        setFamilyAccounts(familyAccountsResponse.data || { accounts: [], members: [] });
       } else {
         setReport(null);
         setAnalytics(null);
         setRecurringSuggestions([]);
+        setAccounts([]);
+        setFamilyAccounts({ accounts: [], members: [] });
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось загрузить семейные финансы");
@@ -64,6 +73,17 @@ export default function Family() {
   };
 
   const activeMembers = state.family?.members?.filter(member => member.status === "active") || [];
+  const ownAccounts = accounts.filter(account => account.user_id === state.family?.current_user_id);
+  const selectedSharedAccount = familyAccounts.accounts.find(account => account.id === Number(shareDraft.account_id));
+  const roleLabel = (role) => ({ owner: "Владелец", editor: "Редактор", viewer: "Наблюдатель", member: "Редактор" }[role] || role);
+
+  const selectAccountForSharing = (accountId) => {
+    const shared = familyAccounts.accounts.find(item => item.id === Number(accountId));
+    setShareDraft({
+      account_id: accountId,
+      members: Object.fromEntries((shared?.access || []).map(item => [item.user_id, item.permission])),
+    });
+  };
   const currencyOptions = useMemo(() => {
     const values = new Set(["RUB"]);
     report?.outstanding?.forEach(item => values.add(item.currency));
@@ -137,7 +157,7 @@ export default function Family() {
               <h2>{state.family.name}</h2>
             </div>
             <span className="family-role">
-              {state.family.current_user_role === "owner" ? "Владелец" : "Участник"}
+              {roleLabel(state.family.current_user_role)}
             </span>
           </div>
 
@@ -320,7 +340,20 @@ export default function Family() {
                         <small>{member.email}</small>
                       </span>
                       <span className="family-member-actions">
-                        {member.status === "active" ? "Подключён" : "Приглашён"}
+                        {member.status === "active" ? roleLabel(member.role) : "Приглашён"}
+                        {isOwner && member.role !== "owner" && member.status === "active" && (
+                          <select
+                            value={member.role === "member" ? "editor" : member.role}
+                            aria-label={`Роль ${member.name}`}
+                            onChange={event => submit(async () => {
+                              await api.patch(`/api/family/members/${member.id}/role`, { role: event.target.value });
+                              setMessage("Роль участника обновлена");
+                            })}
+                          >
+                            <option value="editor">Редактор</option>
+                            <option value="viewer">Наблюдатель</option>
+                          </select>
+                        )}
                         {canRemove && (
                           <button
                             type="button"
@@ -350,7 +383,7 @@ export default function Family() {
                 <form onSubmit={event => {
                   event.preventDefault();
                   submit(async () => {
-                    await api.post("/api/family/invite", { email: inviteEmail });
+                    await api.post("/api/family/invite", { email: inviteEmail, role: "editor" });
                     setInviteEmail("");
                     setMessage("Приглашение создано");
                   });
@@ -365,6 +398,63 @@ export default function Family() {
                   <button type="submit">Пригласить</button>
                 </form>
               )}
+            </section>
+
+            <section className="family-card family-shared-accounts">
+              <h2>Общие счета</h2>
+              <p>Личные счета остаются видны только владельцу. Откройте доступ лишь к тем счетам, которыми действительно пользуется семья.</p>
+              {ownAccounts.length ? (
+                <form onSubmit={event => {
+                  event.preventDefault();
+                  if (!shareDraft.account_id) return;
+                  submit(async () => {
+                    await api.put(`/api/family/accounts/${shareDraft.account_id}/access`, {
+                      is_shared: true,
+                      members: Object.entries(shareDraft.members).map(([user_id, permission]) => ({ user_id: Number(user_id), permission })),
+                    });
+                    setMessage("Доступ к общему счёту обновлён");
+                  });
+                }}>
+                  <select value={shareDraft.account_id} onChange={event => selectAccountForSharing(event.target.value)}>
+                    <option value="">Выберите свой счёт</option>
+                    {ownAccounts.map(account => <option key={account.id} value={account.id}>{account.name}{account.is_shared ? " — общий" : ""}</option>)}
+                  </select>
+                  {shareDraft.account_id && activeMembers.filter(member => member.user_id !== state.family.current_user_id).map(member => (
+                    <label className="family-account-access" key={member.user_id}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(shareDraft.members[member.user_id])}
+                        onChange={event => setShareDraft(current => {
+                          const members = { ...current.members };
+                          if (event.target.checked) members[member.user_id] = members[member.user_id] || "editor";
+                          else delete members[member.user_id];
+                          return { ...current, members };
+                        })}
+                      />
+                      <span>{member.name}</span>
+                      {shareDraft.members[member.user_id] && (
+                        <select value={shareDraft.members[member.user_id]} onChange={event => setShareDraft(current => ({
+                          ...current, members: { ...current.members, [member.user_id]: event.target.value },
+                        }))}>
+                          <option value="editor">Может редактировать</option>
+                          <option value="viewer">Только просмотр</option>
+                        </select>
+                      )}
+                    </label>
+                  ))}
+                  <button type="submit">Сохранить доступ</button>
+                  {selectedSharedAccount && (
+                    <button type="button" className="family-member-remove" onClick={() => {
+                      if (!window.confirm("Закрыть семейный доступ к этому счёту?")) return;
+                      submit(async () => {
+                        await api.put(`/api/family/accounts/${selectedSharedAccount.id}/access`, { is_shared: false, members: [] });
+                        setShareDraft({ account_id: "", members: {} });
+                        setMessage("Счёт снова личный");
+                      });
+                    }}>Сделать личным</button>
+                  )}
+                </form>
+              ) : <p className="family-analytics-empty">Сначала создайте личный счёт в разделе «Счета».</p>}
             </section>
 
             <section className="family-card">
@@ -531,12 +621,18 @@ export default function Family() {
         .family-members span:first-child strong, .family-members span:first-child small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .family-members small, .family-expenses span { color: #7a8590; font-size: 12px; }
         .family-member-actions { display: flex !important; align-items: center; gap: 10px; color: #7a8590; font-size: 13px; flex-shrink: 0; }
+        .family-member-actions select { width: auto; min-width: 118px; padding: 6px 25px 6px 8px; font-size: 12px; }
         .family-member-remove {
           background: transparent; border: 1px solid #e4ddcd; color: #a83220;
           padding: 4px 10px; font-size: 12px; border-radius: 7px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
         }
         .family-member-remove:hover { background: #fff0ec; border-color: #e2a99a; }
         .family-amount { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
+        .family-shared-accounts { grid-column: 1 / -1; }
+        .family-shared-accounts form { display: grid; gap: 9px; }
+        .family-account-access { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px); gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid #eee8dc; }
+        .family-account-access input { width: auto; }
+        .family-account-access select { width: 100%; }
         .family-expenses article > div:last-child { text-align: right; }
         @media (max-width: 720px) {
           .family-columns { grid-template-columns: 1fr; }
@@ -551,6 +647,9 @@ export default function Family() {
           .family-recurring-owner { max-width: none; text-align: left; }
           .family-expenses article { align-items: flex-start; }
           .family-heading { align-items: flex-start; }
+          .family-member-actions { flex-wrap: wrap; justify-content: flex-end; }
+          .family-account-access { grid-template-columns: auto minmax(0, 1fr); }
+          .family-account-access select { grid-column: 2; }
         }
       `}</style>
     </main>

@@ -1,7 +1,7 @@
 from calendar import monthrange
 from datetime import datetime, timezone
 import html
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -13,7 +13,7 @@ from app.database import get_db
 from app.models.account import Account
 from app.models.budget import Budget
 from app.models.category import Category
-from app.models.family import Family, FamilyMember, FamilySettlement
+from app.models.family import AccountFamilyAccess, Family, FamilyMember, FamilySettlement
 from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision
 from app.models.notification import Notification
 from app.models.recurring_transaction import RecurringTransaction
@@ -77,6 +77,21 @@ class FamilyCreate(BaseModel):
 
 class InviteCreate(BaseModel):
     email: str = Field(min_length=5, max_length=255)
+    role: Literal["editor", "viewer"] = "editor"
+
+
+class MemberRoleUpdate(BaseModel):
+    role: Literal["editor", "viewer"]
+
+
+class AccountAccessItem(BaseModel):
+    user_id: int
+    permission: Literal["editor", "viewer"]
+
+
+class AccountAccessUpdate(BaseModel):
+    is_shared: bool
+    members: list[AccountAccessItem] = []
 
 
 class SettlementCreate(BaseModel):
@@ -123,6 +138,13 @@ def family_payload(db: Session, family: Family, current_user_id: int) -> dict:
             for member in members
         ],
     }
+
+
+def _require_family_owner(db: Session, user_id: int) -> FamilyMember:
+    membership = require_membership(db, user_id)
+    if membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Это действие доступно владельцу семейного пространства")
+    return membership
 
 
 @router.get("/")
@@ -218,7 +240,7 @@ def invite_member(
         family_id=membership.family_id,
         user_id=user.id if user else None,
         email=email,
-        role="member",
+        role=data.role,
         status="pending",
         invited_by_user_id=user_id,
     )
@@ -255,6 +277,109 @@ def invite_member(
         ),
     )
     return {"id": invitation.id, "email": email, "status": "pending"}
+
+
+@router.patch("/members/{member_id}/role")
+def update_member_role(
+    member_id: int,
+    data: MemberRoleUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = _require_family_owner(db, user_id)
+    target = db.query(FamilyMember).filter(
+        FamilyMember.id == member_id,
+        FamilyMember.family_id == membership.family_id,
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Участник не найден")
+    if target.role == "owner":
+        raise HTTPException(status_code=400, detail="Роль владельца нельзя изменить")
+    target.role = data.role
+    db.commit()
+    return {"id": target.id, "role": target.role}
+
+
+@router.get("/accounts")
+def list_family_accounts(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    members = db.query(FamilyMember).filter(
+        FamilyMember.family_id == membership.family_id,
+        FamilyMember.status == "active",
+    ).order_by(FamilyMember.id).all()
+    accounts = db.query(Account).filter(
+        Account.family_id == membership.family_id,
+        Account.is_shared.is_(True),
+    ).order_by(Account.id).all()
+    access_items = db.query(AccountFamilyAccess).filter(
+        AccountFamilyAccess.account_id.in_([a.id for a in accounts])
+    ).all() if accounts else []
+    by_account: dict[int, list[dict]] = {account.id: [] for account in accounts}
+    for item in access_items:
+        by_account.setdefault(item.account_id, []).append({
+            "user_id": item.user_id, "permission": item.permission,
+        })
+    return {
+        "can_manage": membership.role == "owner",
+        "members": [
+            {"user_id": item.user_id, "email": item.email, "role": item.role}
+            for item in members
+        ],
+        "accounts": [
+            {
+                "id": account.id,
+                "name": account.name,
+                "owner_user_id": account.user_id,
+                "access": by_account.get(account.id, []),
+            }
+            for account in accounts
+        ],
+    }
+
+
+@router.put("/accounts/{account_id}/access")
+def update_account_access(
+    account_id: int,
+    data: AccountAccessUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    account = db.query(Account).filter(
+        Account.id == account_id,
+        Account.user_id == user_id,
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Можно настраивать доступ только к своему счёту")
+
+    active_member_ids = {
+        item.user_id for item in db.query(FamilyMember).filter(
+            FamilyMember.family_id == membership.family_id,
+            FamilyMember.status == "active",
+        ).all()
+        if item.user_id and item.user_id != user_id
+    }
+    requested = {item.user_id: item.permission for item in data.members}
+    if not set(requested).issubset(active_member_ids):
+        raise HTTPException(status_code=400, detail="Можно выбрать только активных участников этой семьи")
+
+    db.query(AccountFamilyAccess).filter(
+        AccountFamilyAccess.account_id == account.id
+    ).delete(synchronize_session=False)
+    account.is_shared = bool(data.is_shared)
+    account.family_id = membership.family_id if data.is_shared else None
+    if data.is_shared:
+        for target_user_id, permission in requested.items():
+            db.add(AccountFamilyAccess(
+                account_id=account.id,
+                user_id=target_user_id,
+                permission=permission,
+            ))
+    db.commit()
+    return {"id": account.id, "is_shared": account.is_shared, "access": requested}
 
 
 @router.delete("/members/{member_id}", status_code=204)
@@ -581,7 +706,9 @@ def family_analytics(
     if is_current_period:
         for item in transactions:
             item_date = item.date if item.date.tzinfo else item.date.replace(tzinfo=timezone.utc)
-            if not item.is_planned or item_date < now or item.type not in {TransactionType.expense, TransactionType.income}:
+            # A plan for today is still an upcoming item until the user marks it
+            # complete.  Compare calendar dates rather than the creation time.
+            if not item.is_planned or item_date.date() < now.date() or item.type not in {TransactionType.expense, TransactionType.income}:
                 continue
             # Already converted in the pass over `transactions` above — reuse it
             # instead of calling convert_for_user a second time for the same item.
@@ -807,6 +934,8 @@ def create_settlement(
     user_id: int = Depends(current_user_id),
 ):
     membership = require_membership(db, user_id)
+    if membership.role == "viewer":
+        raise HTTPException(status_code=403, detail="Наблюдатель не может создавать возмещения")
     recipient = db.query(FamilyMember).filter(
         FamilyMember.family_id == membership.family_id,
         FamilyMember.user_id == data.to_user_id,

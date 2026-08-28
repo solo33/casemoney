@@ -1429,41 +1429,6 @@ hr {
 .shopping-toolbar, .shopping-add-card, .shopping-items-card {
   background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px;
 }
-.receipts-card { background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
-.receipts-heading { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
-.receipts-heading h2 { margin: 0 0 4px; font-size: 17px; }
-.receipts-heading p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.receipt-upload-form { display: grid; grid-template-columns: minmax(180px, 1.2fr) minmax(120px, 1fr) 140px 100px 82px minmax(180px, 1.2fr) auto; gap: 8px; align-items: end; padding: 12px; background: #f7f2e7; border: 1px solid #ead9a8; border-radius: 9px; }
-.receipt-file-label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; min-width: 0; }
-.receipt-file-label input { width: 100%; font-size: 12px; }
-.receipt-layout { display: grid; grid-template-columns: minmax(280px, .9fr) minmax(360px, 1.1fr); gap: 14px; margin-top: 14px; }
-.receipt-list { min-width: 0; }
-.receipt-row { display: flex; gap: 8px; align-items: center; border-top: 1px solid #eee8da; padding: 9px 0; }
-.receipt-row:first-child { border-top: 0; }
-.receipt-row.is-selected { margin: 0 -8px; padding: 9px 8px; background: #f3ecdc; border-radius: 8px; border-top-color: transparent; }
-.receipt-row-main { display: grid; gap: 3px; min-width: 0; flex: 1; text-align: left; padding: 0; border: 0; background: transparent; color: var(--text); }
-.receipt-row-main strong, .receipt-row-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.receipt-row-main span, .receipt-row-main small { color: var(--muted); font-size: 12px; }
-.receipt-row-main small { color: #7b816f; }
-.receipt-row-actions { display: flex; gap: 5px; align-items: center; }
-.receipt-row-actions button { padding: 5px 7px; font-size: 12px; }
-.receipt-editor { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; min-width: 0; }
-.receipt-editor-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 9px; }
-.receipt-editor-heading h3 { margin: 0 0 2px; font-size: 16px; }
-.receipt-editor-heading span { color: var(--muted); font-size: 12px; }
-.receipt-lines > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, auto) auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid #eee8da; }
-.receipt-lines > div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.receipt-lines small { color: var(--muted); }
-.receipt-line-form { display: grid; grid-template-columns: minmax(130px, 1.2fr) 70px 80px 85px minmax(120px, 1fr) auto; gap: 7px; margin-top: 10px; }
-.receipt-line-form input, .receipt-line-form select { min-width: 0; }
-.receipt-line-form button { white-space: nowrap; }
-
-@media (max-width: 1100px) and (min-width: 768px) {
-  .receipt-upload-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .receipt-file-label { grid-column: span 2; }
-  .receipt-upload-form button { grid-column: span 2; }
-  .receipt-layout { grid-template-columns: 1fr; }
-}
 .shopping-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
 .shopping-toolbar label, .shopping-expense-modal label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .shopping-toolbar select { min-width: 250px; }
@@ -1644,6 +1609,44 @@ hr {
 .quick-category-pills button.is-active { background: #173a54; border-color: #173a54; color: #fff; }
 .quick-template-link { color: #9a6b1a; font-size: 13px; text-decoration: none; }
 
+/* Android bank-notification drafts. Notification text never appears in this UI. */
+.page-heading-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+.page-heading-row h1 { margin-bottom: 6px; }
+.bank-import-permission { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid #e6d4a2; border-radius: 9px; background: #fff9e8; }
+.bank-import-permission > div, .bank-import-banks label > span { display: grid; gap: 4px; }
+.bank-import-permission small, .bank-import-banks small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.bank-import-permission button { flex: 0 0 auto; }
+.bank-import-banks { display: grid; gap: 8px; margin-top: 12px; }
+.bank-import-banks label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid #eee7d9; cursor: pointer; }
+.bank-import-banks input { width: 18px; height: 18px; margin-top: 2px; }
+.bank-drafts-message { margin: 0 0 14px; padding: 10px 13px; border: 1px solid #e6d4a2; border-radius: 8px; background: #fff9e8; color: #755518; }
+.empty-state { display: grid; gap: 7px; padding: 30px 18px; text-align: center; border: 1px dashed #d7cdbb; border-radius: 12px; color: var(--muted); background: #fffdf7; }
+.empty-state b { color: #173a54; font-size: 16px; }
+.bank-drafts-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.bank-drafts-list { display: grid; gap: 12px; }
+.bank-draft-card { padding: 16px; border: 1px solid #e4ddcd; border-radius: 11px; background: #fffdf7; }
+.bank-draft-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 13px; border-bottom: 1px solid #eee7d9; }
+.bank-draft-card header > div { display: grid; gap: 4px; }
+.bank-draft-card header b { color: #173a54; font-size: 16px; }
+.bank-draft-card header small { color: var(--muted); font-size: 12px; }
+.bank-draft-type { width: max-content; padding: 3px 7px; border-radius: 999px; color: #fff; background: #c0432b; font-size: 11px; font-weight: 800; }
+.bank-draft-type.is-income { background: #167a4a; }
+.bank-draft-card header > strong { font-variant-numeric: tabular-nums; font-size: 18px; white-space: nowrap; }
+.amount-income { color: #167a4a; }.amount-expense { color: #c0432b; }
+.bank-draft-fields { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 10px; padding: 14px 0; }
+.bank-draft-fields label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.bank-draft-wide { grid-column: 1 / -1; }
+.bank-draft-card footer { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 700px) {
+  .page-heading-row { display: grid; }
+  .bank-import-permission { display: grid; }
+  .bank-import-permission button { width: 100%; }
+  .bank-draft-card { padding: 13px; }
+  .bank-draft-fields { grid-template-columns: 1fr; }
+  .bank-draft-wide { grid-column: auto; }
+  .bank-draft-card footer button { flex: 1; }
+}
+
 @media (max-width: 767px) {
   .shopping-page { padding-bottom: 100px; }
   .shopping-toolbar { align-items: stretch; flex-direction: column; }
@@ -1654,14 +1657,6 @@ hr {
   .shopping-add-form input:first-child { grid-column: 1 / -1; }
   .shopping-add-form input:nth-child(4) { grid-column: 1 / span 2; }
   .shopping-add-form button { grid-column: 3; }
-  .receipt-upload-form { grid-template-columns: 1fr 1fr; padding: 10px; }
-  .receipt-file-label { grid-column: 1 / -1; }
-  .receipt-upload-form select, .receipt-upload-form button { grid-column: 1 / -1; }
-  .receipt-layout { grid-template-columns: 1fr; }
-  .receipt-row { align-items: start; }
-  .receipt-row-actions { flex-wrap: wrap; justify-content: end; max-width: 115px; }
-  .receipt-line-form { grid-template-columns: 1fr 1fr; }
-  .receipt-line-form input:first-child, .receipt-line-form select, .receipt-line-form button { grid-column: 1 / -1; }
   .shopping-item-actions .btn-secondary { font-size: 0; padding: 7px; }
   .shopping-item-actions .btn-secondary::after { content: "₽"; font-size: 15px; }
   .mobile-shopping-button { position: fixed; display: inline-flex; align-items: center; gap: 6px; right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 98; padding: 10px 13px; background: #173a54; color: #fffdf7; text-decoration: none; border-radius: 999px; box-shadow: 0 8px 22px rgba(15,30,45,.26); font-size: 13px; font-weight: 700; }

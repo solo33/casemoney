@@ -32,6 +32,11 @@ class Account(Base):
     # Свободная заметка: например последние цифры карты или назначение счёта.
     note = Column(Text, nullable=True)
 
+    # Личный счёт становится общим только после явного действия владельца.
+    # Доступ каждого участника хранится отдельно в account_family_access.
+    family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
+    is_shared = Column(Boolean, nullable=False, default=False)
+
     transactions = relationship(
         "Transaction",
         foreign_keys="Transaction.account_id",
