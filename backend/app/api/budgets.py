@@ -173,22 +173,49 @@ def _budget_state(db: Session, budget: Budget) -> tuple[float, float, float]:
 
 
 def _carry_in(db: Session, budget: Budget) -> float:
+    """Calculate a rollover chain iteratively, without recursive API work.
+
+    A long-running monthly budget used to recurse through every prior period.
+    Besides risking a recursion limit, rendering several budgets repeated the
+    same queries.  Here each historic period is evaluated exactly once, from
+    oldest to newest; a missing period intentionally breaks the chain.
+    """
     previous_start = _previous_period_start(budget.period_start, budget.period)
-    previous = db.query(Budget).filter(
+    rows = db.query(Budget).filter(
         Budget.user_id == budget.user_id,
         Budget.category_id == budget.category_id,
         Budget.period == budget.period,
-        Budget.period_start == previous_start,
-    ).first()
-    if not previous or previous.rollover_mode == "none":
+        Budget.period_start < budget.period_start,
+    ).order_by(Budget.period_start.asc()).all()
+    by_start = {row.period_start: row for row in rows}
+
+    chain: list[Budget] = []
+    cursor = previous_start
+    while cursor in by_start:
+        chain.append(by_start[cursor])
+        cursor = _previous_period_start(cursor, budget.period)
+    chain.reverse()
+
+    carry = 0.0
+    carry_currency: str | None = None
+    for previous in chain:
+        if carry_currency is not None:
+            carry = convert_for_user(db, budget.user_id, carry, carry_currency, previous.currency)
+        start, end = _period_range(previous.period_start, previous.period)
+        spent = _spent_for_category(
+            db, previous.user_id, previous.category_id, previous.currency,
+            start, end, previous.include_planned, previous.scope,
+        )
+        if previous.rollover_mode == "none":
+            carry = 0.0
+        else:
+            remainder = previous.amount + carry - spent
+            carry = max(0.0, remainder) if previous.rollover_mode == "carry_remaining" else remainder
+        carry_currency = previous.currency
+
+    if not chain or carry_currency is None or chain[-1].rollover_mode == "none":
         return 0.0
-    _, _, remainder = _budget_state(db, previous)
-    if previous.rollover_mode == "carry_remaining":
-        remainder = max(0, remainder)
-    # remainder is expressed in previous.currency — convert once here so a currency
-    # change between consecutive periods for the same category can't silently
-    # corrupt the current period's effective_limit.
-    return round(convert_for_user(db, budget.user_id, remainder, previous.currency, budget.currency), 2)
+    return round(convert_for_user(db, budget.user_id, carry, carry_currency, budget.currency), 2)
 
 
 def _serialize(db: Session, budget: Budget, category: Category) -> BudgetResponse:

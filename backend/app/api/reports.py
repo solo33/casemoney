@@ -16,6 +16,7 @@ from app.models.account_group import AccountGroup
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
+from app.services.finance_period import financial_period_totals
 from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -231,20 +232,14 @@ def get_summary(
         TransactionType.income if breakdown_type == "income" else TransactionType.expense
     )
 
-    total_income = 0.0
-    total_expense = 0.0
-    cat_totals: dict[Optional[int], float] = {}
-    for t in transactions:
-        if t.is_financing:
-            continue
-        amount_main = _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
-        if t.type == TransactionType.income:
-            total_income += amount_main
-        elif t.type == TransactionType.expense:
-            total_expense += amount_main
-        # Разбивка по категориям — по выбранному типу (доход или расход)
-        if t.type == breakdown_enum:
-            cat_totals[t.category_id] = cat_totals.get(t.category_id, 0.0) + amount_main
+    period_totals = financial_period_totals(
+        db, user_id, df, dt, main,
+        include_planned=include_planned,
+        category_type=breakdown_enum,
+    )
+    total_income = period_totals.income
+    total_expense = period_totals.expense
+    cat_totals = period_totals.expense_categories or {}
 
     # Знаменатель для процентов — сумма по выбранному типу
     breakdown_total = total_income if breakdown_type == "income" else total_expense

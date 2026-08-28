@@ -17,7 +17,7 @@ from app.database import get_db
 from app.models.category import Category
 from app.models.transaction import Transaction, TransactionType
 from app.services import accounts as accounts_svc
-from app.services import exchange as exchange_svc
+from app.services.finance_period import financial_period_totals
 from app.services.auth import decode_token
 from app.services.plans import ensure_family_plan
 
@@ -53,27 +53,10 @@ class InsightResponse(BaseModel):
 
 
 def _totals(db: Session, user_id: int, start: datetime, end: datetime, currency: str):
-    rows = db.query(Transaction).filter(
-        Transaction.user_id == user_id,
-        Transaction.date >= start,
-        Transaction.date < end,
-        Transaction.is_planned.is_(False),
-        Transaction.is_financing.is_(False),
-        Transaction.type.in_([TransactionType.income, TransactionType.expense]),
-    ).all()
-    income = expense = 0.0
-    categories: dict[int | None, float] = {}
-    for item in rows:
-        try:
-            amount = exchange_svc.convert_transaction_for_user(db, user_id, item, currency)
-        except exchange_svc.ExchangeError:
-            continue
-        if item.type == TransactionType.income:
-            income += amount
-        else:
-            expense += amount
-            categories[item.category_id] = categories.get(item.category_id, 0.0) + amount
-    return round(income, 2), round(expense, 2), categories
+    totals = financial_period_totals(
+        db, user_id, start, end, currency, include_expense_categories=True,
+    )
+    return totals.income, totals.expense, totals.expense_categories or {}
 
 
 @router.post("/summary", response_model=InsightResponse)

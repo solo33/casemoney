@@ -24,7 +24,7 @@ from app.models.category import Category
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services import accounts as accounts_svc
-from app.services import exchange as exchange_svc
+from app.services.finance_period import financial_period_totals
 from app.services.auth import decode_token
 from app.services.plans import ensure_family_plan
 
@@ -61,30 +61,11 @@ def _aggregate_snapshot(db: Session, user_id: int, period_days: int) -> tuple[st
     start = now - timedelta(days=period_days)
     prev_start = start - timedelta(days=period_days)
     currency = accounts_svc.get_user_main_currency(db, user_id)
-    rows = db.query(Transaction).filter(
-        Transaction.user_id == user_id,
-        Transaction.date >= prev_start,
-        Transaction.date < now,
-        Transaction.is_planned.is_(False),
-        Transaction.is_financing.is_(False),
-        Transaction.type.in_([TransactionType.income, TransactionType.expense]),
-    ).all()
-    current_income = current_expense = previous_expense = 0.0
-    current_categories: dict[int | None, float] = {}
-    for item in rows:
-        try:
-            amount = exchange_svc.convert_transaction_for_user(db, user_id, item, currency)
-        except exchange_svc.ExchangeError:
-            continue
-        if item.date < start:
-            if item.type == TransactionType.expense:
-                previous_expense += amount
-            continue
-        if item.type == TransactionType.income:
-            current_income += amount
-        else:
-            current_expense += amount
-            current_categories[item.category_id] = current_categories.get(item.category_id, 0.0) + amount
+    current = financial_period_totals(
+        db, user_id, start, now, currency, include_expense_categories=True,
+    )
+    previous = financial_period_totals(db, user_id, prev_start, start, currency)
+    current_categories = current.expense_categories or {}
     ids = [category_id for category_id in current_categories if category_id is not None]
     names = dict(db.query(Category.id, Category.name).filter(Category.id.in_(ids)).all()) if ids else {}
     categories = [
@@ -93,10 +74,10 @@ def _aggregate_snapshot(db: Session, user_id: int, period_days: int) -> tuple[st
     ]
     return currency, {
         "period_days": period_days,
-        "income": round(current_income),
-        "expense": round(current_expense),
-        "net": round(current_income - current_expense),
-        "previous_expense": round(previous_expense),
+        "income": round(current.income),
+        "expense": round(current.expense),
+        "net": round(current.income - current.expense),
+        "previous_expense": round(previous.expense),
         "top_expense_categories": categories,
     }
 
