@@ -27,6 +27,17 @@ class CategoryRuleResponse(BaseModel):
     is_active: bool
 
 
+class CategorySuggestion(BaseModel):
+    """A non-binding category proposal derived from this user's own data."""
+
+    category_id: int
+    category_name: str
+    category_type: str
+    source: str  # rule | history
+    confidence: float = Field(ge=0, le=1)
+    matching_operations: int = Field(ge=1)
+
+
 class DuplicateTransactionItem(BaseModel):
     id: int
     date: str

@@ -66,6 +66,7 @@ export default function Transactions() {
   const [tags, setTags] = useState([]);
   const [tagReport, setTagReport] = useState(null);
   const [frequentCategories, setFrequentCategories] = useState([]);
+  const [categorySuggestion, setCategorySuggestion] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -112,6 +113,44 @@ export default function Transactions() {
     to_amount: "", to_currency: "", fee_amount: "", fee_category_id: "",
     date: isoToday(),
   });
+
+  useEffect(() => {
+    if (newTx.type === "transfer" || newTx.category_id || newTx.description.trim().length < 2 || navigator.onLine === false) {
+      setCategorySuggestion(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await api.get("/api/automation/category-suggestion", {
+          params: { description: newTx.description, transaction_type: newTx.type },
+        });
+        if (!cancelled) setCategorySuggestion(response.data || null);
+      } catch {
+        if (!cancelled) setCategorySuggestion(null);
+      }
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [newTx.description, newTx.type, newTx.category_id]);
+
+  const applyCategorySuggestion = () => {
+    if (!categorySuggestion) return;
+    setNewTx(current => ({ ...current, category_id: String(categorySuggestion.category_id) }));
+    setCategorySuggestion(null);
+  };
+
+  const saveSuggestedCategoryRule = async () => {
+    if (!categorySuggestion || newTx.description.trim().length < 2) return;
+    try {
+      await api.post("/api/automation/rules", {
+        pattern: newTx.description,
+        category_id: categorySuggestion.category_id,
+      });
+      setNotice(`Правило «${newTx.description.trim()} → ${categorySuggestion.category_name}» сохранено.`);
+    } catch (requestError) {
+      setNotice(requestError.response?.data?.detail || "Не удалось сохранить правило.");
+    }
+  };
 
   const loadAccounts = useCallback(async () => {
     const applyOptions = (groups, nextCategories) => {
@@ -484,6 +523,13 @@ export default function Transactions() {
                       onClick={() => setNewTx({ ...newTx, category_id: String(category.id) })}
                     >{category.icon ? `${category.icon} ` : ""}{category.name}</button>
                   ))}
+                </div>
+              )}
+              {categorySuggestion && (
+                <div className="category-suggestion" role="status">
+                  <span>Подсказка: <strong>{categorySuggestion.category_name}</strong>{categorySuggestion.source === "history" ? ` — ${categorySuggestion.matching_operations} похожих операций` : " — ваше правило"}</span>
+                  <button type="button" onClick={applyCategorySuggestion}>Выбрать</button>
+                  {categorySuggestion.source === "history" && <button type="button" className="btn-ghost" onClick={saveSuggestedCategoryRule}>Запомнить</button>}
                 </div>
               )}
               {user?.family_access && <Link className="quick-template-link" to="/settings/templates">Шаблоны</Link>}

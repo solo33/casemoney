@@ -1607,6 +1607,9 @@ hr {
 .quick-category-pills { display: flex; gap: 5px; flex-wrap: wrap; flex: 1 1 100%; order: 10; }
 .quick-category-pills button { padding: 5px 8px; border-radius: 999px; border: 1px solid #e1d7c5; background: #f8f5ed; color: #43515f; font-size: 12px; line-height: 1.2; }
 .quick-category-pills button.is-active { background: #173a54; border-color: #173a54; color: #fff; }
+.category-suggestion { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; padding: 7px 9px; border-radius: 8px; background: #eef5f7; color: #314c5e; font-size: 13px; }
+.category-suggestion span { flex: 1 1 180px; }
+.category-suggestion button { min-height: 30px; padding: 4px 8px; font-size: 12px; }
 .quick-template-link { color: #9a6b1a; font-size: 13px; text-decoration: none; }
 
 /* Android bank-notification drafts. Notification text never appears in this UI. */

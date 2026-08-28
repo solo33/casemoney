@@ -46,6 +46,79 @@ def matched_category_id(
     return max(matches, key=lambda item: len(item.pattern)).category_id
 
 
+def suggest_category_from_history(
+    db,
+    user_id: int,
+    description: str | None,
+    category_type: str,
+) -> dict | None:
+    """Suggest one category without changing any transaction.
+
+    A saved rule wins because it is an explicit instruction.  Without a rule,
+    only operations with the same normalized description are considered.  This
+    keeps a suggestion understandable and avoids guessing from unrelated text.
+    """
+    note = normalize_rule_pattern(description or "")
+    if len(note) < 2:
+        return None
+
+    rule_category_id = matched_category_id(db, user_id, note, category_type)
+    if rule_category_id is not None:
+        category = db.query(Category).filter(
+            Category.id == rule_category_id,
+            Category.user_id == user_id,
+        ).first()
+        if category:
+            return {
+                "category_id": category.id,
+                "category_name": category.name,
+                "category_type": category.type,
+                "source": "rule",
+                "confidence": 1.0,
+                "matching_operations": 1,
+            }
+
+    rows = (
+        db.query(Transaction.category_id, Transaction.description)
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type == TransactionType(category_type),
+            Transaction.is_planned.is_(False),
+            Transaction.category_id.isnot(None),
+            Transaction.description.isnot(None),
+        )
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(1000)
+        .all()
+    )
+    matching_ids = [
+        row.category_id
+        for row in rows
+        if normalize_rule_pattern(row.description or "") == note
+    ]
+    if not matching_ids:
+        return None
+    counts: dict[int, int] = {}
+    for category_id in matching_ids:
+        counts[category_id] = counts.get(category_id, 0) + 1
+    category_id, uses = max(counts.items(), key=lambda item: item[1])
+    category = db.query(Category).filter(
+        Category.id == category_id,
+        Category.user_id == user_id,
+        Category.type == category_type,
+    ).first()
+    if not category:
+        return None
+    return {
+        "category_id": category.id,
+        "category_name": category.name,
+        "category_type": category.type,
+        "source": "history",
+        "confidence": round(uses / len(matching_ids), 2),
+        "matching_operations": uses,
+    }
+
+
 def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]:
     """Find conservative weekly/monthly payment candidates without creating anything.
 

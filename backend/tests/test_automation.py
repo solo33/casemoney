@@ -29,6 +29,27 @@ def test_category_rule_classifies_only_empty_category(client, auth):
     assert explicit.json()["category_id"] == other["id"]
 
 
+def test_category_suggestion_uses_history_and_never_changes_form_data(client, auth):
+    account = make_account(client, auth)
+    food = _expense_category(client, auth)
+    for amount in (100, 200):
+        response = client.post("/api/transactions/", headers=auth, json={
+            "type": "expense", "amount": amount, "currency": "RUB",
+            "account_id": account["id"], "category_id": food["id"],
+            "description": "Пятёрочка у дома",
+        })
+        assert response.status_code == 201, response.text
+
+    response = client.get("/api/automation/category-suggestion", headers=auth, params={
+        "description": "  ПЯТЁРОЧКА  У ДОМА ", "transaction_type": "expense",
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()["category_id"] == food["id"]
+    assert response.json()["source"] == "history"
+    assert response.json()["matching_operations"] == 2
+    assert client.get("/api/transactions/", headers=auth).json()["total"] == 2
+
+
 def test_duplicate_endpoint_never_modifies_transactions(client, auth):
     account = make_account(client, auth)
     payload = {"type": "expense", "amount": 100, "currency": "RUB", "account_id": account["id"], "description": "Кофе"}

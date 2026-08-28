@@ -14,9 +14,9 @@ from app.models.category import Category
 from app.models.category_rule import CategoryRule
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
-from app.schemas.automation import (AutomationSettings, AutomationSettingsUpdate, CategoryRuleCreate, CategoryRuleResponse, DuplicateGroupResponse, DuplicateTransactionItem, RegularPaymentSuggestion)
+from app.schemas.automation import (AutomationSettings, AutomationSettingsUpdate, CategoryRuleCreate, CategoryRuleResponse, CategorySuggestion, DuplicateGroupResponse, DuplicateTransactionItem, RegularPaymentSuggestion)
 from app.services.auth import decode_token
-from app.services.automation import normalize_rule_pattern, regular_payment_suggestions
+from app.services.automation import normalize_rule_pattern, regular_payment_suggestions, suggest_category_from_history
 
 
 router = APIRouter(prefix="/api/automation", tags=["automation"])
@@ -104,6 +104,18 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db), user_id: int = Depe
         raise HTTPException(status_code=404, detail="Правило не найдено.")
     db.delete(rule)
     db.commit()
+
+
+@router.get("/category-suggestion", response_model=CategorySuggestion | None)
+def category_suggestion(
+    description: str,
+    transaction_type: str = "expense",
+    db: Session = Depends(get_db),
+    user_id: int = Depends(_current_user_id),
+):
+    if transaction_type not in {"income", "expense"}:
+        raise HTTPException(status_code=400, detail="Подсказка доступна только для дохода или расхода.")
+    return suggest_category_from_history(db, user_id, description, transaction_type)
 
 
 @router.get("/duplicates", response_model=list[DuplicateGroupResponse])
