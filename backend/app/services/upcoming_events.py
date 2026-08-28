@@ -94,6 +94,11 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
         CreditObligation.next_payment_date < end,
     ).all()
     for item in obligations:
+        # A deposit configured to create a planned interest entry is already
+        # represented in the first part of this feed. Emitting the obligation
+        # as well would duplicate it on the dashboard and in calendars.
+        if item.kind == "deposit" and item.planned_interest_transaction_id:
+            continue
         is_income = item.kind == "deposit" or item.direction == "receivable"
         amount = _deposit_income(item) if item.kind == "deposit" else item.monthly_payment
         events.append({

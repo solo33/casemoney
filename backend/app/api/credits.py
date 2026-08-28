@@ -109,6 +109,68 @@ def _calculate_deposit_income(credit: CreditObligation) -> Optional[float]:
     return round(principal * rate / 12, 2)
 
 
+def _delete_planned_interest(db: Session, credit: CreditObligation) -> None:
+    """Remove the generated forecast, never touching a real account balance."""
+    transaction_id = credit.planned_interest_transaction_id
+    credit.planned_interest_transaction_id = None
+    if transaction_id is None:
+        return
+    transaction = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.user_id == credit.user_id,
+        Transaction.is_planned.is_(True),
+    ).first()
+    if transaction:
+        db.delete(transaction)
+
+
+def _sync_planned_interest(db: Session, credit: CreditObligation) -> None:
+    """Keep exactly one future interest-income draft for a deposit.
+
+    The draft is an aid for a user's plan, not an accounting operation: it is
+    not applied to account balances and is replaced by the next draft after a
+    real interest payment is recorded.
+    """
+    can_plan = (
+        credit.kind == "deposit"
+        and credit.status == "active"
+        and credit.interest_accrual_mode == "planned"
+        and credit.next_payment_date is not None
+        and credit.source_account_id is not None
+        and credit.category_id is not None
+        and float(credit.monthly_payment or 0) > 0
+    )
+    if not can_plan:
+        _delete_planned_interest(db, credit)
+        return
+
+    transaction = None
+    if credit.planned_interest_transaction_id is not None:
+        transaction = db.query(Transaction).filter(
+            Transaction.id == credit.planned_interest_transaction_id,
+            Transaction.user_id == credit.user_id,
+            Transaction.is_planned.is_(True),
+        ).first()
+    values = {
+        "amount": float(credit.monthly_payment),
+        "currency": credit.currency,
+        "type": TransactionType.income,
+        "description": f"Плановые проценты по депозиту: {credit.name}",
+        "date": datetime.combine(credit.next_payment_date, time.min, tzinfo=timezone.utc),
+        "account_id": credit.source_account_id,
+        "category_id": credit.category_id,
+        "is_planned": True,
+    }
+    if transaction is None:
+        transaction = Transaction(user_id=credit.user_id, **values)
+        db.add(transaction)
+        db.flush()
+        credit.planned_interest_transaction_id = transaction.id
+    else:
+        for key, value in values.items():
+            setattr(transaction, key, value)
+
+
 def _calculate_mortgage_split(credit: CreditObligation, amount: float) -> tuple[Optional[float], Optional[float]]:
     """Return the principal and interest portions of one mortgage payment.
 
@@ -222,6 +284,8 @@ def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True
         early_repayment_mode=credit.early_repayment_mode,
         interest_payout_frequency=credit.interest_payout_frequency,
         capitalization=credit.capitalization,
+        interest_accrual_mode=credit.interest_accrual_mode,
+        planned_interest_transaction_id=credit.planned_interest_transaction_id,
         opened_at=credit.opened_at,
         due_day=credit.due_day,
         statement_day=credit.statement_day,
@@ -305,6 +369,7 @@ def create_credit(
         early_repayment_mode=data.early_repayment_mode,
         interest_payout_frequency=data.interest_payout_frequency,
         capitalization=data.capitalization,
+        interest_accrual_mode=data.interest_accrual_mode,
         opened_at=data.opened_at,
         due_day=data.due_day,
         statement_day=data.statement_day,
@@ -340,6 +405,7 @@ def create_credit(
         _apply_tx_effect(db, transaction)
         _write_history(db, user_id, transaction, "created")
         credit.funding_transaction_id = transaction.id
+    _sync_planned_interest(db, credit)
     db.commit()
     db.refresh(credit)
     return _serialize(db, credit)
@@ -371,6 +437,7 @@ def update_credit(
     if credit.kind == "deposit":
         credit.interest_payout_frequency = credit.interest_payout_frequency or "monthly"
         credit.monthly_payment = _calculate_deposit_income(credit)
+        _sync_planned_interest(db, credit)
     db.commit()
     db.refresh(credit)
     return _serialize(db, credit)
@@ -402,6 +469,8 @@ def delete_credit(
     ]
     if credit.funding_transaction_id is not None:
         transaction_ids.append(credit.funding_transaction_id)
+    if credit.planned_interest_transaction_id is not None:
+        transaction_ids.append(credit.planned_interest_transaction_id)
 
     for transaction_id in set(transaction_ids):
         transaction = db.query(Transaction).filter(
@@ -409,8 +478,9 @@ def delete_credit(
             Transaction.user_id == user_id,
         ).first()
         if transaction:
-            _apply_tx_effect(db, transaction, reverse=True)
-            _write_history(db, user_id, transaction, "deleted")
+            if not transaction.is_planned:
+                _apply_tx_effect(db, transaction, reverse=True)
+                _write_history(db, user_id, transaction, "deleted")
             db.delete(transaction)
 
     db.delete(credit)
@@ -482,6 +552,11 @@ def register_payment(
     account = _own_account(db, user_id, data.account_id)
     linked = _own_account(db, user_id, credit.linked_account_id)
     paid_at = data.paid_at or datetime.now(timezone.utc)
+
+    # Replace the forecast with the actual receipt. This happens before the
+    # real transaction is inserted, so a failure cannot leave two entries.
+    if credit.kind == "deposit":
+        _delete_planned_interest(db, credit)
 
     if credit.kind == "deposit":
         tx_type = TransactionType.income
@@ -587,6 +662,7 @@ def register_payment(
         credit.last_email_reminder_for_date = None
     if credit.kind == "deposit":
         credit.monthly_payment = _calculate_deposit_income(credit)
+        _sync_planned_interest(db, credit)
     if credit.kind not in {"credit_card", "deposit"} and credit.current_balance is not None and credit.current_balance <= 0.005:
         credit.status = "closed"
     db.commit()

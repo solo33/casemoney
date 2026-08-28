@@ -380,6 +380,50 @@ def test_deposit_interest_is_calculated_and_capitalized(client):
     assert account_balance(client, auth, account["id"]) == 1_000
 
 
+def test_deposit_can_create_one_planned_interest_income(client):
+    auth = register_and_login(client, "deposit-plan@test.com")
+    enable_family("deposit-plan@test.com")
+    account = make_account(client, auth, balance=0)
+    category = client.post(
+        "/api/categories/", headers=auth, json={"name": "Проценты", "type": "income"}
+    )
+    assert category.status_code == 201, category.text
+    expected_date = date.today() + timedelta(days=8)
+    created = client.post("/api/credits/", headers=auth, json={
+        "name": "Вклад с планом",
+        "kind": "deposit",
+        "currency": "RUB",
+        "current_balance": 120_000,
+        "annual_interest_rate": 12,
+        "interest_payout_frequency": "monthly",
+        "interest_accrual_mode": "planned",
+        "next_payment_date": str(expected_date),
+        "source_account_id": account["id"],
+        "category_id": category.json()["id"],
+    })
+    assert created.status_code == 201, created.text
+    deposit = created.json()
+    assert deposit["monthly_payment"] == 1_200
+    assert deposit["interest_accrual_mode"] == "planned"
+    assert deposit["planned_interest_transaction_id"] is not None
+    planned = client.get("/api/transactions/?is_planned=true", headers=auth)
+    assert planned.status_code == 200, planned.text
+    assert len(planned.json()["items"]) == 1
+    assert planned.json()["items"][0]["amount"] == 1_200
+    assert account_balance(client, auth, account["id"]) == 0
+
+    received = client.post(
+        f"/api/credits/{deposit['id']}/payments",
+        headers=auth,
+        json={"amount": 1_200, "account_id": account["id"]},
+    )
+    assert received.status_code == 201, received.text
+    planned_after_payment = client.get("/api/transactions/?is_planned=true", headers=auth).json()["items"]
+    assert len(planned_after_payment) == 1
+    assert planned_after_payment[0]["id"] != deposit["planned_interest_transaction_id"]
+    assert account_balance(client, auth, account["id"]) == 1_200
+
+
 
 def test_due_credit_creates_one_system_and_email_notification(client, monkeypatch):
     sent = []

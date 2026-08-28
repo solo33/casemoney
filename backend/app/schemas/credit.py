@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 CreditKind = Literal["mortgage", "loan", "credit_card", "private_debt", "deposit"]
 CreditDirection = Literal["owe", "receivable"]
 InterestPayoutFrequency = Literal["monthly", "maturity"]
+InterestAccrualMode = Literal["manual", "planned"]
 EarlyRepaymentMode = Literal["reduce_term", "reduce_payment"]
 
 
@@ -24,6 +25,7 @@ class CreditCreate(BaseModel):
     early_repayment_mode: EarlyRepaymentMode = "reduce_term"
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: bool = False
+    interest_accrual_mode: InterestAccrualMode = "manual"
     opened_at: Optional[date] = None
     due_day: Optional[int] = Field(None, ge=1, le=31)
     statement_day: Optional[int] = Field(None, ge=1, le=31)
@@ -68,6 +70,7 @@ class CreditUpdate(BaseModel):
     early_repayment_mode: Optional[EarlyRepaymentMode] = None
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: Optional[bool] = None
+    interest_accrual_mode: Optional[InterestAccrualMode] = None
     opened_at: Optional[date] = None
     due_day: Optional[int] = Field(None, ge=1, le=31)
     statement_day: Optional[int] = Field(None, ge=1, le=31)
@@ -129,6 +132,8 @@ class CreditResponse(BaseModel):
     early_repayment_mode: str
     interest_payout_frequency: Optional[str]
     capitalization: bool
+    interest_accrual_mode: str
+    planned_interest_transaction_id: Optional[int]
     opened_at: Optional[date]
     due_day: Optional[int]
     statement_day: Optional[int]

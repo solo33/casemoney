@@ -52,6 +52,11 @@ class CreditObligation(Base):
     early_repayment_mode = Column(String(24), nullable=False, default="reduce_term")
     interest_payout_frequency = Column(String(16), nullable=True)  # monthly, maturity
     capitalization = Column(Boolean, nullable=False, default=False)
+    # ``manual`` leaves the next interest payment as a reminder. ``planned``
+    # also creates one future income transaction so it is visible in planning
+    # reports and calendars without affecting an account balance yet.
+    interest_accrual_mode = Column(String(16), nullable=False, default="manual")
+    planned_interest_transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     opened_at = Column(Date, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
