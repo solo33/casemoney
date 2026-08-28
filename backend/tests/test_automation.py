@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from .conftest import make_account
+from .conftest import account_balance, make_account
 
 
 def _expense_category(client, auth, name="Продукты"):
@@ -114,3 +114,38 @@ def test_regular_payment_suggestions_are_read_only(client, auth):
     assert item["cadence"] == "ежемесячно"
     assert item["category_name"] == "Продукты"
     assert client.get("/api/transactions/", headers=auth).json()["total"] == 3
+
+
+def test_confirming_transfer_suggestion_replaces_two_rows_without_changing_balances(client, auth):
+    source = make_account(client, auth, "Основная карта", balance=2000)
+    target = make_account(client, auth, "Накопительный", balance=100)
+    expense = client.post("/api/transactions/", headers=auth, json={
+        "type": "expense", "amount": 500, "currency": "RUB", "account_id": source["id"],
+        "description": "Перевод в накопления",
+    })
+    income = client.post("/api/transactions/", headers=auth, json={
+        "type": "income", "amount": 500, "currency": "RUB", "account_id": target["id"],
+        "description": "Пополнение накоплений",
+    })
+    assert expense.status_code == income.status_code == 201
+
+    suggestions = client.get("/api/transactions/transfer-suggestions", headers=auth)
+    assert suggestions.status_code == 200, suggestions.text
+    assert len(suggestions.json()) == 1
+    candidate = suggestions.json()[0]
+    assert candidate["expense_id"] == expense.json()["id"]
+    assert candidate["income_id"] == income.json()["id"]
+
+    confirmed = client.post(
+        f"/api/transactions/{candidate['expense_id']}/confirm-transfer-match",
+        headers=auth,
+        json={"income_transaction_id": candidate["income_id"]},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    row = confirmed.json()
+    assert row["type"] == "transfer"
+    assert row["to_account_id"] == target["id"]
+    assert row["to_amount"] == 500
+    assert client.get("/api/transactions/", headers=auth).json()["total"] == 1
+    assert account_balance(client, auth, source["id"]) == 1500
+    assert account_balance(client, auth, target["id"]) == 600

@@ -53,6 +53,32 @@ class TransactionBulkUpdateResult(BaseModel):
     updated: int
 
 
+class TransferSuggestion(BaseModel):
+    """A possible manually-created transfer; never applied automatically."""
+
+    expense_id: int
+    income_id: int
+    date: datetime
+    income_date: datetime
+    account_id: int
+    account_name: str
+    to_account_id: int
+    to_account_name: str
+    amount: float
+    currency: str
+    to_amount: float
+    to_currency: str
+    fee_amount: Optional[float] = None
+    confidence: float = Field(ge=0, le=1)
+
+
+class TransferMatchConfirm(BaseModel):
+    """The user explicitly approves one proposed expense/income pair."""
+
+    income_transaction_id: int
+    fee_category_id: Optional[int] = None
+
+
 class TransactionResponse(BaseModel):
     id: int
     amount: float

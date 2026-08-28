@@ -962,6 +962,11 @@ hr {
   .transactions-bulk-bar { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin: 0 0 10px; padding: 11px; border: 1px solid #d9c489; border-radius: 10px; background: #fff8e3; }
   .transactions-bulk-bar select, .transactions-bulk-bar button { min-height: 40px; }
   .transactions-bulk-bar select, .transactions-bulk-bar small { grid-column: 1 / -1; }
+  .transfer-suggestions { padding: 11px; }
+  .transfer-suggestions-title { align-items: flex-start; flex-direction: column; }
+  .transfer-suggestion { align-items: stretch; }
+  .transfer-suggestion .btn-ghost { width: 100%; margin-left: 0; min-height: 40px; }
+  .transfer-fee-select select { max-width: none; flex: 1; }
   .transactions-mobile-edit { min-width: 0; margin-top: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
   .transactions-mobile-edit td { display: block; }
   .transactions-mobile-edit td > div { flex-direction: column; align-items: stretch !important; }
@@ -1610,6 +1615,15 @@ hr {
 .category-suggestion { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1 1 100%; padding: 7px 9px; border-radius: 8px; background: #eef5f7; color: #314c5e; font-size: 13px; }
 .category-suggestion span { flex: 1 1 180px; }
 .category-suggestion button { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+
+.transfer-suggestions { margin: 0 0 12px; padding: 12px; border: 1px solid #d9c489; border-radius: 10px; background: #fff8e3; color: #35495a; }
+.transfer-suggestions-title { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+.transfer-suggestions-title small { color: #697685; }
+.transfer-suggestion { display: flex; align-items: center; gap: 9px 12px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid #eadfbe; font-size: 14px; }
+.transfer-suggestion > span { flex: 1 1 300px; }
+.transfer-suggestion .btn-ghost { margin-left: auto; }
+.transfer-fee-select { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: #7a6040; font-size: 12px; }
+.transfer-fee-select select { min-height: 31px; max-width: 185px; font-size: 12px; }
 .quick-template-link { color: #9a6b1a; font-size: 13px; text-decoration: none; }
 
 /* Android bank-notification drafts. Notification text never appears in this UI. */

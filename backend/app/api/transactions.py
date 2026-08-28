@@ -25,6 +25,8 @@ from app.schemas.transaction import (
     TransactionResponse,
     TransactionBulkCategoryUpdate,
     TransactionBulkUpdateResult,
+    TransferSuggestion,
+    TransferMatchConfirm,
 )
 from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
@@ -234,6 +236,35 @@ def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amo
     return to_account_id, cur, round(float(to_amount), 2)
 
 
+def _transfer_pair_confidence(expense: Transaction, income: Transaction) -> tuple[float, Optional[float]] | None:
+    """Return a conservative score for an imported expense/income pair."""
+    if expense.account_id == income.account_id or expense.is_planned or income.is_planned:
+        return None
+    days = abs((expense.date.date() - income.date.date()).days)
+    if days > 3:
+        return None
+    fee_amount = None
+    if expense.currency == income.currency:
+        larger = max(float(expense.amount), float(income.amount), 1.0)
+        difference = abs(float(expense.amount) - float(income.amount))
+        if difference > max(5.0, larger * 0.03):
+            return None
+        if expense.amount > income.amount:
+            fee_amount = round(float(expense.amount) - float(income.amount), 2)
+        amount_score = 1 - min(difference / larger, 0.12)
+    else:
+        if not expense.exchange_rate or not income.exchange_rate:
+            return None
+        expense_value = float(expense.amount) * float(expense.exchange_rate)
+        income_value = float(income.amount) * float(income.exchange_rate)
+        larger = max(expense_value, income_value, 1.0)
+        difference = abs(expense_value - income_value)
+        if difference > larger * 0.05:
+            return None
+        amount_score = 1 - difference / larger
+    return round(0.65 * amount_score + 0.35 * (1 - days / 4), 2), fee_amount
+
+
 def _write_history(db: Session, user_id: int, tx: Transaction, action: str,
                    prev_amount: Optional[float] = None, prev_currency: Optional[str] = None) -> None:
     """Записать событие в журнал изменений (денормализованный снимок)."""
@@ -406,6 +437,125 @@ def frequent_categories(
          "parent_id": categories[row.category_id].parent_id, "uses": row.uses}
         for row in rows if row.category_id in categories
     ]
+
+
+@router.get("/transfer-suggestions", response_model=List[TransferSuggestion])
+def transfer_suggestions(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Find likely two-sided own-account transfers for a user to review."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    rows = (
+        db.query(Transaction)
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.type.in_([TransactionType.expense, TransactionType.income]),
+            Transaction.is_planned.is_(False),
+            Transaction.linked_transfer_id.is_(None),
+            Transaction.date >= cutoff,
+        )
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(1200)
+        .all()
+    )
+    expenses = [item for item in rows if item.type == TransactionType.expense]
+    incomes = [item for item in rows if item.type == TransactionType.income]
+    account_ids = {item.account_id for item in rows}
+    accounts = {
+        account.id: account.name
+        for account in db.query(Account).filter(Account.id.in_(account_ids)).all()
+    } if account_ids else {}
+    used_income_ids: set[int] = set()
+    result: list[TransferSuggestion] = []
+    for expense in expenses:
+        candidates = []
+        for income in incomes:
+            if income.id in used_income_ids:
+                continue
+            score = _transfer_pair_confidence(expense, income)
+            if score:
+                candidates.append((score, income))
+        if not candidates:
+            continue
+        (confidence, fee_amount), income = max(candidates, key=lambda item: item[0][0])
+        used_income_ids.add(income.id)
+        result.append(TransferSuggestion(
+            expense_id=expense.id,
+            income_id=income.id,
+            date=expense.date,
+            income_date=income.date,
+            account_id=expense.account_id,
+            account_name=accounts.get(expense.account_id, "Счёт"),
+            to_account_id=income.account_id,
+            to_account_name=accounts.get(income.account_id, "Счёт"),
+            amount=expense.amount,
+            currency=expense.currency,
+            to_amount=income.amount,
+            to_currency=income.currency,
+            fee_amount=fee_amount,
+            confidence=confidence,
+        ))
+    return sorted(result, key=lambda item: (item.date, item.expense_id), reverse=True)[:30]
+
+
+@router.post("/{transaction_id}/confirm-transfer-match", response_model=TransactionResponse)
+def confirm_transfer_match(
+    transaction_id: int,
+    data: TransferMatchConfirm,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Replace a confirmed expense/income pair with one transfer."""
+    expense = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.user_id == user_id,
+        Transaction.type == TransactionType.expense,
+        Transaction.is_planned.is_(False),
+    ).first()
+    income = db.query(Transaction).filter(
+        Transaction.id == data.income_transaction_id,
+        Transaction.user_id == user_id,
+        Transaction.type == TransactionType.income,
+        Transaction.is_planned.is_(False),
+    ).first()
+    if not expense or not income:
+        raise HTTPException(status_code=404, detail="Одна из операций уже недоступна для сопоставления.")
+    pair = _transfer_pair_confidence(expense, income)
+    if not pair:
+        raise HTTPException(status_code=400, detail="Эти операции не похожи на перевод между своими счетами.")
+    _, possible_fee = pair
+    if data.fee_category_id is not None:
+        if not possible_fee:
+            raise HTTPException(status_code=400, detail="Комиссию можно указать только при разнице сумм в одной валюте.")
+        _ensure_expense_category(db, user_id, data.fee_category_id)
+
+    previous_amount, previous_currency = expense.amount, expense.currency
+    _apply_tx_effect(db, expense, reverse=True)
+    _apply_tx_effect(db, income, reverse=True)
+    expense.type = TransactionType.transfer
+    expense.category_id = None
+    expense.to_account_id = income.account_id
+    expense.to_currency = income.currency
+    expense.to_amount = income.amount
+    if data.fee_category_id is not None and possible_fee:
+        # Source debit = credit on destination + separately reported fee.
+        expense.amount = income.amount
+    exchange_svc.snapshot_transaction_rates(db, user_id, expense, force=True)
+    _apply_tx_effect(db, expense)
+    db.flush()
+    if data.fee_category_id is not None and possible_fee:
+        _sync_transfer_fee(
+            db, expense,
+            fee_amount=possible_fee,
+            fee_category_id=data.fee_category_id,
+        )
+    _write_history(db, user_id, income, "deleted")
+    db.delete(income)
+    _write_history(db, user_id, expense, "edited", prev_amount=previous_amount, prev_currency=previous_currency)
+    db.commit()
+    db.refresh(expense)
+    return expense
 
 
 @router.get("/", response_model=TransactionsPage)

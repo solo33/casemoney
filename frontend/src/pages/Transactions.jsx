@@ -67,6 +67,9 @@ export default function Transactions() {
   const [tagReport, setTagReport] = useState(null);
   const [frequentCategories, setFrequentCategories] = useState([]);
   const [categorySuggestion, setCategorySuggestion] = useState(null);
+  const [transferSuggestions, setTransferSuggestions] = useState([]);
+  const [transferFees, setTransferFees] = useState({});
+  const [matchingTransferId, setMatchingTransferId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -215,6 +218,12 @@ export default function Transactions() {
     api.get(`/api/tags/${filters.tag_id}/report`).then(response => setTagReport(response.data)).catch(() => setTagReport(null));
   }, [filters.tag_id]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  const loadTransferSuggestions = useCallback(() => {
+    api.get("/api/transactions/transfer-suggestions")
+      .then(response => setTransferSuggestions(response.data || []))
+      .catch(() => setTransferSuggestions([]));
+  }, []);
+  useEffect(() => { loadTransferSuggestions(); }, [loadTransferSuggestions]);
   useEffect(() => { setSelectedIds([]); setBulkCategoryId(""); }, [filters, page]);
   useEffect(() => {
     if (newTx.type === "transfer") { setFrequentCategories([]); return; }
@@ -222,6 +231,27 @@ export default function Transactions() {
       .then(response => setFrequentCategories(response.data || []))
       .catch(() => setFrequentCategories([]));
   }, [newTx.type]);
+
+  const confirmTransferSuggestion = async (suggestion) => {
+    const message = `Связать списание ${formatMoney(suggestion.amount)} ${currencySymbol(suggestion.currency)} со счёта «${suggestion.account_name}» и поступление на «${suggestion.to_account_name}» как перевод?`;
+    if (!window.confirm(message)) return;
+    setMatchingTransferId(suggestion.expense_id);
+    try {
+      const feeCategoryId = transferFees[suggestion.expense_id];
+      await api.post(`/api/transactions/${suggestion.expense_id}/confirm-transfer-match`, {
+        income_transaction_id: suggestion.income_id,
+        ...(feeCategoryId ? { fee_category_id: Number(feeCategoryId) } : {}),
+      });
+      setNotice("Операции объединены в перевод между своими счетами.");
+      loadTransactions();
+      loadAccounts();
+      loadTransferSuggestions();
+    } catch (requestError) {
+      setNotice(requestError.response?.data?.detail || "Не удалось сопоставить операции.");
+    } finally {
+      setMatchingTransferId(null);
+    }
+  };
 
   // Reload on FAB add
   useEffect(() => {
@@ -654,6 +684,34 @@ export default function Transactions() {
           </> : <small>Выберите только доходы или только расходы — переводы не категоризируются.</small>}
           <button type="button" className="btn-ghost" onClick={() => setSelectedIds([])}>Снять выбор</button>
         </div>
+      )}
+
+      {transferSuggestions.length > 0 && (
+        <section className="transfer-suggestions" aria-label="Возможные переводы между своими счетами">
+          <div className="transfer-suggestions-title">
+            <strong>Возможные переводы между своими счетами</strong>
+            <small>Ничего не меняется без подтверждения.</small>
+          </div>
+          {transferSuggestions.map(suggestion => {
+            const feeCategories = categories.filter(category => category.type === "expense");
+            return <div className="transfer-suggestion" key={`${suggestion.expense_id}-${suggestion.income_id}`}>
+              <span>
+                {suggestion.account_name} → {suggestion.to_account_name}: <b>{formatMoney(suggestion.amount)} {currencySymbol(suggestion.currency)}</b>
+                {suggestion.currency !== suggestion.to_currency && <> → <b>{formatMoney(suggestion.to_amount)} {currencySymbol(suggestion.to_currency)}</b></>}
+              </span>
+              {suggestion.fee_amount > 0 && <label className="transfer-fee-select">
+                Комиссия {formatMoney(suggestion.fee_amount)} {currencySymbol(suggestion.currency)}
+                <select value={transferFees[suggestion.expense_id] || ""} onChange={event => setTransferFees(current => ({ ...current, [suggestion.expense_id]: event.target.value }))}>
+                  <option value="">не учитывать отдельно</option>
+                  {feeCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </label>}
+              <button type="button" className="btn-ghost" disabled={matchingTransferId === suggestion.expense_id} onClick={() => confirmTransferSuggestion(suggestion)}>
+                {matchingTransferId === suggestion.expense_id ? "Связываем…" : "Связать"}
+              </button>
+            </div>;
+          })}
+        </section>
       )}
 
       {tagReport && (
