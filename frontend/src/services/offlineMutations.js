@@ -76,6 +76,14 @@ export async function removeOfflineMutation(id) {
   publishQueueChanged({ removedId: id });
 }
 
+export async function retryOfflineMutation(id) {
+  const mutation = await runStore("readonly", store => store.get(id));
+  if (!mutation) return null;
+  const next = { ...mutation, status: "pending", error: null };
+  await saveMutation(next);
+  return next;
+}
+
 async function saveMutation(mutation) {
   await runStore("readwrite", store => store.put(mutation));
   publishQueueChanged({ queued: mutation });
@@ -133,6 +141,9 @@ export async function syncOfflineMutations() {
   let synced = 0;
 
   for (const mutation of mutations) {
+    // Ошибочные изменения ждут явного решения пользователя. Иначе фоновая
+    // синхронизация будет бесконечно повторять конфликтный запрос.
+    if (mutation.status === "failed") continue;
     try {
       await api.request({
         method: mutation.method,

@@ -1308,15 +1308,21 @@ hr {
 .notification-settings-grid{display:grid;border:1px solid #e5dccb;border-radius:10px;overflow:hidden}.notification-settings-row{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto;gap:14px;align-items:center;padding:12px 14px;border-bottom:1px solid #eee7da}.notification-settings-row:last-child{border-bottom:0}.notification-settings-row>div{display:grid;gap:3px}.notification-settings-row small{color:#73808d;line-height:1.35}.notification-settings-row label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:13px;color:#425466}.web-push-control{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;margin:0 0 14px;border:1px solid #d9e2e8;border-radius:9px;background:#f6fafc}.web-push-control>div{display:grid;gap:3px}.web-push-control small{color:#667785;line-height:1.35}.web-push-control button{flex:0 0 auto}@media(max-width:600px){.notification-settings-row{grid-template-columns:1fr 1fr;padding:12px}.notification-settings-row>div{grid-column:1/-1}.notification-settings-row label{font-size:12px}.web-push-control{align-items:flex-start;flex-direction:column}.web-push-control button{width:100%}}
 .finance-ai-actions{display:grid;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e7dfd0}.finance-ai-actions>b{font-size:14px;color:#173a54}.finance-ai-actions>span,.finance-ai-actions small{font-size:12px;line-height:1.4;color:#65717d}.finance-ai-actions>div{display:flex;flex-wrap:wrap;gap:8px}.finance-ai-actions .btn-ghost{padding:7px 10px;font-size:12px}.finance-ai-error{color:#b42318!important}.finance-ai-result{display:grid;gap:6px;padding:10px 12px;border-radius:8px;background:#f6f2e9}.finance-ai-result p{margin:0;color:#283847;font-size:13px;line-height:1.45}.finance-ai-result p::before{content:'• ';color:#9c7b3c;font-weight:700}@media(max-width:600px){.finance-ai-actions>div{display:grid;grid-template-columns:1fr}.finance-ai-actions .btn-ghost{width:100%}}
 /* Локальные изменения: компактный индикатор поверх нижней навигации. */
-.offline-sync-status {
+.offline-sync-wrap {
   position: fixed;
   right: 16px;
   bottom: 18px;
   z-index: 190;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.offline-sync-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: min(360px, calc(100vw - 32px));
+  max-width: 100%;
   min-height: 42px;
   padding: 9px 13px;
   border: 1px solid #c89b35;
@@ -1327,6 +1333,14 @@ hr {
   font-size: 13px;
   font-weight: 600;
 }
+.offline-sync-conflicts { width: min(360px, calc(100vw - 32px)); display: grid; gap: 7px; padding: 13px; border: 1px solid #d7b96d; border-radius: 12px; background: #fffdf7; box-shadow: 0 12px 30px rgba(23,58,84,.22); color: #1b2531; }
+.offline-sync-conflicts > strong { font-size: 14px; }
+.offline-sync-conflicts > p { margin: 0; color: #65717d; font-size: 12px; line-height: 1.4; }
+.offline-sync-conflicts article { display: grid; gap: 5px; padding: 9px; border: 1px solid #eee3c9; border-radius: 8px; background: #fff8df; }
+.offline-sync-conflicts article > b { font-size: 13px; }
+.offline-sync-conflicts article > span { color: #7a5c2d; font-size: 12px; line-height: 1.35; }
+.offline-sync-conflicts article > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.offline-sync-conflicts article button { min-height: 30px; padding: 5px 8px; font-size: 12px; }
 
 .notification-bell-wrap { position: relative; flex: 0 0 auto; }
 .notification-bell {
@@ -1421,7 +1435,7 @@ hr {
 }
 
 @media (max-width: 767px) {
-  .offline-sync-status {
+  .offline-sync-wrap {
     right: 10px;
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 20px);
