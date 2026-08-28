@@ -1434,6 +1434,7 @@ hr {
 .shopping-toolbar, .shopping-add-card, .shopping-items-card {
   background: #fffdf7; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px;
 }
+.home-sync-status{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:7px;margin:-4px 0 0;color:#71808c;font-size:12px;line-height:1.2}.home-sync-status__dot{width:7px;height:7px;border-radius:50%;background:#3f9d6b;box-shadow:0 0 0 3px rgba(63,157,107,.12)}.home-sync-status__dot.is-offline{background:#bd8133;box-shadow:0 0 0 3px rgba(189,129,51,.13)}.home-sync-status__retry{min-height:0;padding:2px 5px;border:0;background:transparent;color:#9c6f20;font:inherit;font-weight:700}.home-sync-status__retry:hover,.home-sync-status__retry:focus-visible{background:#f2ede1;color:#173a54;box-shadow:none}@media(max-width:767px){.home-sync-status{justify-content:flex-start;margin:0 0 -2px;font-size:11px}.home-sync-status__retry{padding-left:4px}}
 .shopping-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
 .shopping-toolbar label, .shopping-expense-modal label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
 .shopping-toolbar select { min-width: 250px; }

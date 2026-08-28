@@ -26,6 +26,7 @@ import {
 } from "../utils/money";
 import { isMobileViewport, normalizeDashboardWidgets as dashboardWidgetSettings } from "../utils/dashboardWidgets";
 import { budgetTotals } from "../utils/budgetTotals";
+import { getLastSuccessfulSync, markSyncSuccessful, requestSync, SYNC_STATUS_EVENT } from "../services/syncStatus";
 
 const TYPE_LABEL = { income: "Доход", expense: "Расход", transfer: "Перевод" };
 const TYPE_COLOR = { income: "#167a4a", expense: "#c0432b", transfer: "#2f6296" };
@@ -99,7 +100,23 @@ export default function Home() {
   const [trendLoading, setTrendLoading] = useState(true);
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(() => getLastSuccessfulSync());
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const loadVersion = useRef(0);
+
+  useEffect(() => {
+    const onSync = event => setLastSyncedAt(event.detail?.lastSuccessfulSync || getLastSuccessfulSync());
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener(SYNC_STATUS_EVENT, onSync);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener(SYNC_STATUS_EVENT, onSync);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   const dismissOnboarding = () => {
     localStorage.setItem("cm_onb_done", "1");
@@ -195,9 +212,7 @@ export default function Home() {
       const d = await api.get("/api/dashboard/", { params: { forecast_days: forecastDays } });
       if (isCurrent()) {
         setDashboard(d.data);
-        const syncedAt = new Date().toISOString();
-        localStorage.setItem("casemoney:last-successful-sync", syncedAt);
-        window.dispatchEvent(new CustomEvent("casemoney:last-successful-sync", { detail: syncedAt }));
+        markSyncSuccessful();
       }
     } catch {
       if (isCurrent()) setError("Не удалось обновить общий баланс");
@@ -376,6 +391,18 @@ export default function Home() {
           .home-aside, .home-main { display: contents !important; }
         }
       `}</style>
+
+      <div className="home-sync-status" role="status">
+        <span className={`home-sync-status__dot ${isOnline ? "is-online" : "is-offline"}`} aria-hidden="true" />
+        <span>
+          {!isOnline
+            ? "Нет сети · показываем данные на устройстве"
+            : lastSyncedAt
+              ? `Обновлено ${new Date(lastSyncedAt).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+              : "Данные ещё не синхронизированы"}
+        </span>
+        {isOnline && <button type="button" className="home-sync-status__retry" onClick={() => { requestSync(); fetchAll(); }}>Обновить</button>}
+      </div>
 
       {error && (
         <div style={{
