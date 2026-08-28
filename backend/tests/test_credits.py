@@ -119,6 +119,29 @@ def test_mortgage_schedule_shows_future_payment_split(client):
     assert first["balance_after"] == 81_000
 
 
+def test_mortgage_payment_preview_uses_server_calculation(client):
+    auth = register_and_login(client, "mortgage-preview@test.com")
+    enable_family("mortgage-preview@test.com")
+    created = client.post(
+        "/api/credits/", headers=auth,
+        json={
+            "name": "Ипотека с превью", "kind": "mortgage", "currency": "RUB",
+            "current_balance": 100_000, "annual_interest_rate": 12,
+        },
+    )
+    assert created.status_code == 201, created.text
+    preview = client.get(
+        f"/api/credits/{created.json()['id']}/payment-preview",
+        headers=auth, params={"amount": 20_000},
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json() == {
+        "principal_amount": 19_000,
+        "interest_amount": 1_000,
+        "currency": "RUB",
+    }
+
+
 def test_early_mortgage_payment_can_reduce_regular_payment(client):
     auth = register_and_login(client, "mortgage-reduce-payment@test.com")
     enable_family("mortgage-reduce-payment@test.com")

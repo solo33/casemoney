@@ -90,6 +90,12 @@ class CreditPaymentCreate(BaseModel):
     early_repayment_mode: Optional[EarlyRepaymentMode] = None
 
 
+class MortgagePaymentPreview(BaseModel):
+    principal_amount: float
+    interest_amount: float
+    currency: str
+
+
 class CreditPaymentResponse(BaseModel):
     id: int
     transaction_id: Optional[int]

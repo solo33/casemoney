@@ -17,6 +17,7 @@ from app.schemas.credit import (
     CreditCreate,
     CreditPaymentCreate,
     CreditPaymentResponse,
+    MortgagePaymentPreview,
     CreditResponse,
     CreditSummary,
     CreditUpdate,
@@ -434,6 +435,33 @@ def mortgage_schedule(
         monthly_payment=float(credit.monthly_payment or 0),
         early_repayment_mode=credit.early_repayment_mode,
         items=_mortgage_schedule(credit),
+    )
+
+
+@router.get("/{credit_id}/payment-preview", response_model=MortgagePaymentPreview)
+def mortgage_payment_preview(
+    credit_id: int,
+    amount: float,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(require_family),
+):
+    """Server-side source of truth for the mortgage payment split."""
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+    credit = db.query(CreditObligation).filter(
+        CreditObligation.id == credit_id,
+        CreditObligation.user_id == user_id,
+        CreditObligation.kind == "mortgage",
+    ).first()
+    if not credit:
+        raise HTTPException(status_code=404, detail="Ипотека не найдена")
+    principal, interest = _calculate_mortgage_split(credit, amount)
+    if principal is None or interest is None:
+        raise HTTPException(status_code=400, detail="Укажите годовую ставку в настройках ипотеки")
+    return MortgagePaymentPreview(
+        principal_amount=principal,
+        interest_amount=interest,
+        currency=credit.currency,
     )
 
 
