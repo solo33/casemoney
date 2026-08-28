@@ -57,7 +57,7 @@ export default function Family() {
     } finally {
       setLoading(false);
     }
-  }, [analyticsPeriod, setAnalytics, setError, setLoading, setRecurringSuggestions, setReport, setState]);
+  }, [analyticsPeriod, setAccounts, setAnalytics, setError, setFamilyAccounts, setLoading, setRecurringSuggestions, setReport, setState]);
 
   useEffect(() => { load(); }, [load]);
 

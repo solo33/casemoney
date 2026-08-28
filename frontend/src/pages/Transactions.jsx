@@ -5,6 +5,7 @@ import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import AccountOptions, { entryAccountGroups } from "../components/AccountOptions";
 import CategoryOptions from "../components/CategoryOptions";
 import CategoryPicker from "../components/CategoryPicker";
+import TagPicker from "../components/TagPicker";
 import {
   COMMON_CURRENCIES,
   currencySymbol,
@@ -62,6 +63,8 @@ export default function Transactions() {
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [tagReport, setTagReport] = useState(null);
   const [frequentCategories, setFrequentCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -78,6 +81,7 @@ export default function Transactions() {
     account_id: searchParams.get("account_id") || "",
     currency: searchParams.get("currency") || "",
     category_id: searchParams.get("category_id") || "",
+    tag_id: searchParams.get("tag_id") || "",
     type: searchParams.get("type") || "",
     date_from: searchParams.get("date_from") || "",
     date_to: searchParams.get("date_to") || "",
@@ -91,6 +95,7 @@ export default function Transactions() {
       account_id: searchParams.get("account_id") || "",
       currency: searchParams.get("currency") || "",
       category_id: searchParams.get("category_id") || "",
+      tag_id: searchParams.get("tag_id") || "",
       type: searchParams.get("type") || "",
       date_from: searchParams.get("date_from") || "",
       date_to: searchParams.get("date_to") || "",
@@ -103,6 +108,7 @@ export default function Transactions() {
   const [newTx, setNewTx] = useState({
     amount: "", type: "expense", currency: "",
     description: "", account_id: "", category_id: "", to_account_id: "",
+    tag_ids: [],
     to_amount: "", to_currency: "", fee_amount: "", fee_category_id: "",
     date: isoToday(),
   });
@@ -162,6 +168,13 @@ export default function Transactions() {
   }, [filters, page]);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => {
+    api.get("/api/tags/").then(response => setTags(response.data || [])).catch(() => setTags([]));
+  }, []);
+  useEffect(() => {
+    if (!filters.tag_id) { setTagReport(null); return; }
+    api.get(`/api/tags/${filters.tag_id}/report`).then(response => setTagReport(response.data)).catch(() => setTagReport(null));
+  }, [filters.tag_id]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
   useEffect(() => { setSelectedIds([]); setBulkCategoryId(""); }, [filters, page]);
   useEffect(() => {
@@ -268,12 +281,13 @@ export default function Transactions() {
         to_currency: newTx.type === "transfer" ? newTx.to_currency : undefined,
         fee_amount: newTx.type === "transfer" && Number(newTx.fee_amount) > 0 ? parseFloat(newTx.fee_amount) : undefined,
         fee_category_id: newTx.type === "transfer" && newTx.fee_category_id ? parseInt(newTx.fee_category_id) : undefined,
+        tag_ids: newTx.type === "transfer" ? [] : newTx.tag_ids.map(Number),
       };
       if (newTx.date) payload.date = new Date(newTx.date).toISOString();
       const requestKey = idempotencyKeyFor(createRequestRef, payload);
       const result = await submitOrQueueTransaction(payload, requestKey);
       clearIdempotencyKey(createRequestRef);
-      setNewTx(t => ({ ...t, amount: "", description: "", category_id: "", fee_amount: "", fee_category_id: "" }));
+      setNewTx(t => ({ ...t, amount: "", description: "", category_id: "", tag_ids: [], fee_amount: "", fee_category_id: "" }));
       setEditing(null);
       setPage(0);
       if (!result.queued) {
@@ -372,7 +386,7 @@ export default function Transactions() {
   };
 
   const resetFilters = () => {
-    setFilters({ account_id: "", currency: "", category_id: "", type: "", date_from: "", date_to: "", q: "" });
+    setFilters({ account_id: "", currency: "", category_id: "", tag_id: "", type: "", date_from: "", date_to: "", q: "" });
     setPage(0);
     setSearchParams({}, { replace: true });
   };
@@ -473,6 +487,12 @@ export default function Transactions() {
                 </div>
               )}
               {user?.family_access && <Link className="quick-template-link" to="/settings/templates">Шаблоны</Link>}
+              <TagPicker
+                tags={tags}
+                value={newTx.tag_ids}
+                onChange={tag_ids => setNewTx({ ...newTx, tag_ids })}
+                onTagCreated={tag => setTags(current => [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "ru")))}
+              />
             </>
           )}
           <input type="date" value={newTx.date} onChange={e => setNewTx({ ...newTx, date: e.target.value })} />
@@ -515,6 +535,10 @@ export default function Transactions() {
         <select value={filters.category_id} onChange={e => setFilter("category_id", e.target.value)}>
           <option value="">Все категории</option>
           <CategoryOptions categories={categories} />
+        </select>
+        <select value={filters.tag_id} onChange={e => setFilter("tag_id", e.target.value)}>
+          <option value="">Все метки и проекты</option>
+          {tags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
         </select>
         <input
           type="date"
@@ -586,6 +610,19 @@ export default function Transactions() {
         </div>
       )}
 
+      {tagReport && (
+        <section className="tag-project-report" aria-label={`Сводка по проекту ${tagReport.tag.name}`}>
+          <div><span className="tag-project-dot" style={{ background: tagReport.tag.color }} />Проект: <strong>{tagReport.tag.name}</strong></div>
+          {tagReport.totals.length === 0
+            ? <small>Пока нет выполненных доходов или расходов.</small>
+            : <div className="tag-project-totals">{tagReport.totals.map(total => (
+              <span key={`${total.type}-${total.currency}`} className={`is-${total.type}`}>
+                {total.type === "income" ? "Доходы" : "Расходы"}: {formatMoney(total.amount)} {currencySymbol(total.currency)}
+              </span>
+            ))}</div>}
+        </section>
+      )}
+
       {/* Таблица */}
       {data.items.length > 0 && (
         <div className="table-wrap transactions-desktop-table" style={{
@@ -609,8 +646,9 @@ export default function Transactions() {
                 editing === tx.id
                   ? <EditRow
                       key={tx.id} tx={tx}
-                      accounts={accounts} accountGroups={accountGroups} categories={categories}
+                      accounts={accounts} accountGroups={accountGroups} categories={categories} tags={tags}
                       onCategoryCreated={category => setCategories(current => [...current, category])}
+                      onTagCreated={tag => setTags(current => [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "ru")))}
                       onCancel={() => setEditing(null)}
                       onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                     />
@@ -645,8 +683,9 @@ export default function Transactions() {
               />
               {editing === tx.id && (
                 <table className="transactions-mobile-edit"><tbody><EditRow
-                  tx={tx} accounts={accounts} accountGroups={accountGroups} categories={categories}
+                  tx={tx} accounts={accounts} accountGroups={accountGroups} categories={categories} tags={tags}
                   onCategoryCreated={category => setCategories(current => [...current, category])}
+                  onTagCreated={tag => setTags(current => [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "ru")))}
                   onCancel={() => setEditing(null)}
                   onSaved={() => { setEditing(null); loadTransactions(); loadAccounts(); }}
                 /></tbody></table>
@@ -704,7 +743,7 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete, chec
         padding: "8px 12px", color: "#515c68", fontSize: 13,
         maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }} title={tx.description}>
-        {tx.description || "—"}
+        {tx.description || "—"}{(tx.tags || []).length > 0 && <small className="transaction-tags-inline"> · {(tx.tags || []).map(tag => `#${tag.name}`).join(" ")}</small>}
       </td>
       <td style={{ padding: "8px 8px", whiteSpace: "nowrap" }}>
         <button className="btn-ghost" style={{ padding: "3px 8px", fontSize: 12 }} onClick={onEdit}>
@@ -731,6 +770,7 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
         <span className="mobile-transaction-copy">
           <strong>{title}</strong>
           <small>{formatDate(tx.date)} · {accountName(tx.account_id)} · {category}</small>
+          {(tx.tags || []).length > 0 && <small className="transaction-tags-mobile">{(tx.tags || []).map(tag => `#${tag.name}`).join(" ")}</small>}
         </span>
         <span className="mobile-transaction-amount" style={{ color: TYPE_COLOR[tx.type] }}>
           {tx.type === "expense" ? "−" : tx.type === "income" ? "+" : ""}{formatMoney(tx.amount)} {currencySymbol(tx.currency)}
@@ -741,13 +781,14 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
   );
 }
 
-function EditRow({ tx, accounts, accountGroups, categories, onCategoryCreated, onCancel, onSaved }) {
+function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCreated, onTagCreated, onCancel, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
     currency: tx.currency,
     account_id: String(tx.account_id),
     category_id: tx.category_id ? String(tx.category_id) : "",
+    tag_ids: (tx.tags || []).map(tag => String(tag.id)),
     to_account_id: tx.to_account_id ? String(tx.to_account_id) : "",
     to_amount: tx.to_amount != null ? String(tx.to_amount) : "",
     to_currency: tx.to_currency || "",
@@ -798,6 +839,7 @@ function EditRow({ tx, accounts, accountGroups, categories, onCategoryCreated, o
         to_currency: form.type === "transfer" ? form.to_currency : null,
         fee_amount: form.type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : null,
         fee_category_id: form.type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : null,
+        tag_ids: form.type === "transfer" ? [] : form.tag_ids.map(Number),
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       };
@@ -889,6 +931,12 @@ function EditRow({ tx, accounts, accountGroups, categories, onCategoryCreated, o
               style={{ minWidth: 180 }}
             />
           )}
+          {form.type !== "transfer" && <TagPicker
+            tags={tags}
+            value={form.tag_ids}
+            onChange={tag_ids => setForm({ ...form, tag_ids })}
+            onTagCreated={onTagCreated}
+          />}
           <input
             placeholder="Описание"
             value={form.description}

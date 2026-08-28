@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from app.schemas.tag import TagResponse
 
 
 class TransactionCreate(BaseModel):
@@ -20,6 +21,7 @@ class TransactionCreate(BaseModel):
     is_family_expense: bool = False
     reimbursement_amount: Optional[float] = Field(None, ge=0)
     is_planned: bool = False
+    tag_ids: list[int] = Field(default_factory=list, max_length=20)
 
 
 class TransactionUpdate(BaseModel):
@@ -38,6 +40,7 @@ class TransactionUpdate(BaseModel):
     is_family_expense: Optional[bool] = None
     reimbursement_amount: Optional[float] = Field(None, ge=0)
     is_planned: Optional[bool] = None
+    tag_ids: Optional[list[int]] = Field(None, max_length=20)
 
 
 class TransactionBulkCategoryUpdate(BaseModel):
@@ -69,6 +72,7 @@ class TransactionResponse(BaseModel):
     is_family_expense: bool = False
     reimbursement_amount: float = 0
     is_planned: bool = False
+    tags: list[TagResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

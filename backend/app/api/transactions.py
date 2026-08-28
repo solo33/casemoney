@@ -16,6 +16,7 @@ from app.models.account import Account
 from app.models.account_balance import AccountBalance
 from app.models.category import Category
 from app.models.transaction_history import TransactionHistory
+from app.models.transaction_tag import Tag
 from app.models.family import FamilyMember
 from app.models.user import User
 from app.schemas.transaction import (
@@ -137,6 +138,19 @@ def _ensure_expense_category(db: Session, user_id: int, category_id: int) -> Non
     ).first()
     if not category or category.type != "expense":
         raise HTTPException(status_code=400, detail="Для комиссии выберите категорию расхода")
+
+
+def _resolve_tags(db: Session, user_id: int, tag_ids: list[int]) -> list[Tag]:
+    """Return only the current user's explicitly selected personal tags."""
+    ids = list(dict.fromkeys(tag_ids))
+    if len(ids) > 20:
+        raise HTTPException(status_code=400, detail="Можно указать не более 20 меток")
+    if not ids:
+        return []
+    tags = db.query(Tag).filter(Tag.user_id == user_id, Tag.id.in_(ids)).all()
+    if len(tags) != len(ids):
+        raise HTTPException(status_code=400, detail="Одна или несколько меток недоступны")
+    return tags
 
 
 def _sync_transfer_fee(
@@ -400,6 +414,7 @@ def get_transactions(
     currency: Optional[str] = Query(None),
     type: Optional[str] = Query(None, description="income | expense | transfer"),
     category_id: Optional[int] = Query(None, description="вкл. подкатегории"),
+    tag_id: Optional[int] = Query(None, description="личная метка/проект"),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     q: Optional[str] = Query(None, description="Поиск в описании"),
@@ -449,6 +464,11 @@ def get_transactions(
     if category_id is not None:
         cat_ids = _expand_categories(db, user_id, category_id)
         query = query.filter(Transaction.category_id.in_(cat_ids))
+    if tag_id is not None:
+        tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user_id).first()
+        if not tag:
+            raise HTTPException(status_code=404, detail="Метка не найдена")
+        query = query.join(Transaction.tags).filter(Tag.id == tag.id)
     if date_from:
         query = query.filter(func.date(Transaction.date) >= date_from)
     if date_to:
@@ -546,6 +566,7 @@ def create_transaction(
         reimbursement_amount=reimbursement_amount,
         is_planned=data.is_planned,
     )
+    transaction.tags = _resolve_tags(db, user_id, data.tag_ids)
     db.add(transaction)
     exchange_svc.snapshot_transaction_rates(db, user_id, transaction)
     try:
@@ -649,6 +670,7 @@ def update_transaction(
     fee_supplied = fee_amount_supplied or fee_category_supplied
     requested_fee_amount = update.pop("fee_amount", None)
     requested_fee_category = update.pop("fee_category_id", None)
+    requested_tag_ids = update.pop("tag_ids", None)
 
     if update.get("is_planned"):
         ensure_family_plan(db, user_id)
@@ -678,6 +700,9 @@ def update_transaction(
 
     for k, v in update.items():
         setattr(tx, k, v)
+
+    if requested_tag_ids is not None:
+        tx.tags = _resolve_tags(db, user_id, requested_tag_ids)
 
     # Пересчитываем поля перевода / очищаем их для дохода-расхода
     if tx.type == TransactionType.transfer:

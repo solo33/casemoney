@@ -1682,6 +1682,22 @@ hr {
 .transactions-bulk-bar { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin: 0 0 10px; padding: 10px 12px; border: 1px solid #d9c489; border-radius: 10px; background: #fff8e3; color: #515c68; }
 .transactions-bulk-bar select { min-width: 220px; min-height: 38px; }
 .transactions-bulk-bar small { flex: 1 1 280px; }
+.tag-picker { display: grid; gap: 7px; min-width: min(100%, 220px); }
+.tag-picker-options { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tag-chip, .tag-picker-add { min-height: 28px; padding: 3px 9px; border-radius: 999px; font-size: 12px; border: 1px solid #d8d0bf; background: #fffdf7; color: #536172; }
+.tag-chip.is-selected { background: var(--tag-color, #2f6296); border-color: var(--tag-color, #2f6296); color: #fff; }
+.tag-picker-add { color: #2f6296; border-style: dashed; }
+.tag-picker-create { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tag-picker-create input { min-height: 34px; min-width: 140px; flex: 1; }
+.tag-picker-create button { min-height: 34px; padding: 4px 9px; font-size: 12px; }
+.tag-picker-create small { width: 100%; color: #c0432b; }
+.tag-project-report { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #d9c489; border-radius: 10px; background: #fff8e3; color: #515c68; font-size: 13px; }
+.tag-project-dot { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%; }
+.tag-project-totals { display: flex; gap: 12px; flex-wrap: wrap; }
+.tag-project-totals .is-income { color: #167a4a; font-weight: 700; }
+.tag-project-totals .is-expense { color: #bd472e; font-weight: 700; }
+.transaction-tags-inline, .transaction-tags-mobile { color: #2f6296; font-weight: 600; }
+.transaction-tags-mobile { display: block; margin-top: 2px; }
 .automation-page { max-width: 1120px; }
 .automation-card { background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px; padding: 22px; margin: 18px 0; }
 .automation-card h2 { margin: 0 0 6px; color: #173a54; font-size: 21px; }
@@ -1728,6 +1744,7 @@ hr {
 .report-regular-grid .is-income { color: #167a4a; }
 @media (max-width: 680px) {
   .automation-card { padding: 16px; }
+  .tag-picker { width: 100%; }
   .automation-rule-form { grid-template-columns: 1fr; gap: 9px; }
   .automation-arrow { display: none; }
   .automation-rule-form button { width: 100%; }

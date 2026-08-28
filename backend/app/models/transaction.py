@@ -77,3 +77,6 @@ class Transaction(Base):
     is_planned = Column(Boolean, nullable=False, default=False)
 
     account = relationship("Account", foreign_keys=[account_id], back_populates="transactions")
+    # Tags are independent from income/expense categories and may be used for
+    # projects such as a trip, renovation, or a client.
+    tags = relationship("Tag", secondary="transaction_tags", back_populates="transactions")
