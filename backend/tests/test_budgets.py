@@ -88,7 +88,14 @@ def test_suggestions_use_twelve_full_months_average_rounded_to_rubles(client):
 
     now = datetime.now(timezone.utc)
     for months_ago in (1, 2, 3):
-        tx_date = now - timedelta(days=30 * months_ago)
+        # Не вычитаем «30 дней»: в конце длинного месяца такая дата может
+        # попасть в тот же календарный месяц, а подсказки считают именно месяцы.
+        year = now.year
+        month = now.month - months_ago
+        if month <= 0:
+            year -= 1
+            month += 12
+        tx_date = now.replace(year=year, month=month, day=15, hour=12, minute=0, second=0, microsecond=0)
         response = client.post("/api/transactions/", headers=auth, json={
             "type": "expense", "amount": 3000, "currency": "RUB",
             "account_id": account["id"], "category_id": category_id,

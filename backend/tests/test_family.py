@@ -412,9 +412,12 @@ def test_family_analytics_exposes_current_month_forecast(client):
         "category_id": category_id, "date": now.isoformat(), "is_family_expense": True,
     })
     assert actual.status_code == 201, actual.text
+    # В последнюю неделю месяца day=min(day + 1, 28) превращал будущую
+    # операцию в прошлую. Оставляем её сегодня, но в заведомо будущем времени.
+    planned_at = now.replace(hour=23, minute=59, second=0, microsecond=0)
     planned = client.post("/api/transactions/", headers=owner, json={
         "amount": 900, "type": "expense", "currency": "RUB", "account_id": account["id"],
-        "category_id": category_id, "date": now.replace(day=min(now.day + 1, 28)).isoformat(),
+        "category_id": category_id, "date": planned_at.isoformat(),
         "description": "Будущий общий платёж", "is_family_expense": True, "is_planned": True,
     })
     assert planned.status_code == 201, planned.text
