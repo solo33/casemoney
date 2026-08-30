@@ -10,8 +10,14 @@ import {
   COMMON_CURRENCIES,
   currencySymbol,
   formatMoney,
-  sortCurrenciesRubFirst,
 } from "../utils/money";
+import {
+  accountCurrencies as currenciesForAccount,
+  isSameTransferCurrency,
+  preferredAccountCurrency,
+  swapTransferFields,
+  transferDisplayRate,
+} from "../utils/transactionForm";
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
@@ -168,9 +174,7 @@ export default function Transactions() {
         setNewTx(t => ({
           ...t,
           account_id: String(first.id),
-          currency: sortCurrenciesRubFirst(
-            (first.balances || []).map(balance => balance.currency)
-          )[0] || "RUB",
+          currency: preferredAccountCurrency(first) || "RUB",
         }));
       }
     };
@@ -265,9 +269,9 @@ export default function Transactions() {
     if (!newTx.account_id || !accounts.length) return;
     const acc = accounts.find(a => String(a.id) === String(newTx.account_id));
     if (!acc?.balances?.length) return;
-    const codes = sortCurrenciesRubFirst(acc.balances.map(b => b.currency));
-    if (!codes.includes(newTx.currency)) {
-      setNewTx(t => ({ ...t, currency: codes[0] }));
+    const currency = preferredAccountCurrency(acc, newTx.currency);
+    if (currency !== newTx.currency) {
+      setNewTx(t => ({ ...t, currency }));
     }
   }, [newTx.account_id, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -275,19 +279,13 @@ export default function Transactions() {
     () => accounts.find(a => String(a.id) === String(newTx.account_id)),
     [accounts, newTx.account_id]
   );
-  const newTxCurrencies = sortCurrenciesRubFirst(
-    (selectedAccount?.balances || []).map(b => b.currency)
-  );
+  const newTxCurrencies = currenciesForAccount(selectedAccount);
   const selectedTargetAccount = useMemo(
     () => accounts.find(a => String(a.id) === String(newTx.to_account_id)),
     [accounts, newTx.to_account_id]
   );
-  const newTxTargetCurrencies = sortCurrenciesRubFirst(
-    (selectedTargetAccount?.balances || []).map(b => b.currency)
-  );
-  const sameNewTransferCurrency = newTx.type === "transfer"
-    && Boolean(newTx.currency)
-    && newTx.currency === newTx.to_currency;
+  const newTxTargetCurrencies = currenciesForAccount(selectedTargetAccount);
+  const sameNewTransferCurrency = isSameTransferCurrency(newTx.type, newTx.currency, newTx.to_currency);
 
   useEffect(() => {
     if (newTx.type !== "transfer" || !selectedTargetAccount) return;
@@ -306,22 +304,11 @@ export default function Transactions() {
     toCurrency: newTx.to_currency,
     onQuote: applyNewTransferQuote,
   });
-  const newDisplayedRate = Number(newTx.amount) > 0 && Number(newTx.to_amount) > 0
-    ? Number(newTx.to_amount) / Number(newTx.amount)
-    : null;
+  const newDisplayedRate = transferDisplayRate({ amount: newTx.amount, toAmount: newTx.to_amount });
 
   const swapNewTransferAccounts = () => {
     if (!newTx.account_id || !newTx.to_account_id) return;
-    const creditedAmount = sameNewTransferCurrency ? newTx.amount : newTx.to_amount;
-    setNewTx(current => ({
-      ...current,
-      account_id: current.to_account_id,
-      currency: current.to_currency,
-      amount: creditedAmount || "",
-      to_account_id: current.account_id,
-      to_currency: current.currency,
-      to_amount: current.amount || "",
-    }));
+    setNewTx(current => swapTransferFields(current, sameNewTransferCurrency));
   };
 
   const handleCreate = async (e) => {
@@ -905,19 +892,11 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCrea
   const [err, setErr] = useState(null);
 
   const acc = accounts.find(a => String(a.id) === form.account_id);
-  const accCurrencies = sortCurrenciesRubFirst(
-    (acc?.balances || []).map(b => b.currency)
-  );
+  const accCurrencies = currenciesForAccount(acc);
   const targetAccount = accounts.find(a => String(a.id) === form.to_account_id);
-  const targetCurrencies = sortCurrenciesRubFirst(
-    (targetAccount?.balances || []).map(b => b.currency)
-  );
-  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) > 0
-    ? Number(form.to_amount) / Number(form.amount)
-    : null;
-  const sameTransferCurrency = form.type === "transfer"
-    && Boolean(form.currency)
-    && form.currency === form.to_currency;
+  const targetCurrencies = currenciesForAccount(targetAccount);
+  const displayedRate = transferDisplayRate({ amount: form.amount, toAmount: form.to_amount });
+  const sameTransferCurrency = isSameTransferCurrency(form.type, form.currency, form.to_currency);
   const cats = form.type === "transfer" ? [] : categories.filter(c => c.type === form.type);
 
   const save = async () => {
@@ -975,24 +954,21 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCrea
           <CurrencyField currencies={accCurrencies.length ? accCurrencies : [form.currency]} value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} />
           <select value={form.account_id} onChange={e => {
             const account = accounts.find(item => String(item.id) === e.target.value);
-            const currencies = sortCurrenciesRubFirst((account?.balances || []).map(b => b.currency));
-            setForm({ ...form, account_id: e.target.value, currency: currencies[0] || form.currency });
+            setForm({ ...form, account_id: e.target.value, currency: preferredAccountCurrency(account, form.currency) });
           }}>
             <AccountOptions groups={accountGroups} includeIds={[form.account_id]} />
           </select>
           {form.type === "transfer" ? (
             <>
               <button type="button" className="transfer-swap-button" disabled={!form.to_account_id} onClick={() => {
-                const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
-                setForm(current => ({ ...current, account_id: current.to_account_id, currency: current.to_currency, amount: creditedAmount || "", to_account_id: current.account_id, to_currency: current.currency, to_amount: current.amount || "" }));
+                setForm(current => swapTransferFields(current, sameTransferCurrency));
               }} aria-label="Поменять счета отправки и получения местами" title="Поменять счета местами">⇄</button>
               <select value={form.to_account_id} onChange={e => {
                 const account = accounts.find(item => String(item.id) === e.target.value);
-                const currencies = sortCurrenciesRubFirst((account?.balances || []).map(b => b.currency));
                 setForm({
                   ...form,
                   to_account_id: e.target.value,
-                  to_currency: currencies[0] || "",
+                  to_currency: preferredAccountCurrency(account),
                   to_amount: "",
                 });
               }} required>

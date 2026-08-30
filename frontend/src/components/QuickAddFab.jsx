@@ -2,10 +2,14 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import api, { isRetryableServiceError } from "../api/client";
 import AccountOptions, { entryAccountGroups } from "./AccountOptions";
 import CategoryPicker from "./CategoryPicker";
+import { COMMON_CURRENCIES } from "../utils/money";
 import {
-  COMMON_CURRENCIES,
-  sortCurrenciesRubFirst,
-} from "../utils/money";
+  accountCurrencies as currenciesForAccount,
+  isSameTransferCurrency,
+  preferredAccountCurrency,
+  swapTransferFields,
+  transferDisplayRate,
+} from "../utils/transactionForm";
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
@@ -81,9 +85,7 @@ export default function QuickAddFab() {
         return {
           ...f,
           account_id: String(flatAccounts[0].id),
-          currency: sortCurrenciesRubFirst(
-            (flatAccounts[0].balances || []).map(balance => balance.currency)
-          )[0] || "",
+          currency: preferredAccountCurrency(flatAccounts[0]),
         };
       });
     };
@@ -116,9 +118,9 @@ export default function QuickAddFab() {
     const acc = accounts.find(a => String(a.id) === String(form.account_id));
     if (!acc) return;
     if (!acc.balances?.length) return;
-    const currencies = sortCurrenciesRubFirst(acc.balances.map(b => b.currency));
-    if (!currencies.includes(form.currency)) {
-      setForm(f => ({ ...f, currency: currencies[0] }));
+    const currency = preferredAccountCurrency(acc, form.currency);
+    if (currency !== form.currency) {
+      setForm(f => ({ ...f, currency }));
     }
   }, [form.account_id, accounts]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -169,21 +171,14 @@ export default function QuickAddFab() {
     [accounts, form.account_id]
   );
 
-  const accountBalances = selectedAccount?.balances || [];
-  const accountCurrencies = sortCurrenciesRubFirst(
-    accountBalances.map(b => b.currency)
-  );
+  const accountCurrencies = currenciesForAccount(selectedAccount);
 
   const selectedTargetAccount = useMemo(
     () => accounts.find(a => String(a.id) === String(form.to_account_id)),
     [accounts, form.to_account_id]
   );
-  const targetCurrencies = sortCurrenciesRubFirst(
-    (selectedTargetAccount?.balances || []).map(balance => balance.currency)
-  );
-  const sameTransferCurrency = form.type === "transfer"
-    && Boolean(form.currency)
-    && form.currency === form.to_currency;
+  const targetCurrencies = currenciesForAccount(selectedTargetAccount);
+  const sameTransferCurrency = isSameTransferCurrency(form.type, form.currency, form.to_currency);
 
   useEffect(() => {
     if (form.type !== "transfer" || !selectedTargetAccount) return;
@@ -205,22 +200,16 @@ export default function QuickAddFab() {
     toCurrency: form.to_currency,
     onQuote: applyTransferQuote,
   });
-  const displayedRate = Number(form.amount) > 0 && Number(form.to_amount) >= 0
-    ? Number(form.to_amount) / Number(form.amount)
-    : quote?.rate;
+  const displayedRate = transferDisplayRate({
+    amount: form.amount,
+    toAmount: form.to_amount,
+    fallbackRate: quote?.rate,
+    allowZeroToAmount: true,
+  });
 
   const swapTransferAccounts = () => {
     if (!form.account_id || !form.to_account_id) return;
-    const creditedAmount = sameTransferCurrency ? form.amount : form.to_amount;
-    setForm(current => ({
-      ...current,
-      account_id: current.to_account_id,
-      currency: current.to_currency,
-      amount: creditedAmount || "",
-      to_account_id: current.account_id,
-      to_currency: current.currency,
-      to_amount: current.amount || "",
-    }));
+    setForm(current => swapTransferFields(current, sameTransferCurrency));
   };
 
   const handleSubmit = async (e) => {
