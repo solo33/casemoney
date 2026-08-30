@@ -10,6 +10,7 @@ from typing import Literal
 
 from sqlalchemy.orm import Session
 
+from app.models.family import FamilyMember
 from app.models.notification import Notification
 from app.models.user import User
 from app.services.email import send_financial_notification
@@ -43,6 +44,21 @@ NOTIFICATION_EVENTS = {
     "family_expense": {
         "label": "Семейные расходы",
         "description": "Новая общая покупка другого участника семьи.",
+        "default": {"in_app": True, "email": False, "push": True},
+    },
+    "family_invitation": {
+        "label": "Приглашения в семью",
+        "description": "Приглашение в семейное пространство и его принятие.",
+        "default": {"in_app": True, "email": True, "push": True},
+    },
+    "family_reimbursement": {
+        "label": "Семейные возмещения",
+        "description": "Участник отметил компенсацию общего расхода.",
+        "default": {"in_app": True, "email": False, "push": True},
+    },
+    "family_access": {
+        "label": "Доступы семьи",
+        "description": "Изменение роли участника или доступа к общему счёту.",
         "default": {"in_app": True, "email": False, "push": True},
     },
     "goal_progress": {
@@ -109,6 +125,43 @@ def notify_user(
     if is_enabled(user, event, "push"):
         send_web_pushes(db, user, title=title, link=link)
     return sent_in_app, sent_email
+
+
+def notify_family_members(
+    db: Session,
+    *,
+    family_id: int,
+    actor_user_id: int | None,
+    event: str,
+    title: str,
+    message: str,
+    link: str | None = None,
+    recipient_ids: set[int] | None = None,
+) -> int:
+    """Notify selected active participants of a family action.
+
+    The author is not alerted about their own action.  `recipient_ids` narrows
+    the audience for access changes; otherwise every other active participant
+    receives the event according to their own channel preferences.
+    """
+    member_query = db.query(FamilyMember.user_id).filter(
+        FamilyMember.family_id == family_id,
+        FamilyMember.status == "active",
+        FamilyMember.user_id.isnot(None),
+    )
+    if recipient_ids is not None:
+        if not recipient_ids:
+            return 0
+        member_query = member_query.filter(FamilyMember.user_id.in_(recipient_ids))
+    user_ids = {item[0] for item in member_query.all()}
+    if actor_user_id is not None:
+        user_ids.discard(actor_user_id)
+    if not user_ids:
+        return 0
+    users = db.query(User).filter(User.id.in_(user_ids), User.is_active.is_(True)).all()
+    for user in users:
+        notify_user(db, user, event=event, title=title, message=message, link=link)
+    return len(users)
 
 
 def send_email_copy(user: User, *, title: str, message: str, link: str | None = None) -> bool:

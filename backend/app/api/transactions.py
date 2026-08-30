@@ -34,6 +34,7 @@ from app.services import exchange as exchange_svc
 from app.services import family_accounts as family_accounts_svc
 from app.services.plans import ensure_family_plan
 from app.services.automation import matched_category_id
+from app.services.notifications import notify_family_members
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 security = HTTPBearer()
@@ -309,12 +310,10 @@ def _family_fields(
 ) -> tuple[Optional[int], bool, float]:
     if not is_family_expense:
         return None, False, 0
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user or user.plan != "family":
-        raise HTTPException(
-            status_code=403,
-            detail="Семейные расходы доступны только на тарифе Family",
-        )
+    # The application-wide billing switch is the source of truth.  Before paid
+    # launch Family is deliberately free, while after it this keeps the same
+    # paid-owner access rule as every other Family endpoint.
+    ensure_family_plan(db, user_id)
     if tx_type != TransactionType.expense:
         raise HTTPException(
             status_code=400,
@@ -723,6 +722,21 @@ def create_transaction(
         db.flush()
         _apply_tx_effect(db, transaction, reverse=False)
         _write_history(db, user_id, transaction, "created")
+        if transaction.is_family_expense and transaction.type == TransactionType.expense:
+            actor = user or db.query(User).filter(User.id == user_id).first()
+            actor_name = actor.username if actor and actor.username else "Участник семьи"
+            notify_family_members(
+                db,
+                family_id=transaction.family_id,
+                actor_user_id=user_id,
+                event="family_expense",
+                title="Новый общий расход",
+                message=(
+                    f"{actor_name} добавил(а) общий расход: "
+                    f"{transaction.amount:.2f} {transaction.currency}."
+                ),
+                link="/settings/family",
+            )
         if tx_type == TransactionType.transfer:
             _sync_transfer_fee(
                 db, transaction,

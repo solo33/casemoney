@@ -15,6 +15,7 @@ from app.services.auth import decode_token
 from app.services import accounts as accounts_svc
 from app.services import exchange as exchange_svc
 from app.services.plans import ensure_family_plan
+from app.services.notifications import notify_family_members
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
 security = HTTPBearer()
@@ -255,6 +256,18 @@ def update_goal(
 
     for k, v in update.items():
         setattr(goal, k, v)
+    if goal.family_id and update:
+        user = db.query(User).filter(User.id == user_id).first()
+        actor_name = user.username if user and user.username else "Участник семьи"
+        notify_family_members(
+            db,
+            family_id=goal.family_id,
+            actor_user_id=user_id,
+            event="goal_progress",
+            title="Изменена общая цель",
+            message=f"{actor_name} изменил(а) параметры цели «{goal.name}».",
+            link="/goals",
+        )
     db.commit()
     db.refresh(goal)
     return _serialize(db, user_id, goal)
@@ -320,5 +333,16 @@ def add_contribution(goal_id: int, data: ContributionCreate, db: Session = Depen
     if not goal or not membership or goal.family_id != membership.family_id:
         raise HTTPException(status_code=404, detail="Общая цель не найдена")
     db.add(GoalContribution(goal_id=goal.id, user_id=user_id, amount=data.amount))
+    user = db.query(User).filter(User.id == user_id).first()
+    actor_name = user.username if user and user.username else "Участник семьи"
+    notify_family_members(
+        db,
+        family_id=goal.family_id,
+        actor_user_id=user_id,
+        event="goal_progress",
+        title="Пополнение общей цели",
+        message=f"{actor_name} добавил(а) {data.amount:.2f} {goal.currency} к цели «{goal.name}».",
+        link="/goals",
+    )
     db.commit()
     return _serialize(db, user_id, goal)

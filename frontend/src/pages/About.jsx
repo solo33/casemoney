@@ -30,8 +30,17 @@ export default function About() {
         return;
       }
 
-      await window.__casemoneyCheckForUpdates?.();
-      setUpdateStatus("ready");
+      const result = await window.__casemoneyCheckForUpdates?.();
+      setUpdateStatus(result?.updateAvailable ? "ready" : "refresh");
+    } catch {
+      setUpdateStatus("error");
+    }
+  };
+
+  const refreshPwaCache = async () => {
+    setUpdateStatus("refreshing");
+    try {
+      await window.__casemoneyRefreshPwaCache?.();
     } catch {
       setUpdateStatus("error");
     }
@@ -60,10 +69,16 @@ export default function About() {
           <InfoRow label="Сайт" value={<a href="https://casemoney.ru">casemoney.ru</a>} />
           <InfoRow label="Поддержка" value={<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>} />
           <div style={{ marginTop: 18 }}>
-            <button type="button" onClick={checkForUpdates} disabled={updateStatus === "checking"}>
+            <button type="button" onClick={checkForUpdates} disabled={updateStatus === "checking" || updateStatus === "refreshing"}>
               {updateStatus === "checking" ? "Проверяем обновления…" : "Проверить обновления"}
             </button>
             {updateStatus === "ready" && <p style={statusStyle}>Новая версия готовится к установке. Если она доступна, появится предложение обновиться.</p>}
+            {updateStatus === "refresh" && <div style={updateActionStyle}>
+              <p style={statusStyle}>Новая версия найдена. Браузер удерживает старый кэш приложения.</p>
+              <button type="button" className="btn-secondary" onClick={refreshPwaCache}>Обновить сейчас</button>
+              <small>Черновики и несинхронизированные операции не удаляются.</small>
+            </div>}
+            {updateStatus === "refreshing" && <p style={statusStyle}>Обновляем приложение…</p>}
             {updateStatus === "current" && <p style={statusStyle}>Установлена актуальная версия.</p>}
             {updateStatus === "error" && <p style={{ ...statusStyle, color: "#b42318" }}>Не удалось проверить обновления. Попробуйте ещё раз.</p>}
           </div>
@@ -96,6 +111,13 @@ const statusStyle = {
   margin: "10px 0 0",
   color: "#287a52",
   fontSize: 13,
+};
+
+const updateActionStyle = {
+  display: "grid",
+  justifyItems: "start",
+  gap: 8,
+  marginTop: 10,
 };
 
 const documentLinkStyle = {

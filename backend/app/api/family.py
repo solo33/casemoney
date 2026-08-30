@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import html
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -15,18 +15,23 @@ from app.models.budget import Budget
 from app.models.category import Category
 from app.models.family import AccountFamilyAccess, Family, FamilyMember, FamilySettlement
 from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision
-from app.models.notification import Notification
+from app.models.goal import Goal, GoalContribution
 from app.models.recurring_transaction import RecurringTransaction
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services.auth import decode_token
 from app.services.email import app_url, send_email
-from app.services.notifications import notify_user
+from app.services.notifications import notify_family_members, notify_user
 from app.services.plans import ensure_family_plan
 from app.services import accounts as accounts_svc
 from app.services import app_config as app_config_svc
 from app.services import exchange as exchange_svc
 from app.services.family_recurring import find_family_recurring_suggestions
+from app.services.family_report import (
+    build_family_report_email_html,
+    build_family_report_pdf,
+    report_period_label,
+)
 
 security = HTTPBearer()
 
@@ -100,6 +105,11 @@ class SettlementCreate(BaseModel):
     currency: str = Field(min_length=2, max_length=10)
     date: Optional[datetime] = None
     description: Optional[str] = Field(None, max_length=500)
+
+
+class FamilyAnalyticsExportRequest(BaseModel):
+    year: int = Field(ge=2000, le=2200)
+    month: int = Field(ge=1, le=12)
 
 
 def _user_label(user: Optional[User], email: str) -> str:
@@ -248,34 +258,38 @@ def invite_member(
     family_name = db.query(Family.name).filter(
         Family.id == membership.family_id
     ).scalar()
+    invitation_title = "Приглашение в семейное пространство"
+    invitation_message = (
+        f"Вас пригласили в семейное пространство «{family_name}». "
+        "Примите приглашение, чтобы участвовать в общих финансах."
+    )
     if user:
-        db.add(Notification(
-            user_id=user.id,
-            title="Приглашение в семейное пространство",
-            message=f"Вас пригласили в семейное пространство «{family_name}». Примите приглашение, чтобы участвовать в общих финансах.",
-            link="/settings/family",
-        ))
+        notify_user(
+            db, user, event="family_invitation", title=invitation_title,
+            message=invitation_message, link="/settings/family",
+        )
     db.commit()
     db.refresh(invitation)
     invite_url = f"{app_url()}/settings/family"
     safe_family_name = html.escape(family_name)
     safe_email = html.escape(email)
     safe_invite_url = html.escape(invite_url, quote=True)
-    send_email(
-        email,
-        f"Приглашение в семейные финансы CaseMoney — {family_name}",
-        (
-            f"Вас пригласили в семейное пространство «{family_name}».\n"
-            f"Войдите в CaseMoney под адресом {email} и примите приглашение:\n"
-            f"{invite_url}"
-        ),
-        (
-            f"<p>Вас пригласили в семейное пространство "
-            f"<strong>«{safe_family_name}»</strong>.</p>"
-            f"<p>Войдите в CaseMoney под адресом {safe_email} и "
-            f"<a href=\"{safe_invite_url}\">примите приглашение</a>.</p>"
-        ),
-    )
+    if not user:
+        send_email(
+            email,
+            f"Приглашение в семейные финансы CaseMoney — {family_name}",
+            (
+                f"Вас пригласили в семейное пространство «{family_name}».\n"
+                f"Войдите в CaseMoney под адресом {email} и примите приглашение:\n"
+                f"{invite_url}"
+            ),
+            (
+                f"<p>Вас пригласили в семейное пространство "
+                f"<strong>«{safe_family_name}»</strong>.</p>"
+                f"<p>Войдите в CaseMoney под адресом {safe_email} и "
+                f"<a href=\"{safe_invite_url}\">примите приглашение</a>.</p>"
+            ),
+        )
     return {"id": invitation.id, "email": email, "status": "pending"}
 
 
@@ -296,6 +310,16 @@ def update_member_role(
     if target.role == "owner":
         raise HTTPException(status_code=400, detail="Роль владельца нельзя изменить")
     target.role = data.role
+    notify_family_members(
+        db,
+        family_id=membership.family_id,
+        actor_user_id=user_id,
+        recipient_ids={target.user_id} if target.user_id else set(),
+        event="family_access",
+        title="Изменена роль в семье",
+        message=f"Ваша роль в семейном пространстве изменена на «{data.role}».",
+        link="/settings/family",
+    )
     db.commit()
     return {"id": target.id, "role": target.role}
 
@@ -366,6 +390,11 @@ def update_account_access(
     if not set(requested).issubset(active_member_ids):
         raise HTTPException(status_code=400, detail="Можно выбрать только активных участников этой семьи")
 
+    previous_recipient_ids = {
+        item.user_id for item in db.query(AccountFamilyAccess).filter(
+            AccountFamilyAccess.account_id == account.id
+        ).all()
+    }
     db.query(AccountFamilyAccess).filter(
         AccountFamilyAccess.account_id == account.id
     ).delete(synchronize_session=False)
@@ -378,6 +407,16 @@ def update_account_access(
                 user_id=target_user_id,
                 permission=permission,
             ))
+    notify_family_members(
+        db,
+        family_id=membership.family_id,
+        actor_user_id=user_id,
+        recipient_ids=previous_recipient_ids | set(requested),
+        event="family_access",
+        title="Изменён доступ к общему счёту",
+        message=f"Изменены настройки доступа к счёту «{account.name}».",
+        link="/settings/family",
+    )
     db.commit()
     return {"id": account.id, "is_shared": account.is_shared, "access": requested}
 
@@ -427,8 +466,19 @@ def accept_invitation(
     invitation.user_id = user_id
     invitation.status = "active"
     invitation.accepted_at = datetime.now(timezone.utc)
-    db.commit()
     family = db.query(Family).filter(Family.id == invitation.family_id).first()
+    actor_name = user.username if user.username else user.email
+    notify_family_members(
+        db,
+        family_id=invitation.family_id,
+        actor_user_id=user_id,
+        recipient_ids={family.owner_user_id} if family else set(),
+        event="family_invitation",
+        title="Приглашение принято",
+        message=f"{actor_name} присоединился(ась) к семейному пространству.",
+        link="/settings/family",
+    )
+    db.commit()
     return family_payload(db, family, user_id)
 
 
@@ -535,8 +585,7 @@ def _convert_or_skip(
         return None
 
 
-@router.get("/analytics")
-def family_analytics(
+def _family_analytics_data(
     year: int,
     month: int,
     db: Session = Depends(get_db),
@@ -779,6 +828,62 @@ def family_analytics(
             "amount": largest_category["actual"],
             "description": "Больше всего фактически потрачено в этой категории за выбранный месяц.",
         })
+    goal_rows = []
+    shared_goals = db.query(Goal).filter(
+        Goal.family_id == membership.family_id,
+        Goal.is_archived.is_(False),
+    ).order_by(Goal.sort_order, Goal.id).all()
+    for goal in shared_goals:
+        current_in_goal_currency = goal.current_amount
+        if goal.account_id:
+            account = db.query(Account).filter(Account.id == goal.account_id).first()
+            if account:
+                current_in_goal_currency = 0.0
+                for balance in account.balances:
+                    converted = _convert_or_skip(
+                        db, goal.user_id, balance.balance, balance.currency,
+                        goal.currency, skipped_currencies,
+                    )
+                    if converted is not None:
+                        current_in_goal_currency += converted
+        all_contributions = db.query(GoalContribution).filter(
+            GoalContribution.goal_id == goal.id,
+        ).all()
+        current_in_goal_currency += sum(item.amount for item in all_contributions)
+        monthly_contributions = 0.0
+        for item in all_contributions:
+            contribution_date = item.created_at
+            if not contribution_date:
+                continue
+            # SQLite in tests may return a naive value even for a timezone-aware
+            # column, while PostgreSQL returns UTC-aware datetimes.
+            if contribution_date.tzinfo is None:
+                contribution_date = contribution_date.replace(tzinfo=timezone.utc)
+            if start <= contribution_date < end:
+                monthly_contributions += item.amount
+        target = _convert_or_skip(
+            db, goal.user_id, goal.target_amount, goal.currency,
+            main_currency, skipped_currencies,
+        )
+        current = _convert_or_skip(
+            db, goal.user_id, current_in_goal_currency, goal.currency,
+            main_currency, skipped_currencies,
+        )
+        monthly = _convert_or_skip(
+            db, goal.user_id, monthly_contributions, goal.currency,
+            main_currency, skipped_currencies,
+        )
+        if target is None or current is None:
+            continue
+        goal_rows.append({
+            "id": goal.id,
+            "name": goal.name,
+            "target_amount": round(target, 2),
+            "current_amount": round(current, 2),
+            "monthly_contribution": round(monthly or 0.0, 2),
+            "progress_percent": round(max(0.0, min(100.0, current / target * 100)) if target else 0.0, 1),
+        })
+
     return {
         "year": year,
         "month": month,
@@ -819,9 +924,63 @@ def family_analytics(
         "settlements": settlement_rows,
         "settlements_total": round(settlements_total, 2),
         "notable_expenses": notable_expenses[:5],
+        "goals": goal_rows,
         "month_summary": month_summary,
         "skipped_currencies": sorted(skipped_currencies),
     }
+
+
+@router.get("/analytics")
+def family_analytics(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    return _family_analytics_data(year, month, db, user_id)
+
+
+@router.get("/analytics/pdf")
+def download_family_analytics_pdf(
+    year: int,
+    month: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    family = db.query(Family).filter(Family.id == membership.family_id).first()
+    data = _family_analytics_data(year, month, db, user_id)
+    filename = f"casemoney-family-{year}-{month:02d}.pdf"
+    return Response(
+        content=build_family_report_pdf(data, family.name if family else "Семья"),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/analytics/email")
+def email_family_analytics(
+    payload: FamilyAnalyticsExportRequest,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = require_membership(db, user_id)
+    family = db.query(Family).filter(Family.id == membership.family_id).first()
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    data = _family_analytics_data(payload.year, payload.month, db, user_id)
+    family_name = family.name if family else "Семья"
+    period = report_period_label(payload.year, payload.month)
+    sent = send_email(
+        user.email,
+        f"CaseMoney — семейный отчёт за {period}",
+        f"Семейный отчёт «{family_name}» за {period}: доходы {data['income_total']:.0f}, расходы {data['expense_total']:.0f} {data['currency']}.",
+        build_family_report_email_html(data, family_name),
+    )
+    if not sent:
+        raise HTTPException(status_code=502, detail="Не удалось отправить отчёт. Проверьте настройки почты и попробуйте позже.")
+    return {"sent": True, "email": user.email}
 
 
 @router.get("/recurring-suggestions")
@@ -956,6 +1115,21 @@ def create_settlement(
         created_by_user_id=user_id,
     )
     db.add(settlement)
+    sender = db.query(User).filter(User.id == user_id).first()
+    sender_name = sender.username if sender and sender.username else "Участник семьи"
+    notify_family_members(
+        db,
+        family_id=membership.family_id,
+        actor_user_id=user_id,
+        recipient_ids={data.to_user_id},
+        event="family_reimbursement",
+        title="Отмечено семейное возмещение",
+        message=(
+            f"{sender_name} отметил(а) возмещение "
+            f"{data.amount:.2f} {data.currency.upper()}."
+        ),
+        link="/settings/family",
+    )
     db.commit()
     db.refresh(settlement)
     return {"id": settlement.id}

@@ -1,6 +1,8 @@
 from datetime import date, datetime, timezone
 
 from tests.conftest import TestingSessionLocal, enable_billing, make_account, register_and_login
+from app.models.family import Family
+from app.models.goal import Goal, GoalContribution
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.services.recurring_transactions import process_recurring_transactions
@@ -429,6 +431,70 @@ def test_family_analytics_exposes_current_month_forecast(client):
     assert any(item["kind"] == "largest_category" and item["title"] == "Главная статья общих расходов: Продукты" for item in summary)
 
 
+def test_family_monthly_report_contains_goals_and_can_be_exported(client, monkeypatch):
+    owner = register_and_login(client, "monthly-report-owner@test.com")
+    enable_family_plan("monthly-report-owner@test.com")
+    created = client.post("/api/family/", headers=owner, json={"name": "Семейный отчёт"})
+    assert created.status_code == 201, created.text
+    now = datetime.now(timezone.utc)
+
+    db = TestingSessionLocal()
+    try:
+        user = db.query(User).filter(User.email == "monthly-report-owner@test.com").one()
+        family = db.query(Family).filter(Family.owner_user_id == user.id).one()
+        goal = Goal(
+            user_id=user.id,
+            family_id=family.id,
+            name="Резерв семьи",
+            target_amount=100_000,
+            current_amount=5_000,
+            currency="RUB",
+        )
+        db.add(goal)
+        db.flush()
+        db.add(GoalContribution(
+            goal_id=goal.id,
+            user_id=user.id,
+            amount=1_500,
+            created_at=now,
+        ))
+        db.commit()
+        goal_id = goal.id
+    finally:
+        db.close()
+
+    analytics = client.get(f"/api/family/analytics?year={now.year}&month={now.month}", headers=owner)
+    assert analytics.status_code == 200, analytics.text
+    goal_data = analytics.json()["goals"]
+    assert goal_data == [{
+        "id": goal_id,
+        "name": "Резерв семьи",
+        "target_amount": 100_000,
+        "current_amount": 6_500,
+        "monthly_contribution": 1_500,
+        "progress_percent": 6.5,
+    }]
+
+    exported = client.get(f"/api/family/analytics/pdf?year={now.year}&month={now.month}", headers=owner)
+    assert exported.status_code == 200, exported.text
+    assert exported.headers["content-type"] == "application/pdf"
+    assert exported.content.startswith(b"%PDF")
+
+    sent = {}
+
+    def fake_send_email(to, subject, text, html=None):
+        sent.update({"to": to, "subject": subject, "text": text, "html": html})
+        return True
+
+    monkeypatch.setattr("app.api.family.send_email", fake_send_email)
+    emailed = client.post("/api/family/analytics/email", headers=owner, json={"year": now.year, "month": now.month})
+    assert emailed.status_code == 200, emailed.text
+    assert emailed.json()["email"] == "monthly-report-owner@test.com"
+    assert sent["to"] == "monthly-report-owner@test.com"
+    assert sent["subject"].startswith("CaseMoney")
+    assert "Резерв семьи" in sent["html"]
+
+
 def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(client):
     owner = register_and_login(client, "recurring-owner@test.com")
     enable_family_plan("recurring-owner@test.com")
@@ -538,3 +604,73 @@ def test_me_update_sanitizes_notification_preferences(client):
     assert saved["planned_operation"] == {"in_app": False, "email": True, "push": True}
     # Untouched events keep their documented defaults rather than being dropped.
     assert saved["credit_due"] == {"in_app": True, "email": True, "push": True}
+
+
+def test_family_action_notifications_honor_each_member_preferences(client, monkeypatch):
+    # Channel delivery is covered by the notification service itself.  Keep this
+    # API scenario local and deterministic instead of opening an SMTP session.
+    monkeypatch.setattr("app.services.notifications.send_financial_notification", lambda **_: True)
+    owner = register_and_login(client, "notify-owner@test.com")
+    member = register_and_login(client, "notify-member@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Уведомления"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "notify-member@test.com"},
+    )
+    assert invitation.status_code == 201, invitation.text
+    assert client.post(
+        f"/api/family/invitations/{invitation.json()['id']}/accept", headers=member,
+    ).status_code == 200
+
+    # Every Family event is visible in settings and a participant can disable
+    # only the event they do not want, without affecting the other alerts.
+    settings = client.get("/api/notifications/settings", headers=owner).json()
+    assert {"family_invitation", "family_reimbursement", "family_access"}.issubset(settings["events"])
+    updated = client.put("/api/notifications/settings", headers=owner, json={
+        "preferences": {"family_expense": {"in_app": False, "email": False, "push": False}},
+    })
+    assert updated.status_code == 200, updated.text
+
+    account = make_account(client, member, name="Карта участника", balance=2_000)
+    shared = client.post("/api/transactions/", headers=member, json={
+        "type": "expense", "amount": 500, "currency": "RUB", "account_id": account["id"],
+        "description": "Общий ужин", "is_family_expense": True,
+    })
+    assert shared.status_code == 201, shared.text
+    owner_alerts = client.get("/api/notifications/", headers=owner).json()["items"]
+    assert all(item["title"] != "Новый общий расход" for item in owner_alerts)
+
+    db = TestingSessionLocal()
+    try:
+        family = db.query(Family).filter(Family.name == "Уведомления").one()
+        owner_user = db.query(User).filter(User.email == "notify-owner@test.com").one()
+        goal = Goal(
+            user_id=owner_user.id, family_id=family.id, name="Отпуск", target_amount=50_000,
+            currency="RUB", current_amount=0,
+        )
+        db.add(goal)
+        db.commit()
+        goal_id = goal.id
+    finally:
+        db.close()
+
+    changed_goal = client.patch(
+        f"/api/goals/{goal_id}", headers=owner, json={"due_date": "2026-12-31"},
+    )
+    assert changed_goal.status_code == 200, changed_goal.text
+    member_alerts = client.get("/api/notifications/", headers=member).json()["items"]
+    assert any(item["title"] == "Изменена общая цель" for item in member_alerts)
+
+    contribution = client.post(
+        f"/api/goals/{goal_id}/contributions", headers=member, json={"amount": 1_000},
+    )
+    assert contribution.status_code == 200, contribution.text
+    owner_alerts = client.get("/api/notifications/", headers=owner).json()["items"]
+    assert any(item["title"] == "Пополнение общей цели" for item in owner_alerts)
+
+    owner_id = client.get("/api/family/", headers=owner).json()["family"]["owner_user_id"]
+    settlement = client.post("/api/family/settlements", headers=member, json={
+        "to_user_id": owner_id, "amount": 500, "currency": "RUB",
+    })
+    assert settlement.status_code == 201, settlement.text
+    owner_alerts = client.get("/api/notifications/", headers=owner).json()["items"]
+    assert any(item["title"] == "Отмечено семейное возмещение" for item in owner_alerts)

@@ -25,6 +25,7 @@ export default function Family() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exportingReport, setExportingReport] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +84,42 @@ export default function Family() {
       account_id: accountId,
       members: Object.fromEntries((shared?.access || []).map(item => [item.user_id, item.permission])),
     });
+  };
+
+  const downloadAnalyticsPdf = async () => {
+    setError("");
+    setExportingReport(true);
+    try {
+      const response = await api.get("/api/family/analytics/pdf", {
+        params: analyticsPeriod,
+        responseType: "blob",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(response.data);
+      link.download = `casemoney-family-${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+    } catch (err) {
+      setError("Не удалось сформировать PDF-отчёт. Попробуйте ещё раз.");
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
+  const emailAnalytics = async () => {
+    setError("");
+    setMessage("");
+    setExportingReport(true);
+    try {
+      const response = await api.post("/api/family/analytics/email", analyticsPeriod);
+      setMessage(`Семейный отчёт отправлен на ${response.data.email}`);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Не удалось отправить отчёт. Попробуйте ещё раз.");
+    } finally {
+      setExportingReport(false);
+    }
   };
   const currencyOptions = useMemo(() => {
     const values = new Set(["RUB"]);
@@ -228,15 +265,21 @@ export default function Family() {
                 <p className="family-eyebrow">Family</p>
                 <h2>Семейный отчёт</h2>
               </div>
-              <input
-                type="month"
-                value={`${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}`}
-                onChange={event => {
-                  const [year, month] = event.target.value.split("-").map(Number);
-                  if (year && month) setAnalyticsPeriod({ year, month });
-                }}
-                aria-label="Месяц семейного отчёта"
-              />
+              <div className="family-report-controls">
+                <input
+                  type="month"
+                  value={`${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}`}
+                  onChange={event => {
+                    const [year, month] = event.target.value.split("-").map(Number);
+                    if (year && month) setAnalyticsPeriod({ year, month });
+                  }}
+                  aria-label="Месяц семейного отчёта"
+                />
+                <div className="family-report-actions">
+                  <button type="button" className="family-report-secondary" onClick={downloadAnalyticsPdf} disabled={exportingReport}>PDF</button>
+                  <button type="button" onClick={emailAnalytics} disabled={exportingReport}>{exportingReport ? "Готовим…" : "На email"}</button>
+                </div>
+              </div>
             </div>
             <div className="family-analytics-stats family-analytics-stats-four">
               <article><span>Доходы</span><strong>{formatMoney(analytics?.income_total || 0)} {analytics?.currency || "RUB"}</strong></article>
@@ -321,6 +364,11 @@ export default function Family() {
                 {(analytics?.notable_expenses || []).map(item => <div className="family-analytics-row" key={item.id}><span>{item.description}<small>{item.paid_by_name}</small></span><strong>{formatMoney(item.amount)} {analytics.currency}</strong></div>)}
                 {!analytics?.notable_expenses?.length && <p className="family-analytics-empty">Пока нет операций для анализа.</p>}
               </div>
+            </div>
+            <div className="family-analytics-details family-goals-section">
+              <h3>Общие цели</h3>
+              {(analytics?.goals || []).map(item => <div className="family-analytics-row" key={item.id}><span>{item.name}<small>Внесено за месяц: {formatMoney(item.monthly_contribution)} {analytics.currency}</small></span><strong>{item.progress_percent}%<small>{formatMoney(item.current_amount)} из {formatMoney(item.target_amount)} {analytics.currency}</small></strong></div>)}
+              {!analytics?.goals?.length && <p className="family-analytics-empty">Общих целей пока нет. Создайте цель и отметьте её как общую.</p>}
             </div>
             {analytics?.skipped_currencies?.length > 0 && <p className="family-analytics-note">Не удалось пересчитать: {analytics.skipped_currencies.join(", ")}. Используйте доступный курс в настройках валют.</p>}
           </section>
@@ -564,6 +612,11 @@ export default function Family() {
         .family-analytics-heading { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
         .family-eyebrow { color: #9c6f1d !important; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 800; margin: 0 0 4px !important; }
         .family-analytics-heading input { width: auto; }
+        .family-report-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .family-report-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .family-report-actions button { padding: 8px 11px; font-size: 12px; }
+        .family-report-secondary { background: #fffdf7; color: #173a54; border: 1px solid #d6cdbb; }
+        .family-report-secondary:hover { background: #f7eed9; }
         .family-analytics-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
         .family-analytics-stats-four { grid-template-columns: repeat(4, 1fr); }
         .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
@@ -593,7 +646,8 @@ export default function Family() {
         .family-income-amount { color: #17704b !important; }
         .family-analytics-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
         .family-analytics-details { padding-top: 4px; border-top: 1px solid #eee8dc; }
-        .family-analytics-columns h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
+        .family-goals-section { max-width: 680px; margin-top: 18px; }
+        .family-analytics-columns h3, .family-goals-section h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
         .family-analytics-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eee8dc; color: #596572; font-size: 13px; }
         .family-analytics-row strong { color: #173a54; white-space: nowrap; text-align: right; }
         .family-analytics-row small { display: block; color: #7a8590; margin-top: 2px; }
@@ -639,6 +693,9 @@ export default function Family() {
           .family-analytics-stats, .family-analytics-stats-four, .family-month-summary, .family-analytics-columns { grid-template-columns: 1fr; }
           .family-analytics-heading { align-items: stretch; flex-direction: column; }
           .family-analytics-heading input { width: 100%; }
+          .family-report-controls { justify-content: stretch; align-items: stretch; }
+          .family-report-actions { display: grid; grid-template-columns: 1fr 1fr; }
+          .family-report-actions button { width: 100%; }
           .family-forecast-heading { flex-direction: column; }
           .family-forecast-stats { grid-template-columns: 1fr; }
           .family-recurring-item { grid-template-columns: 1fr; gap: 9px; }

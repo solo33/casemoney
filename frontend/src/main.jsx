@@ -66,8 +66,38 @@ window.addEventListener('appinstalled', () => {
 })
 
 window.__casemoneyCheckForUpdates = async () => {
-  const registrations = await navigator.serviceWorker?.getRegistrations?.() || []
+  if (!('serviceWorker' in navigator)) {
+    return { supported: false, updateAvailable: false }
+  }
+
+  const registrations = await navigator.serviceWorker.getRegistrations()
   await Promise.all(registrations.map(registration => registration.update()))
+  const waiting = registrations.find(registration => registration.waiting)
+  if (waiting && typeof window.__casemoneyPwaUpdate !== 'function') {
+    window.__casemoneyPwaUpdate = () => waiting.waiting?.postMessage({ type: 'SKIP_WAITING' })
+    window.dispatchEvent(new CustomEvent('casemoney:pwa-update-available', {
+      detail: { update: window.__casemoneyPwaUpdate },
+    }))
+  }
+  return {
+    supported: true,
+    updateAvailable: typeof window.__casemoneyPwaUpdate === 'function',
+  }
+}
+
+// A recovery path for browsers that keep an old service worker alive.  This
+// clears only Cache Storage and the worker; IndexedDB, including unsent offline
+// operations, remains intact and the next page load registers the new worker.
+window.__casemoneyRefreshPwaCache = async () => {
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    await Promise.all(registrations.map(registration => registration.unregister()))
+  }
+  if ('caches' in window) {
+    const cacheNames = await caches.keys()
+    await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)))
+  }
+  window.location.reload()
 }
 
 createRoot(document.getElementById('root')).render(
