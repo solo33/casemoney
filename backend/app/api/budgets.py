@@ -2,10 +2,10 @@ from calendar import monthrange
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import current_user_id, require_family_user_id
 from app.api.family import active_membership
 from app.database import get_db
 from app.models.budget import Budget
@@ -13,27 +13,12 @@ from app.models.category import Category
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.budget import BudgetCreate, BudgetResponse, BudgetSuggestion, BudgetUpdate
 from app.services import accounts as accounts_svc
-from app.services.auth import decode_token
 from app.services.exchange import convert_for_user, convert_transaction_for_user
-from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/budgets", tags=["budgets"])
-security = HTTPBearer()
 PERIODS = {"month", "quarter", "year"}
 ROLLOVER_MODES = {"none", "carry_remaining", "carry_balance"}
 SCOPES = {"personal", "family", "mixed"}
-
-
-def current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(payload["sub"])
-
-
-def require_family(db: Session = Depends(get_db), user_id: int = Depends(current_user_id)) -> int:
-    ensure_family_plan(db, user_id)
-    return user_id
 
 
 def _period_start(anchor: date, period: str) -> date:
@@ -266,7 +251,7 @@ def list_budgets(
     period: str = Query("month"),
     anchor: date | None = Query(None),
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     if period not in PERIODS:
         raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
@@ -285,7 +270,7 @@ def budget_suggestions(
     period: str = Query("month"),
     anchor: date | None = Query(None),
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     if period not in PERIODS:
         raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
@@ -329,7 +314,7 @@ def budget_suggestions(
 
 
 @router.post("/", response_model=BudgetResponse, status_code=201)
-def create_budget(data: BudgetCreate, db: Session = Depends(get_db), user_id: int = Depends(require_family)):
+def create_budget(data: BudgetCreate, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     category = _own_category(db, user_id, data.category_id)
     start = _period_start(data.period_start or date.today(), data.period)
     existing = db.query(Budget).filter(
@@ -357,7 +342,7 @@ def create_budget(data: BudgetCreate, db: Session = Depends(get_db), user_id: in
 
 
 @router.patch("/{budget_id}", response_model=BudgetResponse)
-def update_budget(budget_id: int, data: BudgetUpdate, db: Session = Depends(get_db), user_id: int = Depends(require_family)):
+def update_budget(budget_id: int, data: BudgetUpdate, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     budget = db.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
     if not budget:
         raise HTTPException(status_code=404, detail="Бюджет не найден")
@@ -373,7 +358,7 @@ def update_budget(budget_id: int, data: BudgetUpdate, db: Session = Depends(get_
 
 
 @router.delete("/{budget_id}", status_code=204)
-def delete_budget(budget_id: int, db: Session = Depends(get_db), user_id: int = Depends(require_family)):
+def delete_budget(budget_id: int, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     budget = db.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
     if not budget:
         raise HTTPException(status_code=404, detail="Бюджет не найден")

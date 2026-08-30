@@ -4,9 +4,9 @@ from datetime import date, datetime, time, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import require_family_user_id
 from app.api.transactions import _apply_tx_effect, _write_history
 from app.database import get_db
 from app.models.account import Account
@@ -24,30 +24,10 @@ from app.schemas.credit import (
     MortgageScheduleItem,
     MortgageScheduleResponse,
 )
-from app.services.auth import decode_token
-from app.services.plans import ensure_family_plan
 from app.services.credit_reminders import process_credit_reminders
 
 
 router = APIRouter(prefix="/api/credits", tags=["credits"])
-security = HTTPBearer()
-
-
-def current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(payload["sub"])
-
-
-def require_family(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(current_user_id),
-) -> int:
-    ensure_family_plan(db, user_id)
-    return user_id
-
-
 def _own_account(db: Session, user_id: int, account_id: Optional[int]) -> Optional[Account]:
     if account_id is None:
         return None
@@ -313,7 +293,7 @@ def _serialize(db: Session, credit: CreditObligation, with_payments: bool = True
 @router.get("/", response_model=list[CreditResponse])
 def list_credits(
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     credits = (
         db.query(CreditObligation)
@@ -328,7 +308,7 @@ def list_credits(
 @router.get("/summary", response_model=CreditSummary)
 def credit_summary(
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     credits = db.query(CreditObligation).filter(
         CreditObligation.user_id == user_id,
@@ -347,7 +327,7 @@ def credit_summary(
 def create_credit(
     data: CreditCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     _own_account(db, user_id, data.source_account_id)
     _own_account(db, user_id, data.linked_account_id)
@@ -416,7 +396,7 @@ def update_credit(
     credit_id: int,
     data: CreditUpdate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     credit = db.query(CreditObligation).filter(
         CreditObligation.id == credit_id,
@@ -447,7 +427,7 @@ def update_credit(
 def delete_credit(
     credit_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     """Delete an obligation together with the ledger entries created for it.
 
@@ -491,7 +471,7 @@ def delete_credit(
 def mortgage_schedule(
     credit_id: int,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     credit = db.query(CreditObligation).filter(
         CreditObligation.id == credit_id,
@@ -513,7 +493,7 @@ def mortgage_payment_preview(
     credit_id: int,
     amount: float,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     """Server-side source of truth for the mortgage payment split."""
     if amount <= 0:
@@ -540,7 +520,7 @@ def register_payment(
     credit_id: int,
     data: CreditPaymentCreate,
     db: Session = Depends(get_db),
-    user_id: int = Depends(require_family),
+    user_id: int = Depends(require_family_user_id),
 ):
     credit = db.query(CreditObligation).filter(
         CreditObligation.id == credit_id,

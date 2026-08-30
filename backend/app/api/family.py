@@ -4,11 +4,11 @@ import html
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import current_user_id, require_family_user_id
 from app.database import get_db
 from app.models.account import Account
 from app.models.budget import Budget
@@ -19,10 +19,8 @@ from app.models.goal import Goal, GoalContribution
 from app.models.recurring_transaction import RecurringTransaction
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
-from app.services.auth import decode_token
 from app.services.email import app_url, send_email
 from app.services.notifications import notify_family_members, notify_user
-from app.services.plans import ensure_family_plan
 from app.services import accounts as accounts_svc
 from app.services import app_config as app_config_svc
 from app.services import exchange as exchange_svc
@@ -33,29 +31,10 @@ from app.services.family_report import (
     report_period_label,
 )
 
-security = HTTPBearer()
-
-
-def current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(payload["sub"])
-
-
-def require_family_plan(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(current_user_id),
-) -> None:
-    ensure_family_plan(db, user_id)
-
-
 router = APIRouter(
     prefix="/api/family",
     tags=["family"],
-    dependencies=[Depends(require_family_plan)],
+    dependencies=[Depends(require_family_user_id)],
 )
 
 # После включения оплаты Family оплачивается для трёх адресов вместе с владельцем.

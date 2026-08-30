@@ -1,27 +1,17 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import require_family_user_id
 from app.database import get_db
 from app.models.account import Account
 from app.models.category import Category
 from app.models.transaction import TransactionType
 from app.models.transaction_template import TransactionTemplate
 from app.schemas.transaction_template import TransactionTemplateCreate, TransactionTemplateResponse
-from app.services.auth import decode_token
-from app.services.plans import ensure_family_plan
 
 router = APIRouter(prefix="/api/transaction-templates", tags=["transaction templates"])
-security = HTTPBearer()
-
-
-def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(payload["sub"])
 
 
 def _validate_references(db: Session, user_id: int, data: TransactionTemplateCreate) -> TransactionType:
@@ -37,14 +27,12 @@ def _validate_references(db: Session, user_id: int, data: TransactionTemplateCre
 
 
 @router.get("/", response_model=List[TransactionTemplateResponse])
-def list_templates(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    ensure_family_plan(db, user_id)
+def list_templates(db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     return db.query(TransactionTemplate).filter(TransactionTemplate.user_id == user_id).order_by(TransactionTemplate.name.asc()).all()
 
 
 @router.post("/", response_model=TransactionTemplateResponse, status_code=201)
-def create_template(data: TransactionTemplateCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    ensure_family_plan(db, user_id)
+def create_template(data: TransactionTemplateCreate, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     template = TransactionTemplate(
         user_id=user_id, name=data.name.strip(), type=_validate_references(db, user_id, data),
         amount=data.amount, currency=data.currency.upper(), account_id=data.account_id,
@@ -57,8 +45,7 @@ def create_template(data: TransactionTemplateCreate, db: Session = Depends(get_d
 
 
 @router.delete("/{template_id}", status_code=204)
-def delete_template(template_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    ensure_family_plan(db, user_id)
+def delete_template(template_id: int, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
     template = db.query(TransactionTemplate).filter(TransactionTemplate.id == template_id, TransactionTemplate.user_id == user_id).first()
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
