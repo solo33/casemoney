@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     family_access: bool = False
     show_shopping_button_mobile: bool = True
     default_quick_operation_type: Literal["expense", "income", "transfer"] = "expense"
+    show_transfer_suggestions: bool = False
     hide_zero_balance_currencies: bool = False
     hide_dashboard_balances: bool = False
     dashboard_widgets: dict[str, Any] = Field(default_factory=dict)
@@ -49,6 +50,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=1, max_length=64)
     show_shopping_button_mobile: Optional[bool] = None
     default_quick_operation_type: Optional[Literal["expense", "income", "transfer"]] = None
+    show_transfer_suggestions: Optional[bool] = None
     hide_zero_balance_currencies: Optional[bool] = None
     hide_dashboard_balances: Optional[bool] = None
     dashboard_widgets: Optional[dict[str, Any]] = None

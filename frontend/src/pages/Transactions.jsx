@@ -222,11 +222,16 @@ export default function Transactions() {
     api.get(`/api/tags/${filters.tag_id}/report`).then(response => setTagReport(response.data)).catch(() => setTagReport(null));
   }, [filters.tag_id]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+  const showTransferSuggestions = Boolean(user?.show_transfer_suggestions);
   const loadTransferSuggestions = useCallback(() => {
+    if (!showTransferSuggestions) {
+      setTransferSuggestions([]);
+      return;
+    }
     api.get("/api/transactions/transfer-suggestions")
       .then(response => setTransferSuggestions(response.data || []))
       .catch(() => setTransferSuggestions([]));
-  }, []);
+  }, [showTransferSuggestions]);
   useEffect(() => { loadTransferSuggestions(); }, [loadTransferSuggestions]);
   useEffect(() => { setSelectedIds([]); setBulkCategoryId(""); }, [filters, page]);
   useEffect(() => {
@@ -673,7 +678,7 @@ export default function Transactions() {
         </div>
       )}
 
-      {transferSuggestions.length > 0 && (
+      {showTransferSuggestions && transferSuggestions.length > 0 && (
         <section className="transfer-suggestions" aria-label="Возможные переводы между своими счетами">
           <div className="transfer-suggestions-title">
             <strong>Возможные переводы между своими счетами</strong>

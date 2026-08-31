@@ -24,6 +24,9 @@ class User(Base):
     # Тип операции, который открывается первым в быстрой форме на главной и в PWA.
     # Пользователь всегда может переключиться прямо в форме.
     default_quick_operation_type = Column(String(16), nullable=False, default="expense")
+    # Подсказки сопоставления списаний и поступлений могут быть полезны не всем.
+    # По умолчанию не показываем и даже не загружаем их, пока пользователь не включит настройку.
+    show_transfer_suggestions = Column(Boolean, nullable=False, default=False)
     hide_zero_balance_currencies = Column(Boolean, nullable=False, default=False)
     # Не скрывает данные и не меняет расчёты — только маскирует суммы на главной
     # странице, когда пользователь открывает сервис в общественном месте.

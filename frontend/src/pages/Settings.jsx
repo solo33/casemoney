@@ -221,6 +221,17 @@ export default function Settings() {
           <label className="settings-checkbox-row">
             <input
               type="checkbox"
+              checked={Boolean(user.show_transfer_suggestions)}
+              onChange={event => saveDisplayPreferences({ show_transfer_suggestions: event.target.checked })}
+            />
+            <span>
+              <b>Показывать подсказки переводов</b>
+              <small>Предлагает связать похожие списания и поступления между вашими счетами. Ничего не меняется без подтверждения.</small>
+            </span>
+          </label>
+          <label className="settings-checkbox-row">
+            <input
+              type="checkbox"
               checked={Boolean(user.hide_zero_balance_currencies)}
               onChange={event => saveDisplayPreferences({ hide_zero_balance_currencies: event.target.checked })}
             />

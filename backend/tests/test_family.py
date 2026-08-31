@@ -609,6 +609,22 @@ def test_me_update_sanitizes_notification_preferences(client):
     assert saved["credit_due"] == {"in_app": True, "email": True, "push": True}
 
 
+def test_me_transfer_suggestions_are_opt_in(client):
+    auth = register_and_login(client, "transfer-suggestions@test.com")
+
+    initial = client.get("/api/me/", headers=auth)
+    assert initial.status_code == 200, initial.text
+    assert initial.json()["show_transfer_suggestions"] is False
+
+    updated = client.put(
+        "/api/me/",
+        headers=auth,
+        json={"show_transfer_suggestions": True},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["show_transfer_suggestions"] is True
+
+
 def test_family_action_notifications_honor_each_member_preferences(client, monkeypatch):
     # Channel delivery is covered by the notification service itself.  Keep this
     # API scenario local and deterministic instead of opening an SMTP session.
