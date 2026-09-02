@@ -743,6 +743,7 @@ export default function Transactions() {
                   ? <EditRow
                       key={tx.id} tx={tx}
                       accounts={accounts} accountGroups={accountGroups} categories={categories} tags={tags}
+                      canUseFamily={Boolean(user?.family_access)}
                       onCategoryCreated={category => setCategories(current => [...current, category])}
                       onTagCreated={tag => setTags(current => [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "ru")))}
                       onCancel={() => setEditing(null)}
@@ -752,6 +753,7 @@ export default function Transactions() {
                       key={tx.id} tx={tx}
                       accountName={accountName} categoryName={categoryNameFor}
                       formatDate={formatDate}
+                      canUseFamily={Boolean(user?.family_access)}
                       onEdit={() => setEditing(tx.id)}
                       onDelete={() => handleDelete(tx.id)}
                       checked={selectedIds.includes(tx.id)}
@@ -780,6 +782,7 @@ export default function Transactions() {
               {editing === tx.id && (
                 <table className="transactions-mobile-edit"><tbody><EditRow
                   tx={tx} accounts={accounts} accountGroups={accountGroups} categories={categories} tags={tags}
+                  canUseFamily={Boolean(user?.family_access)}
                   onCategoryCreated={category => setCategories(current => [...current, category])}
                   onTagCreated={tag => setTags(current => [...current, tag].sort((a, b) => a.name.localeCompare(b.name, "ru")))}
                   onCancel={() => setEditing(null)}
@@ -815,13 +818,14 @@ function Th({ children, align = "left" }) {
 
 function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete, checked, onToggle }) {
   return (
-    <tr style={{ borderTop: "1px solid #ece6d8" }}>
+    <tr style={{ borderTop: "1px solid #ece6d8", background: tx.is_family_expense ? "#fff8e6" : undefined }}>
       <td style={{ padding: "8px 4px 8px 10px" }}><input type="checkbox" checked={checked} onChange={onToggle} aria-label={`Выбрать запись ${tx.id}`} /></td>
       <td style={{ padding: "8px 12px", color: "#7a8590", fontSize: 13, whiteSpace: "nowrap" }}>
         {formatDate(tx.date)}
       </td>
       <td style={{ padding: "8px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>
         {TYPE_ICON[tx.type]} {TYPE_LABEL[tx.type]}
+        {tx.is_family_expense && <small style={{ marginLeft: 6, color: "#9a6d17", fontWeight: 700 }}>Семейная</small>}
       </td>
       <td style={{
         padding: "8px 12px", textAlign: "right",
@@ -859,12 +863,12 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
     : (tx.category_id ? categoryName(tx.category_id) : "Без категории");
   const title = tx.description || category || TYPE_LABEL[tx.type];
   return (
-    <article className="mobile-transaction-card">
+    <article className="mobile-transaction-card" style={tx.is_family_expense ? { background: "#fff8e6", borderColor: "#e7c76e" } : undefined}>
       <label className="mobile-transaction-select"><input type="checkbox" checked={checked} onChange={onToggle} aria-label={`Выбрать запись ${tx.id}`} /></label>
       <button type="button" className="mobile-transaction-main" onClick={onEdit} aria-label={`Изменить запись ${title}`}>
         <span className="mobile-transaction-icon" style={{ color: TYPE_COLOR[tx.type] }}>{TYPE_ICON[tx.type]}</span>
         <span className="mobile-transaction-copy">
-          <strong>{title}</strong>
+          <strong>{title}{tx.is_family_expense && <em style={{ marginLeft: 6, color: "#9a6d17", fontStyle: "normal", fontSize: 11 }}>Семейная</em>}</strong>
           <small>{formatDate(tx.date)} · {accountName(tx.account_id)} · {category}</small>
           {(tx.tags || []).length > 0 && <small className="transaction-tags-mobile">{(tx.tags || []).map(tag => `#${tag.name}`).join(" ")}</small>}
         </span>
@@ -877,7 +881,7 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
   );
 }
 
-function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCreated, onTagCreated, onCancel, onSaved }) {
+function EditRow({ tx, accounts, accountGroups, categories, tags, canUseFamily, onCategoryCreated, onTagCreated, onCancel, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
@@ -892,6 +896,8 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCrea
     fee_category_id: tx.fee_category_id ? String(tx.fee_category_id) : "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
+    is_family_expense: Boolean(tx.is_family_expense),
+    reimbursement_amount: tx.reimbursement_amount ? String(tx.reimbursement_amount) : "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -927,6 +933,10 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCrea
         to_currency: form.type === "transfer" ? form.to_currency : null,
         fee_amount: form.type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : null,
         fee_category_id: form.type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : null,
+        is_family_expense: form.type === "expense" && form.is_family_expense,
+        reimbursement_amount: form.type === "expense" && form.is_family_expense && form.reimbursement_amount !== ""
+          ? parseFloat(form.reimbursement_amount)
+          : null,
         tag_ids: form.type === "transfer" ? [] : form.tag_ids.map(Number),
         description: form.description || null,
         date: new Date(form.date).toISOString(),
@@ -1028,6 +1038,27 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, onCategoryCrea
             onChange={e => setForm({ ...form, description: e.target.value })}
             style={{ flex: 1, minWidth: 180 }}
           />
+          {canUseFamily && form.type === "expense" && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, color: "#795c19", fontSize: 13, whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={form.is_family_expense}
+                onChange={e => setForm({ ...form, is_family_expense: e.target.checked })}
+              />
+              Семейная покупка
+            </label>
+          )}
+          {canUseFamily && form.type === "expense" && form.is_family_expense && (
+            <AmountInput
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.reimbursement_amount}
+              onChange={e => setForm({ ...form, reimbursement_amount: e.target.value })}
+              placeholder="К возмещению"
+              inputStyle={{ width: 130, textAlign: "right" }}
+            />
+          )}
           <button onClick={save} disabled={saving}>{saving ? "..." : "OK"}</button>
           <button className="btn-ghost" onClick={onCancel}>Отмена</button>
         </div>

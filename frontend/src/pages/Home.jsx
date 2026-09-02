@@ -691,6 +691,8 @@ export default function Home() {
           accounts={flatAccounts}
           accountGroups={accountOptions}
           categories={categories}
+          canUseFamily={Boolean(user?.family_access)}
+          onCategoryCreated={category => setCategories(current => [...current, category])}
           onClose={() => setEditingTx(null)}
           onSaved={() => {
             setEditingTx(null);
@@ -973,6 +975,8 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
         display: "flex", alignItems: "center", gap: 12,
         padding: "10px 16px",
         borderTop: first ? "none" : "1px solid #ece6d8",
+        background: tx.is_family_expense ? "#fff8e6" : undefined,
+        boxShadow: tx.is_family_expense ? "inset 3px 0 #d6a83d" : undefined,
       }}
       className="tx-row"
     >
@@ -990,6 +994,7 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
       >
         <div style={{ fontWeight: 500, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {tx.description || tx.category_name || TYPE_LABEL[tx.type]}
+          {tx.is_family_expense && <span style={{ marginLeft: 6, color: "#9a6d17", fontSize: 11, fontWeight: 700 }}>Семейная</span>}
         </div>
         <div style={{ fontSize: 12, color: "#a6afb8" }}>
           {showDate ? `${dateStr} · ` : ""}{tx.account_name}
@@ -1037,7 +1042,7 @@ const TYPE_TABS = [
   { value: "income", label: "↗ Доход", color: "#167a4a" },
 ];
 
-function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved }) {
+function TxEditModal({ tx, accounts, accountGroups, categories, canUseFamily, onCategoryCreated, onClose, onSaved }) {
   const [form, setForm] = useState({
     amount: String(tx.amount),
     type: tx.type,
@@ -1049,6 +1054,8 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
     to_currency: tx.to_currency || "",
     description: tx.description || "",
     date: new Date(tx.date).toISOString().slice(0, 10),
+    is_family_expense: Boolean(tx.is_family_expense),
+    reimbursement_amount: tx.reimbursement_amount ? String(tx.reimbursement_amount) : "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
@@ -1108,6 +1115,10 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
         to_account_id: form.type === "transfer" ? parseInt(form.to_account_id) : null,
         to_amount: form.type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : null,
         to_currency: form.type === "transfer" ? form.to_currency : null,
+        is_family_expense: form.type === "expense" && form.is_family_expense,
+        reimbursement_amount: form.type === "expense" && form.is_family_expense && form.reimbursement_amount !== ""
+          ? parseFloat(form.reimbursement_amount)
+          : null,
         description: form.description || null,
         date: new Date(form.date).toISOString(),
       });
@@ -1194,6 +1205,7 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
             categories={cats}
             value={form.category_id}
             onChange={category_id => setForm({ ...form, category_id })}
+            onCategoryCreated={onCategoryCreated}
             placeholder="— Без категории —"
           />
         )}
@@ -1204,6 +1216,28 @@ function TxEditModal({ tx, accounts, accountGroups, categories, onClose, onSaved
           placeholder="Примечание" value={form.description}
           onChange={e => setForm({ ...form, description: e.target.value })}
         />
+
+        {canUseFamily && form.type === "expense" && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid #ead8a8", borderRadius: 8, background: "#fff8e6", color: "#795c19", fontSize: 14 }}>
+            <input
+              type="checkbox"
+              checked={form.is_family_expense}
+              onChange={e => setForm({ ...form, is_family_expense: e.target.checked })}
+            />
+            Семейная покупка
+          </label>
+        )}
+        {canUseFamily && form.type === "expense" && form.is_family_expense && (
+          <AmountInput
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.reimbursement_amount}
+            onChange={e => setForm({ ...form, reimbursement_amount: e.target.value })}
+            placeholder="Сумма к возмещению"
+            inputStyle={{ width: "100%", textAlign: "right" }}
+          />
+        )}
 
         {err && <div style={{ color: "#c0432b", fontSize: 13 }}>{err}</div>}
 
