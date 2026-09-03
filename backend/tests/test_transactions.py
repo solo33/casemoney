@@ -161,6 +161,7 @@ def test_edit_amount_recomputes_balance(client, auth):
     assert account_balance(client, auth, acc["id"]) == 900
     r = client.patch(f"/api/transactions/{tx['id']}", headers=auth, json={"amount": 400})
     assert r.status_code == 200
+    assert r.json()["amount"] == 400
     assert account_balance(client, auth, acc["id"]) == 600
 
 

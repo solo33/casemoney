@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 
 from tests.conftest import TestingSessionLocal, enable_billing, make_account, register_and_login
-from app.models.family import Family
+from app.models.family import Family, FamilyExpenseAccounting
 from app.models.goal import Goal, GoalContribution
 from app.models.transaction import Transaction
 from app.models.user import User
@@ -439,6 +439,40 @@ def test_family_analytics_includes_comparison_settlements_and_large_expenses(cli
     assert body["settlements_total"] == 300
     assert body["settlements"][0]["to_name"]
     assert body["notable_expenses"][0]["description"] == "Большая покупка"
+
+
+def test_family_analytics_recovers_legacy_owner_purchase(client):
+    owner = register_and_login(client, "legacy-analytics-owner@test.com")
+    enable_family_plan("legacy-analytics-owner@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "История"})
+    account = make_account(client, owner, balance=10_000)
+    category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    created = client.post("/api/transactions/", headers=owner, json={
+        "amount": 2_500, "type": "expense", "currency": "RUB",
+        "account_id": account["id"], "category_id": category_id,
+        "date": "2026-08-18T12:00:00Z", "is_family_expense": True,
+    })
+    assert created.status_code == 201, created.text
+
+    # Imitate a shared transaction written before family_id/accounting rows
+    # became mandatory for the Family analytics workflow.
+    db = TestingSessionLocal()
+    try:
+        transaction = db.query(Transaction).filter(Transaction.id == created.json()["id"]).one()
+        transaction.family_id = None
+        db.query(FamilyExpenseAccounting).filter(
+            FamilyExpenseAccounting.source_transaction_id == transaction.id
+        ).delete()
+        db.commit()
+    finally:
+        db.close()
+
+    analytics = client.get("/api/family/analytics?year=2026&month=8", headers=owner)
+    assert analytics.status_code == 200, analytics.text
+    assert analytics.json()["expense_total"] == 2500
 
 
 def test_family_analytics_exposes_current_month_forecast(client):

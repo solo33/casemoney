@@ -197,10 +197,10 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-.amount-input-with-calculator { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.amount-input-with-calculator { position: relative; display: flex; align-items: stretch; gap: 6px; min-width: 0; }
 .amount-input-with-calculator:focus-within { z-index: 170; }
-.amount-input-with-calculator > input { flex: 1; min-width: 0; padding-right: 38px !important; }
-.amount-calculator-trigger { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #596978; font-size: 17px; }
+.amount-input-with-calculator > input { flex: 1 1 auto; min-width: 0; }
+.amount-calculator-trigger { position: static; flex: 0 0 38px; width: 38px; min-width: 38px; height: auto; min-height: 38px; padding: 0; border: 1px solid #d8cfbd; border-radius: 7px; background: #fffdf7; color: #596978; font-size: 17px; }
 .amount-calculator-trigger:hover { background: #eee8dc; }
 .amount-calculator { position: absolute; z-index: 160; top: calc(100% + 6px); right: 0; width: 238px; padding: 10px; border: 1px solid #d8cfbd; border-radius: 10px; background: #fffdf7; box-shadow: 0 12px 32px rgba(23, 58, 84, .2); }
 .amount-calculator-display { width: 100%; margin-bottom: 7px; text-align: right; font: 600 18px var(--font-mono); }
@@ -1161,8 +1161,12 @@ hr {
   }
   .category-picker-sheet {
     width: 100%;
-    max-height: min(78svh, 680px);
+    height: min(78svh, 680px);
+    max-height: 78svh;
     padding: 8px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     background: #fffdf7;
     border-radius: 18px 18px 0 0;
@@ -1184,7 +1188,8 @@ hr {
   }
   .category-picker-heading strong { font-size: 17px; }
   .category-picker-list {
-    max-height: calc(min(78svh, 680px) - 70px);
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 6px 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1266,6 +1271,7 @@ hr {
     text-align: center;
   }
   .category-picker-create {
+    flex: 0 0 auto;
     padding: 10px 0 2px;
     border-top: 1px solid var(--line);
   }

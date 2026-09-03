@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user_id, require_family_user_id
@@ -161,15 +161,28 @@ def _ensure_family_accounting_rows(db: Session, family_id: int) -> bool:
             FamilyExpenseAccounting.family_id == family_id
         ).all()
     }
+    member_user_ids = [item[0] for item in db.query(FamilyMember.user_id).filter(
+        FamilyMember.family_id == family_id,
+        FamilyMember.status == "active",
+        FamilyMember.user_id.isnot(None),
+    ).all()]
     rows = db.query(Transaction).filter(
-        Transaction.family_id == family_id,
         Transaction.is_family_expense.is_(True),
         Transaction.type == TransactionType.expense,
         Transaction.is_planned.is_(False),
+        or_(
+            Transaction.family_id == family_id,
+            # Before the accounting queue existed some valid shared purchases
+            # were only marked by the flag.  Attach those legacy rows to the
+            # member's active family once, so they do not vanish from reports.
+            Transaction.family_id.is_(None) & Transaction.user_id.in_(member_user_ids),
+        ),
     ).all()
     for tx in rows:
         if tx.id in existing_ids:
             continue
+        if tx.family_id is None:
+            tx.family_id = family_id
         is_owner_purchase = tx.user_id == family.owner_user_id
         db.add(FamilyExpenseAccounting(
             family_id=family_id,

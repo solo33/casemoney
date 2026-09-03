@@ -1172,7 +1172,7 @@ function TxEditModal({ tx, accounts, accountGroups, categories, canUseFamily, on
           <AmountInput
             type="number" step="0.01" min="0.01" value={form.amount}
             onChange={e => setForm({ ...form, amount: e.target.value })}
-            required inputStyle={{ width: "100%", textAlign: "right", fontWeight: 600, fontSize: 16 }}
+            required containerStyle={{ flex: 1, minWidth: 0 }} inputStyle={{ width: "100%", textAlign: "right", fontWeight: 600, fontSize: 16 }}
           />
           <CurrencyField currencies={accCurrencies.length ? accCurrencies : [form.currency]} value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} />
         </div>

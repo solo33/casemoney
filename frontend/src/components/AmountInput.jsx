@@ -48,7 +48,7 @@ function calculate(expression) {
 
 const keys = ["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "(", ")", "C", "⌫", "+", "="];
 
-export default function AmountInput({ value, onChange, inputStyle, calculatorLabel = "Открыть калькулятор", ...inputProps }) {
+export default function AmountInput({ value, onChange, inputStyle, containerStyle, calculatorLabel = "Открыть калькулятор", ...inputProps }) {
   const [open, setOpen] = useState(false);
   const [expression, setExpression] = useState("");
   const [error, setError] = useState("");
@@ -87,7 +87,7 @@ export default function AmountInput({ value, onChange, inputStyle, calculatorLab
   };
 
   return (
-    <div className="amount-input-with-calculator" ref={rootRef}>
+    <div className="amount-input-with-calculator" ref={rootRef} style={containerStyle}>
       <input {...inputProps} value={value} onChange={onChange} style={inputStyle} />
       <button type="button" className="amount-calculator-trigger" onClick={openCalculator} aria-label={calculatorLabel} title="Калькулятор">🧮</button>
       {open && (
