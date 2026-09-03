@@ -12,12 +12,17 @@ export default function Family() {
   const [recurringSuggestions, setRecurringSuggestions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [familyAccounts, setFamilyAccounts] = useState({ accounts: [], members: [] });
+  const [pendingExpenses, setPendingExpenses] = useState({ items: [], categories: [] });
+  const [pendingCategoryDrafts, setPendingCategoryDrafts] = useState({});
+  const [recipientAccounts, setRecipientAccounts] = useState([]);
   const [shareDraft, setShareDraft] = useState({ account_id: "", members: {} });
   const [analyticsPeriod, setAnalyticsPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
   const [familyName, setFamilyName] = useState("Наша семья");
   const [inviteEmail, setInviteEmail] = useState("");
   const [settlement, setSettlement] = useState({
     to_user_id: "",
+    from_account_id: "",
+    to_account_id: "",
     amount: "",
     currency: "RUB",
     description: "",
@@ -34,24 +39,34 @@ export default function Family() {
       const familyResponse = await api.get("/api/family/");
       setState(familyResponse.data);
       if (familyResponse.data.family) {
-        const [reportResponse, analyticsResponse, suggestionsResponse, accountsResponse, familyAccountsResponse] = await Promise.all([
+        const isOwner = familyResponse.data.family.current_user_role === "owner";
+        const [reportResponse, analyticsResponse, suggestionsResponse, accountsResponse, familyAccountsResponse, pendingResponse] = await Promise.all([
           api.get("/api/family/report"),
           api.get("/api/family/analytics", { params: analyticsPeriod }),
           api.get("/api/family/recurring-suggestions"),
           api.get("/api/accounts/"),
           api.get("/api/family/accounts"),
+          isOwner ? api.get("/api/family/expense-accounting/pending") : Promise.resolve({ data: { items: [], categories: [] } }),
         ]);
         setReport(reportResponse.data);
         setAnalytics(analyticsResponse.data);
         setRecurringSuggestions(suggestionsResponse.data.items || []);
         setAccounts(accountsResponse.data || []);
         setFamilyAccounts(familyAccountsResponse.data || { accounts: [], members: [] });
+        const pendingData = pendingResponse.data || { items: [], categories: [] };
+        setPendingExpenses(pendingData);
+        setPendingCategoryDrafts(Object.fromEntries(
+          (pendingData.items || []).map(item => [item.id, String(item.suggested_owner_category_id || "")])
+        ));
       } else {
         setReport(null);
         setAnalytics(null);
         setRecurringSuggestions([]);
         setAccounts([]);
         setFamilyAccounts({ accounts: [], members: [] });
+        setPendingExpenses({ items: [], categories: [] });
+        setPendingCategoryDrafts({});
+        setRecipientAccounts([]);
       }
     } catch (err) {
       setError(err.response?.data?.detail || "Не удалось загрузить семейные финансы");
@@ -126,6 +141,19 @@ export default function Family() {
     report?.outstanding?.forEach(item => values.add(item.currency));
     return [...values];
   }, [report]);
+
+  const selectSettlementRecipient = async (memberUserId) => {
+    setSettlement(current => ({ ...current, to_user_id: memberUserId, to_account_id: "" }));
+    setRecipientAccounts([]);
+    const member = activeMembers.find(item => String(item.user_id) === String(memberUserId));
+    if (!member) return;
+    try {
+      const response = await api.get(`/api/family/members/${member.id}/settlement-accounts`);
+      setRecipientAccounts(response.data.accounts || []);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Не удалось загрузить счета получателя");
+    }
+  };
 
   const changeLabel = (change) => {
     if (!change) return "—";
@@ -374,7 +402,7 @@ export default function Family() {
           </section>
 
           <div className="family-columns">
-            <section className="family-card">
+            {state.family.current_user_role === "owner" && <section className="family-card">
               <h2>Участники</h2>
               <div className="family-members">
                 {state.family.members.map(member => {
@@ -446,7 +474,7 @@ export default function Family() {
                   <button type="submit">Пригласить</button>
                 </form>
               )}
-            </section>
+            </section>}
 
             <section className="family-card family-shared-accounts">
               <h2>Общие счета</h2>
@@ -505,15 +533,50 @@ export default function Family() {
               ) : <p className="family-analytics-empty">Сначала создайте личный счёт в разделе «Счета».</p>}
             </section>
 
-            <section className="family-card">
+            {state.family.current_user_role === "owner" && <section className="family-card">
+              <h2>Ожидают учёта у вас</h2>
+              <p>Подтвердите покупку и выберите свою категорию. Сопоставление запомнится для следующих покупок.</p>
+              <div className="family-pending-expenses">
+                {pendingExpenses.items.map(item => (
+                  <article key={item.id}>
+                    <div>
+                      <strong>{item.description || "Общая покупка"}</strong>
+                      <span>{item.source_name} · {item.source_category_name} · {new Date(item.date).toLocaleDateString("ru-RU")}</span>
+                    </div>
+                    <strong>{formatMoney(item.amount)} {item.currency}</strong>
+                    <select
+                      value={pendingCategoryDrafts[item.id] || ""}
+                      onChange={event => setPendingCategoryDrafts(current => ({ ...current, [item.id]: event.target.value }))}
+                      aria-label="Ваша категория"
+                    >
+                      <option value="">Выберите категорию</option>
+                      {pendingExpenses.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                    </select>
+                    <button type="button" onClick={() => {
+                      const categoryId = Number(pendingCategoryDrafts[item.id]);
+                      if (!categoryId) { setError("Выберите категорию для учёта покупки"); return; }
+                      submit(async () => {
+                        await api.post(`/api/family/expense-accounting/${item.id}/accept`, { owner_category_id: categoryId });
+                        setMessage("Покупка учтена в семейной аналитике");
+                      });
+                    }}>Учесть у меня</button>
+                  </article>
+                ))}
+                {!pendingExpenses.items.length && <p className="family-analytics-empty">Все общие покупки уже учтены.</p>}
+              </div>
+            </section>}
+
+            {state.family.current_user_role === "owner" && <section className="family-card">
               <h2>Зафиксировать возмещение</h2>
-              <p>Запись уменьшит долг, но не повлияет повторно на семейные расходы.</p>
+              <p>Это перевод между реальными счетами: расход в категориях повторно не появится.</p>
               <form onSubmit={event => {
                 event.preventDefault();
                 submit(async () => {
                   await api.post("/api/family/settlements", {
                     ...settlement,
                     to_user_id: Number(settlement.to_user_id),
+                    from_account_id: Number(settlement.from_account_id),
+                    to_account_id: Number(settlement.to_account_id),
                     amount: Number(settlement.amount),
                   });
                   setSettlement(current => ({ ...current, amount: "", description: "" }));
@@ -522,7 +585,7 @@ export default function Family() {
               }}>
                 <select
                   value={settlement.to_user_id}
-                  onChange={event => setSettlement({ ...settlement, to_user_id: event.target.value })}
+                  onChange={event => selectSettlementRecipient(event.target.value)}
                   required
                 >
                   <option value="">Кому возместили</option>
@@ -531,6 +594,14 @@ export default function Family() {
                     .map(member => (
                     <option key={member.id} value={member.user_id}>{member.name}</option>
                   ))}
+                </select>
+                <select value={settlement.from_account_id} onChange={event => setSettlement({ ...settlement, from_account_id: event.target.value })} required>
+                  <option value="">С какого моего счёта</option>
+                  {ownAccounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+                </select>
+                <select value={settlement.to_account_id} onChange={event => setSettlement({ ...settlement, to_account_id: event.target.value })} required>
+                  <option value="">На какой счёт получателя</option>
+                  {recipientAccounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
                 </select>
                 <div className="family-amount">
                   <input
@@ -558,7 +629,7 @@ export default function Family() {
                 />
                 <button type="submit">Учесть возмещение</button>
               </form>
-            </section>
+            </section>}
           </div>
 
           <section className="family-card">
@@ -682,6 +753,10 @@ export default function Family() {
         }
         .family-member-remove:hover { background: #fff0ec; border-color: #e2a99a; }
         .family-amount { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
+        .family-pending-expenses { display: grid; gap: 8px; margin-top: 14px; }
+        .family-pending-expenses article { display: grid; grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 220px) auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fff9e9; }
+        .family-pending-expenses article > div { display: grid; gap: 3px; min-width: 0; }
+        .family-pending-expenses span { color: #7a8590; font-size: 12px; }
         .family-shared-accounts { grid-column: 1 / -1; }
         .family-shared-accounts form { display: grid; gap: 9px; }
         .family-account-access { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px); gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid #eee8dc; }
@@ -707,6 +782,7 @@ export default function Family() {
           .family-member-actions { flex-wrap: wrap; justify-content: flex-end; }
           .family-account-access { grid-template-columns: auto minmax(0, 1fr); }
           .family-account-access select { grid-column: 2; }
+          .family-pending-expenses article { grid-template-columns: 1fr; align-items: stretch; }
         }
       `}</style>
     </main>

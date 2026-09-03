@@ -29,12 +29,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-casemoney}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-casemoney}
       PORT: "8080"
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-      RECEIPT_UPLOAD_DIR: /app/data/receipts
     depends_on:
       database:
         condition: service_healthy
-    volumes:
-      - ${PLATFORM_DATA_ROOT:-/srv/solo32/platform}/receipts:/app/data/receipts
     expose:
       - "8080"
     healthcheck:

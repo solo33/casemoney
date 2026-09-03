@@ -159,6 +159,7 @@ def get_dashboard(
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_family_expense.is_(False),
             Transaction.is_planned.is_(False),
             extract("month", Transaction.date) == current_month,
             extract("year", Transaction.date) == current_year,
@@ -192,7 +193,7 @@ def get_dashboard(
     # 5. Последние 10 транзакций
     recent_rows = (
         db.query(Transaction)
-        .filter(Transaction.user_id == user_id, Transaction.is_planned.is_(False))
+        .filter(Transaction.user_id == user_id, Transaction.is_family_expense.is_(False), Transaction.is_planned.is_(False))
         .order_by(Transaction.date.desc())
         .limit(10)
         .all()
@@ -223,7 +224,7 @@ def get_dashboard(
     # всплыть записи 2012 года). Свежие операции — выше.
     changed_rows = (
         db.query(Transaction)
-        .filter(Transaction.user_id == user_id, Transaction.is_planned.is_(False))
+        .filter(Transaction.user_id == user_id, Transaction.is_family_expense.is_(False), Transaction.is_planned.is_(False))
         .order_by(
             func.coalesce(Transaction.updated_at, Transaction.date).desc(),
             Transaction.date.desc(),

@@ -220,6 +220,7 @@ def get_summary(
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_family_expense.is_(False),
             func.date(Transaction.date) >= df,
             func.date(Transaction.date) <= dt,
         )
@@ -329,6 +330,7 @@ def get_annual(
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_family_expense.is_(False),
             func.date(Transaction.date) >= date(year, 1, 1),
             func.date(Transaction.date) <= date(year, 12, 31),
         )
@@ -623,6 +625,7 @@ def get_monthly_trend(
         db.query(Transaction)
         .filter(
             Transaction.user_id == user_id,
+            Transaction.is_family_expense.is_(False),
             func.date(Transaction.date) >= start_date,
         )
     )
@@ -721,6 +724,7 @@ def get_yoy(
 
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
+        Transaction.is_family_expense.is_(False),
         Transaction.type == tx_type,
         Transaction.is_financing.is_(False),
     )

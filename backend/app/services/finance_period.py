@@ -50,6 +50,10 @@ def financial_period_totals(
     """
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
+        # Общая покупка остаётся движением по личному счёту, но её анализ
+        # ведёт владелец семьи после явного принятия, а не личный отчёт того,
+        # кто оплатил покупку.
+        Transaction.is_family_expense.is_(False),
         _date_filter(Transaction.date, start, is_start=True),
         _date_filter(Transaction.date, end, is_start=False),
         Transaction.is_financing.is_(False),

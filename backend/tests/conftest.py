@@ -72,6 +72,16 @@ def _fresh_db(monkeypatch):
         "app.api.auth.send_registration_notification", lambda *args: True
     )
     monkeypatch.setattr("app.api.family.send_email", lambda *args: True)
+    monkeypatch.setattr("app.api.admin.send_email", lambda *args, **kwargs: True)
+    monkeypatch.setattr("app.api.admin.send_web_pushes", lambda *args, **kwargs: 0)
+    # Семейные действия создают in-app уведомления, а email-канал в тестах
+    # не должен обращаться к настоящему почтовому провайдеру.
+    monkeypatch.setattr(
+        "app.services.notifications.send_financial_notification", lambda *args, **kwargs: True
+    )
+    monkeypatch.setattr(
+        "app.services.notifications.send_web_pushes", lambda *args, **kwargs: 0
+    )
     yield
     Base.metadata.drop_all(bind=test_engine)
     # сбрасываем кэш курсов между тестами

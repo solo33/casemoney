@@ -51,6 +51,7 @@ const Shopping = lazy(() => import('./pages/Shopping'))
 const Planning = lazy(() => import('./pages/Planning'))
 const Budget = lazy(() => import('./pages/Budget'))
 const Automation = lazy(() => import('./pages/Automation'))
+const BankDrafts = lazy(() => import('./pages/BankDrafts'))
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -328,6 +329,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <History />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/bank-drafts"
+          element={
+            <ProtectedRoute>
+              <BankDrafts />
             </ProtectedRoute>
           }
         />

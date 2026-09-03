@@ -39,6 +39,7 @@ const HELP_LINKS = [
 ];
 
 const MOBILE_MORE_LINKS = [
+  { to: "/bank-drafts", label: "Черновики из банка" },
   { to: "/shopping", label: "Списки покупок" },
   FAMILY_BUDGET_LINK,
   FAMILY_DEPOSITS_LINK,
@@ -56,6 +57,7 @@ const SETTINGS_LINKS = [
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/automation", label: "Автоматизация" },
+  { to: "/bank-drafts", label: "Черновики из банка" },
   { to: "/settings/family", label: "Семейные финансы" },
   { to: "/shopping", label: "Списки покупок" },
   { to: "/about", label: "О программе" },

@@ -13,7 +13,14 @@ from app.database import get_db
 from app.models.account import Account
 from app.models.budget import Budget
 from app.models.category import Category
-from app.models.family import AccountFamilyAccess, Family, FamilyMember, FamilySettlement
+from app.models.family import (
+    AccountFamilyAccess,
+    Family,
+    FamilyCategoryMapping,
+    FamilyExpenseAccounting,
+    FamilyMember,
+    FamilySettlement,
+)
 from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision
 from app.models.goal import Goal, GoalContribution
 from app.models.recurring_transaction import RecurringTransaction
@@ -80,10 +87,16 @@ class AccountAccessUpdate(BaseModel):
 
 class SettlementCreate(BaseModel):
     to_user_id: int
+    from_account_id: int
+    to_account_id: int
     amount: float = Field(gt=0)
     currency: str = Field(min_length=2, max_length=10)
     date: Optional[datetime] = None
     description: Optional[str] = Field(None, max_length=500)
+
+
+class FamilyExpenseAccept(BaseModel):
+    owner_category_id: int
 
 
 class FamilyAnalyticsExportRequest(BaseModel):
@@ -134,6 +147,52 @@ def _require_family_owner(db: Session, user_id: int) -> FamilyMember:
     if membership.role != "owner":
         raise HTTPException(status_code=403, detail="Это действие доступно владельцу семейного пространства")
     return membership
+
+
+def _ensure_family_accounting_rows(db: Session, family_id: int) -> bool:
+    """Backfill queue rows for common purchases created before this feature."""
+    family = db.query(Family).filter(Family.id == family_id).first()
+    if not family:
+        return False
+    created = False
+    existing_ids = {
+        item[0]
+        for item in db.query(FamilyExpenseAccounting.source_transaction_id).filter(
+            FamilyExpenseAccounting.family_id == family_id
+        ).all()
+    }
+    rows = db.query(Transaction).filter(
+        Transaction.family_id == family_id,
+        Transaction.is_family_expense.is_(True),
+        Transaction.type == TransactionType.expense,
+        Transaction.is_planned.is_(False),
+    ).all()
+    for tx in rows:
+        if tx.id in existing_ids:
+            continue
+        is_owner_purchase = tx.user_id == family.owner_user_id
+        db.add(FamilyExpenseAccounting(
+            family_id=family_id,
+            source_transaction_id=tx.id,
+            source_user_id=tx.user_id,
+            owner_user_id=family.owner_user_id,
+            source_category_id=tx.category_id,
+            owner_category_id=tx.category_id if is_owner_purchase else None,
+            status="accepted" if is_owner_purchase else "pending",
+            accepted_at=datetime.now(timezone.utc) if is_owner_purchase else None,
+        ))
+        created = True
+    return created
+
+
+def _accounting_rows_query(db: Session, family_id: int):
+    # Legacy common purchases need a durable queue record, otherwise the item
+    # would disappear between the GET request and the owner's confirmation.
+    if _ensure_family_accounting_rows(db, family_id):
+        db.commit()
+    return db.query(FamilyExpenseAccounting).filter(
+        FamilyExpenseAccounting.family_id == family_id
+    )
 
 
 @router.get("/")
@@ -461,6 +520,151 @@ def accept_invitation(
     return family_payload(db, family, user_id)
 
 
+@router.get("/expense-accounting/pending")
+def pending_family_expense_accounting(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = _require_family_owner(db, user_id)
+    rows = _accounting_rows_query(db, membership.family_id).filter(
+        FamilyExpenseAccounting.owner_user_id == user_id,
+        FamilyExpenseAccounting.status == "pending",
+    ).order_by(FamilyExpenseAccounting.created_at.asc()).all()
+    tx_ids = [item.source_transaction_id for item in rows]
+    transactions = {
+        item.id: item for item in db.query(Transaction).filter(Transaction.id.in_(tx_ids)).all()
+    } if tx_ids else {}
+    user_ids = {item.source_user_id for item in rows}
+    users = {
+        item.id: item for item in db.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+    source_category_ids = {item.source_category_id for item in rows if item.source_category_id}
+    source_categories = dict(db.query(Category.id, Category.name).filter(Category.id.in_(source_category_ids)).all()) if source_category_ids else {}
+    owner_categories = db.query(Category).filter(
+        Category.user_id == user_id,
+        Category.type == "expense",
+    ).order_by(Category.sort_order, Category.name).all()
+    mappings = {
+        (item.source_user_id, item.source_category_id): item.owner_category_id
+        for item in db.query(FamilyCategoryMapping).filter(
+            FamilyCategoryMapping.family_id == membership.family_id,
+            FamilyCategoryMapping.owner_user_id == user_id,
+        ).all()
+    }
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "transaction_id": tx.id,
+                "amount": tx.amount,
+                "currency": tx.currency,
+                "description": tx.description,
+                "date": tx.date,
+                "source_user_id": item.source_user_id,
+                "source_name": _user_label(users.get(item.source_user_id), ""),
+                "source_category_id": item.source_category_id,
+                "source_category_name": source_categories.get(item.source_category_id, "Без категории"),
+                "suggested_owner_category_id": mappings.get((item.source_user_id, item.source_category_id)),
+                "reimbursement_amount": tx.reimbursement_amount,
+            }
+            for item in rows if (tx := transactions.get(item.source_transaction_id))
+        ],
+        "categories": [
+            {"id": category.id, "name": category.name, "parent_id": category.parent_id}
+            for category in owner_categories
+        ],
+    }
+
+
+@router.post("/expense-accounting/{accounting_id}/accept")
+def accept_family_expense_accounting(
+    accounting_id: int,
+    data: FamilyExpenseAccept,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = _require_family_owner(db, user_id)
+    item = db.query(FamilyExpenseAccounting).filter(
+        FamilyExpenseAccounting.id == accounting_id,
+        FamilyExpenseAccounting.family_id == membership.family_id,
+        FamilyExpenseAccounting.owner_user_id == user_id,
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Общая покупка не найдена")
+    if item.status == "accepted":
+        raise HTTPException(status_code=409, detail="Эта покупка уже учтена")
+    owner_category = db.query(Category).filter(
+        Category.id == data.owner_category_id,
+        Category.user_id == user_id,
+        Category.type == "expense",
+    ).first()
+    if not owner_category:
+        raise HTTPException(status_code=400, detail="Выберите свою расходную категорию")
+    item.owner_category_id = owner_category.id
+    item.status = "accepted"
+    item.accepted_at = datetime.now(timezone.utc)
+    if item.source_category_id:
+        mapping = db.query(FamilyCategoryMapping).filter(
+            FamilyCategoryMapping.family_id == membership.family_id,
+            FamilyCategoryMapping.source_user_id == item.source_user_id,
+            FamilyCategoryMapping.source_category_id == item.source_category_id,
+            FamilyCategoryMapping.owner_user_id == user_id,
+        ).first()
+        if mapping:
+            mapping.owner_category_id = owner_category.id
+        else:
+            db.add(FamilyCategoryMapping(
+                family_id=membership.family_id,
+                source_user_id=item.source_user_id,
+                source_category_id=item.source_category_id,
+                owner_user_id=user_id,
+                owner_category_id=owner_category.id,
+            ))
+    source_user = db.query(User).filter(User.id == item.source_user_id).first()
+    if source_user:
+        notify_user(
+            db,
+            source_user,
+            event="family_expense_accounted",
+            title="Общая покупка учтена",
+            message="Владелец семьи включил вашу общую покупку в семейный учёт.",
+            link="/settings/family",
+        )
+    db.commit()
+    return {"id": item.id, "status": item.status, "owner_category_id": item.owner_category_id}
+
+
+@router.get("/members/{member_id}/settlement-accounts")
+def member_settlement_accounts(
+    member_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    membership = _require_family_owner(db, user_id)
+    member = db.query(FamilyMember).filter(
+        FamilyMember.id == member_id,
+        FamilyMember.family_id == membership.family_id,
+        FamilyMember.status == "active",
+    ).first()
+    if not member or not member.user_id or member.user_id == user_id:
+        raise HTTPException(status_code=404, detail="Участник семьи не найден")
+    accounts = db.query(Account).filter(
+        Account.user_id == member.user_id,
+        Account.show_for_entries.is_(True),
+    ).order_by(Account.sort_order, Account.name).all()
+    return {
+        "member_id": member.id,
+        "accounts": [
+            {
+                "id": account.id,
+                "name": account.name,
+                "currencies": [balance.currency for balance in account.balances],
+            }
+            for account in accounts
+        ],
+    }
+
+
 @router.get("/report")
 def family_report(
     db: Session = Depends(get_db),
@@ -476,17 +680,24 @@ def family_report(
         user.id: user
         for user in db.query(User).filter(User.id.in_(member_ids)).all()
     }
+    accounting_rows = _accounting_rows_query(db, membership.family_id).filter(
+        FamilyExpenseAccounting.status == "accepted"
+    ).all()
+    accounting_by_tx_id = {item.source_transaction_id: item for item in accounting_rows}
+    source_ids = list(accounting_by_tx_id)
     expenses = db.query(Transaction).filter(
-        Transaction.family_id == membership.family_id,
-        Transaction.is_family_expense.is_(True),
-        Transaction.type == TransactionType.expense,
-    ).order_by(Transaction.date.desc(), Transaction.id.desc()).all()
+        Transaction.id.in_(source_ids)
+    ).order_by(Transaction.date.desc(), Transaction.id.desc()).all() if source_ids else []
     settlements = db.query(FamilySettlement).filter(
         FamilySettlement.family_id == membership.family_id
     ).order_by(FamilySettlement.date.desc(), FamilySettlement.id.desc()).all()
 
     account_ids = {item.account_id for item in expenses}
-    category_ids = {item.category_id for item in expenses if item.category_id}
+    category_ids = {
+        accounting_by_tx_id[item.id].owner_category_id or item.category_id
+        for item in expenses
+        if accounting_by_tx_id[item.id].owner_category_id or item.category_id
+    }
     account_names = dict(
         db.query(Account.id, Account.name).filter(Account.id.in_(account_ids)).all()
     ) if account_ids else {}
@@ -516,7 +727,9 @@ def family_report(
                 "paid_by_user_id": item.user_id,
                 "paid_by_name": _user_label(users.get(item.user_id), ""),
                 "account_name": account_names.get(item.account_id),
-                "category_name": category_names.get(item.category_id),
+                "category_name": category_names.get(
+                    accounting_by_tx_id[item.id].owner_category_id or item.category_id
+                ),
             }
             for item in expenses
         ],
@@ -593,22 +806,39 @@ def _family_analytics_data(
         for item in db.query(User).filter(User.id.in_([member.user_id for member in members])).all()
     }
 
-    transactions = db.query(Transaction).filter(
-        Transaction.family_id == membership.family_id,
-        Transaction.is_family_expense.is_(True),
+    accepted_rows = _accounting_rows_query(db, membership.family_id).filter(
+        FamilyExpenseAccounting.status == "accepted"
+    ).all()
+    accepted_by_tx_id = {item.source_transaction_id: item for item in accepted_rows}
+    accepted_ids = list(accepted_by_tx_id)
+    actual_transactions = db.query(Transaction).filter(
+        Transaction.id.in_(accepted_ids),
         Transaction.date >= start,
         Transaction.date < end,
-    ).all()
+    ).all() if accepted_ids else []
+    # A plan is explicitly shared, but it has no completed purchase yet and
+    # therefore no accounting-row confirmation.  Include it in forecasts
+    # directly; actual member purchases still require owner acceptance above.
+    planned_query = db.query(Transaction).filter(
+        Transaction.family_id == membership.family_id,
+        Transaction.is_family_expense.is_(True),
+        Transaction.is_planned.is_(True),
+        Transaction.date >= start,
+        Transaction.date < end,
+    )
+    if accepted_ids:
+        planned_query = planned_query.filter(Transaction.id.notin_(accepted_ids))
+    planned_transactions = planned_query.all()
+    transactions = actual_transactions + planned_transactions
     previous_end = start
     previous_start = datetime(
         year - (month == 1), 12 if month == 1 else month - 1, 1, tzinfo=timezone.utc,
     )
     previous_transactions = db.query(Transaction).filter(
-        Transaction.family_id == membership.family_id,
-        Transaction.is_family_expense.is_(True),
+        Transaction.id.in_(accepted_ids),
         Transaction.date >= previous_start,
         Transaction.date < previous_end,
-    ).all()
+    ).all() if accepted_ids else []
     category_names = dict(db.query(Category.id, Category.name).all())
 
     actual_expenses = 0.0
@@ -630,7 +860,9 @@ def _family_analytics_data(
         if item.is_planned:
             if item.type == TransactionType.expense:
                 planned_expenses += amount
-                name = category_names.get(item.category_id, "Без категории")
+                accounting = accepted_by_tx_id.get(item.id)
+                category_id = accounting.owner_category_id if accounting else item.category_id
+                name = category_names.get(category_id, "Без категории")
                 planned_per_category[name] = planned_per_category.get(name, 0.0) + amount
             elif item.type == TransactionType.income:
                 planned_income += amount
@@ -642,7 +874,9 @@ def _family_analytics_data(
             continue
         actual_expenses += amount
         per_member[item.user_id] = per_member.get(item.user_id, 0.0) + amount
-        name = category_names.get(item.category_id, "Без категории")
+        accounting = accepted_by_tx_id.get(item.id)
+        category_id = accounting.owner_category_id if accounting else item.category_id
+        name = category_names.get(category_id, "Без категории")
         per_category[name] = per_category.get(name, 0.0) + amount
         notable_expenses.append({
             "id": item.id,
@@ -1074,6 +1308,11 @@ def create_settlement(
     membership = require_membership(db, user_id)
     if membership.role == "viewer":
         raise HTTPException(status_code=403, detail="Наблюдатель не может создавать возмещения")
+    # Владелец возвращает деньги одной настоящей операцией: его счёт
+    # уменьшается, счёт участника увеличивается. Это перевод, а не второй
+    # расход — общая покупка уже вошла в аналитику при подтверждении.
+    if membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Возмещение фиксирует владелец семейного пространства")
     recipient = db.query(FamilyMember).filter(
         FamilyMember.family_id == membership.family_id,
         FamilyMember.user_id == data.to_user_id,
@@ -1083,17 +1322,79 @@ def create_settlement(
         raise HTTPException(status_code=404, detail="Участник семьи не найден")
     if data.to_user_id == user_id:
         raise HTTPException(status_code=400, detail="Нельзя возместить самому себе")
+    source_account = db.query(Account).filter(
+        Account.id == data.from_account_id,
+        Account.user_id == user_id,
+    ).first()
+    destination_account = db.query(Account).filter(
+        Account.id == data.to_account_id,
+        Account.user_id == data.to_user_id,
+    ).first()
+    if not source_account or not destination_account:
+        raise HTTPException(status_code=400, detail="Выберите свой счёт и счёт получателя")
+    currency = data.currency.upper()
+    source_currencies = {balance.currency.upper() for balance in source_account.balances}
+    destination_currencies = {balance.currency.upper() for balance in destination_account.balances}
+    if currency not in source_currencies or currency not in destination_currencies:
+        raise HTTPException(status_code=400, detail="Оба счёта должны поддерживать валюту возмещения")
+    accepted_rows = _accounting_rows_query(db, membership.family_id).filter(
+        FamilyExpenseAccounting.status == "accepted",
+        FamilyExpenseAccounting.source_user_id == data.to_user_id,
+    ).all()
+    accepted_ids = [item.source_transaction_id for item in accepted_rows]
+    owed = 0.0
+    if accepted_ids:
+        owed = float(
+            db.query(func.coalesce(func.sum(Transaction.reimbursement_amount), 0))
+            .filter(
+                Transaction.id.in_(accepted_ids),
+                Transaction.currency == currency,
+            )
+            .scalar()
+            or 0
+        )
+    reimbursed = db.query(func.coalesce(func.sum(FamilySettlement.amount), 0)).filter(
+        FamilySettlement.family_id == membership.family_id,
+        FamilySettlement.to_user_id == data.to_user_id,
+        FamilySettlement.currency == currency,
+    ).scalar() or 0
+    if data.amount > float(owed) - float(reimbursed) + 0.005:
+        raise HTTPException(status_code=400, detail="Сумма больше подтверждённого долга к возмещению")
     settlement = FamilySettlement(
         family_id=membership.family_id,
         from_user_id=user_id,
         to_user_id=data.to_user_id,
         amount=data.amount,
-        currency=data.currency.upper(),
+        currency=currency,
         date=data.date or datetime.now(timezone.utc),
         description=data.description,
         created_by_user_id=user_id,
+        from_account_id=source_account.id,
+        to_account_id=destination_account.id,
     )
     db.add(settlement)
+    db.flush()
+    # Import locally to avoid exposing this specialised cross-family transfer
+    # through the normal generic transfer form.
+    from app.api.transactions import _apply_tx_effect, _write_history
+    transfer = Transaction(
+        amount=data.amount,
+        currency=currency,
+        type=TransactionType.transfer,
+        description=data.description or "Возмещение семейных расходов",
+        date=settlement.date,
+        account_id=source_account.id,
+        to_account_id=destination_account.id,
+        to_amount=data.amount,
+        to_currency=currency,
+        user_id=user_id,
+    )
+    db.add(transfer)
+    db.flush()
+    exchange_svc.snapshot_transaction_rates(db, user_id, transfer)
+    _apply_tx_effect(db, transfer)
+    _write_history(db, user_id, transfer, "created")
+    settlement.transaction_id = transfer.id
     sender = db.query(User).filter(User.id == user_id).first()
     sender_name = sender.username if sender and sender.username else "Участник семьи"
     notify_family_members(

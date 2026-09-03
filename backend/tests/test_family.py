@@ -215,6 +215,22 @@ def test_family_expense_is_shared_without_exposing_personal_transactions(client)
     assert shared.status_code == 201, shared.text
     assert shared.json()["is_family_expense"] is True
 
+    # До подтверждения владельцем расход не попадает ни в семейную аналитику,
+    # ни в долг к возмещению.
+    assert client.get("/api/family/report", headers=owner).json()["expenses"] == []
+    owner_category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    pending = client.get("/api/family/expense-accounting/pending", headers=owner).json()
+    assert len(pending["items"]) == 1
+    accounted = client.post(
+        f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
+        headers=owner,
+        json={"owner_category_id": owner_category_id},
+    )
+    assert accounted.status_code == 200, accounted.text
+
     report = client.get("/api/family/report", headers=owner)
     assert report.status_code == 200, report.text
     data = report.json()
@@ -328,6 +344,7 @@ def test_settlement_reduces_outstanding_without_creating_expense(client):
         if item["email"] == "recipient@test.com"
     )
     account = make_account(client, member, balance=5000)
+    owner_account = make_account(client, owner, name="Счёт владельца", balance=5000)
     tx = client.post(
         "/api/transactions/",
         headers=member,
@@ -340,12 +357,25 @@ def test_settlement_reduces_outstanding_without_creating_expense(client):
         },
     )
     assert tx.status_code == 201, tx.text
+    owner_category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    pending = client.get("/api/family/expense-accounting/pending", headers=owner).json()
+    accepted_expense = client.post(
+        f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
+        headers=owner,
+        json={"owner_category_id": owner_category_id},
+    )
+    assert accepted_expense.status_code == 200, accepted_expense.text
 
     settlement = client.post(
         "/api/family/settlements",
         headers=owner,
         json={
             "to_user_id": recipient_id,
+            "from_account_id": owner_account["id"],
+            "to_account_id": account["id"],
             "amount": 400,
             "currency": "RUB",
             "description": "Частичное возмещение",
@@ -369,6 +399,7 @@ def test_family_analytics_includes_comparison_settlements_and_large_expenses(cli
     accepted = client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member).json()
     member_id = next(item["user_id"] for item in accepted["members"] if item["email"] == "analytics-member@test.com")
     account = make_account(client, member, balance=10000)
+    owner_account = make_account(client, owner, name="Счёт владельца", balance=10000)
     categories = client.get("/api/categories/", headers=member).json()
     category_id = next(item["id"] for item in categories if item["name"] == "Продукты" and item["type"] == "expense")
     current = datetime(2026, 8, 15, tzinfo=timezone.utc)
@@ -380,8 +411,21 @@ def test_family_analytics_includes_comparison_settlements_and_large_expenses(cli
             "is_family_expense": True,
         })
         assert response.status_code == 201, response.text
+    owner_category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    pending = client.get("/api/family/expense-accounting/pending", headers=owner).json()
+    for item in pending["items"]:
+        accepted_expense = client.post(
+            f"/api/family/expense-accounting/{item['id']}/accept",
+            headers=owner,
+            json={"owner_category_id": owner_category_id},
+        )
+        assert accepted_expense.status_code == 200, accepted_expense.text
     settlement = client.post("/api/family/settlements", headers=owner, json={
-        "to_user_id": member_id, "amount": 300, "currency": "RUB", "date": current.isoformat(),
+        "to_user_id": member_id, "from_account_id": owner_account["id"],
+        "to_account_id": account["id"], "amount": 300, "currency": "RUB", "date": current.isoformat(),
     })
     assert settlement.status_code == 201, settlement.text
 
@@ -686,10 +730,26 @@ def test_family_action_notifications_honor_each_member_preferences(client, monke
     owner_alerts = client.get("/api/notifications/", headers=owner).json()["items"]
     assert any(item["title"] == "Пополнение общей цели" for item in owner_alerts)
 
-    owner_id = client.get("/api/family/", headers=owner).json()["family"]["owner_user_id"]
-    settlement = client.post("/api/family/settlements", headers=member, json={
-        "to_user_id": owner_id, "amount": 500, "currency": "RUB",
+    owner_account = make_account(client, owner, name="Счёт владельца", balance=2_000)
+    owner_category_id = next(
+        item["id"] for item in client.get("/api/categories/", headers=owner).json()
+        if item["name"] == "Продукты" and item["type"] == "expense"
+    )
+    pending = client.get("/api/family/expense-accounting/pending", headers=owner).json()
+    accepted_expense = client.post(
+        f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
+        headers=owner,
+        json={"owner_category_id": owner_category_id},
+    )
+    assert accepted_expense.status_code == 200, accepted_expense.text
+    member_id = next(
+        item["user_id"] for item in client.get("/api/family/", headers=owner).json()["family"]["members"]
+        if item["email"] == "notify-member@test.com"
+    )
+    settlement = client.post("/api/family/settlements", headers=owner, json={
+        "to_user_id": member_id, "from_account_id": owner_account["id"],
+        "to_account_id": account["id"], "amount": 500, "currency": "RUB",
     })
     assert settlement.status_code == 201, settlement.text
-    owner_alerts = client.get("/api/notifications/", headers=owner).json()["items"]
-    assert any(item["title"] == "Отмечено семейное возмещение" for item in owner_alerts)
+    member_alerts = client.get("/api/notifications/", headers=member).json()["items"]
+    assert any(item["title"] == "Отмечено семейное возмещение" for item in member_alerts)

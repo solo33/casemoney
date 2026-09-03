@@ -5,6 +5,13 @@ import api from "../api/client";
 import { useUser } from "../contexts/UserContext";
 import SettingsTabs from "../components/SettingsTabs";
 import { DASHBOARD_WIDGETS, normalizeDashboardWidgets as normalizedWidgetSettings } from "../utils/dashboardWidgets";
+import {
+  BANK_APPS,
+  getBankNotificationStatus,
+  isBankNotificationImportAvailable,
+  requestBankNotificationPermission,
+  saveBankNotificationSettings,
+} from "../services/bankNotificationImport";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -255,6 +262,7 @@ export default function Settings() {
       </Section>
 
       <NotificationSettings flash={flash} />
+      <BankNotificationSettings flash={flash} />
 
       <Section title="Главная страница">
         <p style={muted}>Выберите блоки главной страницы, их порядок и начальное состояние. На телефоне свёрнутые блоки остаются компактными.</p>
@@ -421,6 +429,55 @@ function NotificationSettings({ flash }) {
           <button type="button" onClick={save} disabled={saving} style={{ marginTop: 14 }}>{saving ? "Сохраняем…" : "Сохранить уведомления"}</button>
         </>
       )}
+    </Section>
+  );
+}
+
+function BankNotificationSettings({ flash }) {
+  const navigate = useNavigate();
+  const [status, setStatus] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isBankNotificationImportAvailable()) return undefined;
+    let active = true;
+    const loadStatus = () => getBankNotificationStatus().then(next => {
+      if (active) setStatus(next);
+    }).catch(() => {
+      if (active) setStatus(null);
+    });
+    loadStatus();
+    const onResume = () => loadStatus();
+    window.addEventListener("focus", onResume);
+    return () => { active = false; window.removeEventListener("focus", onResume); };
+  }, []);
+
+  if (!isBankNotificationImportAvailable()) return null;
+  const banks = status?.banks || {};
+  const updateBank = async (packageName, checked) => {
+    const next = { ...banks, [packageName]: checked };
+    setSaving(true);
+    try {
+      const response = await saveBankNotificationSettings({ enabled: true, banks: next });
+      setStatus(response);
+    } catch {
+      flash("Не удалось сохранить выбор банков", true);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Section title="Импорт банковских уведомлений">
+      <p style={muted}>Работает только в Android‑приложении. CaseMoney создаёт черновики на этом телефоне: исходный текст push не отправляется на сервер, а операция не меняет баланс без вашего подтверждения.</p>
+      {!status ? <p style={muted}>Проверяем доступ…</p> : <>
+        <div className="bank-import-permission">
+          <div><b>{status.permissionGranted ? "Доступ к уведомлениям разрешён" : "Доступ к уведомлениям не включён"}</b><small>Android выдаёт системный доступ ко всем уведомлениям. Приложение обрабатывает только выбранные банки и отбрасывает коды, OTP и сообщения безопасности.</small></div>
+          <button type="button" className="btn-secondary" onClick={async () => { await requestBankNotificationPermission(); flash("Откройте CaseMoney после включения доступа в системных настройках."); }}>Открыть настройки Android</button>
+        </div>
+        <div className="bank-import-banks">
+          {BANK_APPS.map(bank => <label key={bank.id}><input type="checkbox" checked={Boolean(banks[bank.id])} disabled={saving || !status.permissionGranted} onChange={event => updateBank(bank.id, event.target.checked)} /> <span><b>{bank.label}</b><small>Распознавать операции из уведомлений этого приложения</small></span></label>)}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}><button type="button" onClick={() => navigate("/bank-drafts")}>Открыть черновики</button>{status.enabled && <button type="button" className="btn-ghost" onClick={async () => { setSaving(true); try { setStatus(await saveBankNotificationSettings({ enabled: false, banks })); } finally { setSaving(false); } }}>Приостановить импорт</button>}</div>
+      </>}
     </Section>
   );
 }

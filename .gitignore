@@ -48,8 +48,5 @@ backend/*.log
 backend/*.err.log
 backend/*.out.log
 
-# Приватные вложения чеков из локальной разработки.
-backend/uploads/
-
 # Локальный self-signed SSL для HTTPS-разработки (localhost/LAN)
 certs/

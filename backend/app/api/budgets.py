@@ -6,7 +6,8 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import current_user_id, require_family_user_id
-from app.api.family import active_membership
+from app.api.family import _accounting_rows_query, active_membership
+from app.models.family import FamilyExpenseAccounting
 from app.database import get_db
 from app.models.budget import Budget
 from app.models.category import Category
@@ -82,7 +83,10 @@ def _category_tree_ids(db: Session, user_id: int, category_id: int) -> set[int]:
 
 def _transaction_scope_filter(db: Session, user_id: int, scope: str):
     if scope == "personal":
-        return Transaction.user_id == user_id
+        return and_(
+            Transaction.user_id == user_id,
+            Transaction.is_family_expense.is_(False),
+        )
 
     membership = active_membership(db, user_id)
     family_id = membership.family_id if membership else None
@@ -91,13 +95,16 @@ def _transaction_scope_filter(db: Session, user_id: int, scope: str):
             status_code=400,
             detail="Сначала создайте семейное пространство или выберите личный бюджет",
         )
-    family_expenses = and_(
-        Transaction.family_id == family_id,
-        Transaction.is_family_expense.is_(True),
-    )
+    accepted_ids = _accounting_rows_query(db, family_id).filter(
+        FamilyExpenseAccounting.status == "accepted"
+    ).with_entities(FamilyExpenseAccounting.source_transaction_id)
+    family_expenses = Transaction.id.in_(accepted_ids)
     if scope == "family":
         return family_expenses
-    return or_(Transaction.user_id == user_id, family_expenses)
+    return or_(
+        and_(Transaction.user_id == user_id, Transaction.is_family_expense.is_(False)),
+        family_expenses,
+    )
 
 
 def _related_category_ids(db: Session, user_id: int, category_id: int) -> set[int]:
