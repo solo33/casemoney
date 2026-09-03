@@ -819,16 +819,21 @@ def _family_analytics_data(
         for item in db.query(User).filter(User.id.in_([member.user_id for member in members])).all()
     }
 
-    accepted_rows = _accounting_rows_query(db, membership.family_id).filter(
-        FamilyExpenseAccounting.status == "accepted"
-    ).all()
+    # The report is a view of the household's actual common spending, not
+    # only of the purchases the owner has already categorised.  Acceptance is
+    # still required for the owner's category analytics and reimbursements,
+    # but it must not make the total household amount look like zero.
+    accounting_rows = _accounting_rows_query(db, membership.family_id).all()
+    accepted_rows = [item for item in accounting_rows if item.status == "accepted"]
     accepted_by_tx_id = {item.source_transaction_id: item for item in accepted_rows}
     accepted_ids = list(accepted_by_tx_id)
+    accounting_by_tx_id = {item.source_transaction_id: item for item in accounting_rows}
+    accounting_ids = list(accounting_by_tx_id)
     actual_transactions = db.query(Transaction).filter(
-        Transaction.id.in_(accepted_ids),
+        Transaction.id.in_(accounting_ids),
         Transaction.date >= start,
         Transaction.date < end,
-    ).all() if accepted_ids else []
+    ).all() if accounting_ids else []
     # A plan is explicitly shared, but it has no completed purchase yet and
     # therefore no accounting-row confirmation.  Include it in forecasts
     # directly; actual member purchases still require owner acceptance above.
@@ -848,16 +853,18 @@ def _family_analytics_data(
         year - (month == 1), 12 if month == 1 else month - 1, 1, tzinfo=timezone.utc,
     )
     previous_transactions = db.query(Transaction).filter(
-        Transaction.id.in_(accepted_ids),
+        Transaction.id.in_(accounting_ids),
         Transaction.date >= previous_start,
         Transaction.date < previous_end,
-    ).all() if accepted_ids else []
+    ).all() if accounting_ids else []
     category_names = dict(db.query(Category.id, Category.name).all())
 
     actual_expenses = 0.0
     actual_income = 0.0
     planned_expenses = 0.0
     planned_income = 0.0
+    unaccounted_expenses = 0.0
+    unaccounted_expense_count = 0
     per_member: dict[int, float] = {}
     per_category: dict[str, float] = {}
     planned_per_category: dict[str, float] = {}
@@ -887,10 +894,21 @@ def _family_analytics_data(
             continue
         actual_expenses += amount
         per_member[item.user_id] = per_member.get(item.user_id, 0.0) + amount
-        accounting = accepted_by_tx_id.get(item.id)
-        category_id = accounting.owner_category_id if accounting else item.category_id
-        name = category_names.get(category_id, "Без категории")
-        per_category[name] = per_category.get(name, 0.0) + amount
+        accounting = accounting_by_tx_id.get(item.id)
+        is_accounted = bool(accounting and accounting.status == "accepted")
+        # Pending purchases already participate in the household total and
+        # member contribution. Their owner category is intentionally absent
+        # until the owner confirms the mapping, so do not distort the budget
+        # by guessing a category in the owner's taxonomy.
+        if is_accounted:
+            category_id = accounting.owner_category_id
+            name = category_names.get(category_id, "Без категории")
+            per_category[name] = per_category.get(name, 0.0) + amount
+        else:
+            category_id = item.category_id
+            name = category_names.get(category_id, "Без категории")
+            unaccounted_expenses += amount
+            unaccounted_expense_count += 1
         notable_expenses.append({
             "id": item.id,
             "description": item.description or name,
@@ -1122,6 +1140,8 @@ def _family_analytics_data(
         "expense_total": round(actual_expenses, 2),
         "net_total": round(actual_income - actual_expenses, 2),
         "planned_income_total": round(planned_income, 2),
+        "unaccounted_expense_total": round(unaccounted_expenses, 2),
+        "unaccounted_expense_count": unaccounted_expense_count,
         "comparison": {
             "previous_income": round(previous_income, 2),
             "previous_expenses": round(previous_expenses, 2),

@@ -387,6 +387,33 @@ def test_settlement_reduces_outstanding_without_creating_expense(client):
     assert report["totals"] == [{"currency": "RUB", "amount": 1000}]
 
 
+def test_family_analytics_counts_pending_shared_purchases_in_household_total(client):
+    owner = register_and_login(client, "pending-total-owner@test.com")
+    member = register_and_login(client, "pending-total-member@test.com")
+    enable_family_plan("pending-total-owner@test.com")
+    enable_family_plan("pending-total-member@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Общий итог"})
+    invitation = client.post(
+        "/api/family/invite", headers=owner, json={"email": "pending-total-member@test.com"}
+    ).json()
+    client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member)
+    account = make_account(client, member, balance=10_000)
+    shared = client.post("/api/transactions/", headers=member, json={
+        "amount": 1_250, "type": "expense", "currency": "RUB", "account_id": account["id"],
+        "date": "2026-08-15T12:00:00Z", "description": "Общий ужин", "is_family_expense": True,
+    })
+    assert shared.status_code == 201, shared.text
+
+    analytics = client.get("/api/family/analytics?year=2026&month=8", headers=owner)
+    assert analytics.status_code == 200, analytics.text
+    body = analytics.json()
+    assert body["expense_total"] == 1_250
+    assert any(item["actual"] == 1_250 for item in body["members"])
+    assert body["unaccounted_expense_total"] == 1_250
+    assert body["unaccounted_expense_count"] == 1
+    assert body["categories"] == []
+
+
 def test_family_analytics_includes_comparison_settlements_and_large_expenses(client):
     owner = register_and_login(client, "analytics-owner@test.com")
     member = register_and_login(client, "analytics-member@test.com")

@@ -315,6 +315,11 @@ export default function Family() {
               <article className={analytics?.net_total < 0 ? "family-stat-negative" : "family-stat-accent"}><span>Результат</span><strong>{formatMoney(analytics?.net_total || 0)} {analytics?.currency || "RUB"}</strong></article>
               <article><span>Запланировано</span><strong>{formatMoney(analytics?.planned_total || 0)} {analytics?.currency || "RUB"}</strong></article>
             </div>
+            {analytics?.unaccounted_expense_total > 0 && (
+              <p className="family-analytics-note">
+                В общей сумме учтено {formatMoney(analytics.unaccounted_expense_total)} {analytics.currency} по {analytics.unaccounted_expense_count} покупкам, которые ещё ждут распределения по вашим категориям.
+              </p>
+            )}
             {(analytics?.month_summary || []).length > 0 && (
               <section className="family-month-summary" aria-label="Итоги семейного месяца">
                 {(analytics.month_summary || []).map(item => (
@@ -362,7 +367,7 @@ export default function Family() {
               <div>
                 <h3>Категории общих расходов</h3>
                 {(analytics?.categories || []).slice(0, 5).map(item => <div className="family-analytics-row" key={item.name}><span>{item.name}</span><strong>{formatMoney(item.actual)} {analytics.currency}</strong></div>)}
-                {!analytics?.categories?.length && <p className="family-analytics-empty">В этом периоде пока нет общих расходов.</p>}
+                {!analytics?.categories?.length && <p className="family-analytics-empty">Покупки ещё ждут распределения по вашим категориям.</p>}
               </div>
             </div>
             <div className="family-analytics-columns family-analytics-details">
