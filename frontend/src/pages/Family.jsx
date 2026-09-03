@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import SettingsTabs from "../components/SettingsTabs";
+import CategoryOptions from "../components/CategoryOptions";
 import { formatMoney } from "../utils/money";
 
 
@@ -555,7 +556,7 @@ export default function Family() {
                       aria-label="Ваша категория"
                     >
                       <option value="">Выберите категорию</option>
-                      {pendingExpenses.categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      <CategoryOptions categories={pendingExpenses.categories} />
                     </select>
                     <button type="button" onClick={() => {
                       const categoryId = Number(pendingCategoryDrafts[item.id]);
