@@ -98,6 +98,8 @@ class TransactionResponse(BaseModel):
     is_family_expense: bool = False
     reimbursement_amount: float = 0
     is_planned: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     tags: list[TagResponse] = Field(default_factory=list)
 
     class Config:

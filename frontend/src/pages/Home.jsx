@@ -969,6 +969,7 @@ function ToggleBtn({ active, onClick, children }) {
 
 function TxRow({ tx, first, showDate, onEdit, onDelete }) {
   const dateStr = new Date(tx.date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  const changedStr = new Date(tx.updated_at || tx.date).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
   return (
     <div
       style={{
@@ -997,7 +998,7 @@ function TxRow({ tx, first, showDate, onEdit, onDelete }) {
           {tx.is_family_expense && <span style={{ marginLeft: 6, color: "#9a6d17", fontSize: 11, fontWeight: 700 }}>Семейная</span>}
         </div>
         <div style={{ fontSize: 12, color: "#a6afb8" }}>
-          {showDate ? `${dateStr} · ` : ""}{tx.account_name}
+          {showDate ? `Изменено ${changedStr} · ` : ""}{tx.account_name}
         </div>
       </div>
       <div style={{

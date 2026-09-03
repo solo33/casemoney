@@ -678,7 +678,12 @@ def get_transactions(
 
     total = query.count()
     items = (
-        query.order_by(Transaction.date.desc(), Transaction.id.desc())
+        # Financial date remains available for reports and filters, but the
+        # journal itself should surface the records the user just changed.
+        query.order_by(
+            func.coalesce(Transaction.updated_at, Transaction.created_at, Transaction.date).desc(),
+            Transaction.id.desc(),
+        )
         .offset(offset).limit(limit).all()
     )
     return TransactionsPage(items=items, total=total, limit=limit, offset=offset)

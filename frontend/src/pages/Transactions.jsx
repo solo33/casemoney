@@ -414,6 +414,9 @@ export default function Transactions() {
   const formatDate = (iso) => new Date(iso).toLocaleDateString("ru-RU", {
     day: "2-digit", month: "2-digit", year: "2-digit",
   });
+  const formatDateTime = (iso) => new Date(iso).toLocaleString("ru-RU", {
+    day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
 
   const filteredCategoriesForCreate = newTx.type === "transfer"
     ? categories : categories.filter(c => c.type === newTx.type);
@@ -729,6 +732,7 @@ export default function Transactions() {
               <tr>
                 <Th><input type="checkbox" aria-label="Выбрать все записи на странице" checked={data.items.length > 0 && data.items.every(item => selectedIds.includes(item.id))} onChange={toggleAllPage} /></Th>
                 <Th>Дата</Th>
+                <Th>Изменено</Th>
                 <Th>Тип</Th>
                 <Th align="right">Сумма</Th>
                 <Th>Счёт</Th>
@@ -752,7 +756,7 @@ export default function Transactions() {
                   : <Row
                       key={tx.id} tx={tx}
                       accountName={accountName} categoryName={categoryNameFor}
-                      formatDate={formatDate}
+                      formatDate={formatDate} formatDateTime={formatDateTime}
                       canUseFamily={Boolean(user?.family_access)}
                       onEdit={() => setEditing(tx.id)}
                       onDelete={() => handleDelete(tx.id)}
@@ -770,10 +774,10 @@ export default function Transactions() {
           {data.items.map(tx => (
             <div key={tx.id}>
               <MobileTransactionCard
-                tx={tx}
-                accountName={accountName}
-                categoryName={categoryNameFor}
-                formatDate={formatDate}
+              tx={tx}
+              accountName={accountName}
+              categoryName={categoryNameFor}
+              formatDate={formatDate} formatDateTime={formatDateTime}
                 onEdit={() => setEditing(editing === tx.id ? null : tx.id)}
                 onDelete={() => handleDelete(tx.id)}
                 checked={selectedIds.includes(tx.id)}
@@ -816,12 +820,15 @@ function Th({ children, align = "left" }) {
   );
 }
 
-function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete, checked, onToggle }) {
+function Row({ tx, accountName, categoryName, formatDate, formatDateTime, onEdit, onDelete, checked, onToggle }) {
   return (
     <tr style={{ borderTop: "1px solid #ece6d8", background: tx.is_family_expense ? "#fff8e6" : undefined }}>
       <td style={{ padding: "8px 4px 8px 10px" }}><input type="checkbox" checked={checked} onChange={onToggle} aria-label={`Выбрать запись ${tx.id}`} /></td>
       <td style={{ padding: "8px 12px", color: "#7a8590", fontSize: 13, whiteSpace: "nowrap" }}>
         {formatDate(tx.date)}
+      </td>
+      <td style={{ padding: "8px 12px", color: "#7a8590", fontSize: 12, whiteSpace: "nowrap" }}>
+        {formatDateTime(tx.updated_at || tx.created_at || tx.date)}
       </td>
       <td style={{ padding: "8px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>
         {TYPE_ICON[tx.type]} {TYPE_LABEL[tx.type]}
@@ -857,7 +864,7 @@ function Row({ tx, accountName, categoryName, formatDate, onEdit, onDelete, chec
   );
 }
 
-function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEdit, onDelete, checked, onToggle }) {
+function MobileTransactionCard({ tx, accountName, categoryName, formatDate, formatDateTime, onEdit, onDelete, checked, onToggle }) {
   const category = tx.type === "transfer"
     ? `→ ${accountName(tx.to_account_id)}`
     : (tx.category_id ? categoryName(tx.category_id) : "Без категории");
@@ -870,6 +877,7 @@ function MobileTransactionCard({ tx, accountName, categoryName, formatDate, onEd
         <span className="mobile-transaction-copy">
           <strong>{title}{tx.is_family_expense && <em style={{ marginLeft: 6, color: "#9a6d17", fontStyle: "normal", fontSize: 11 }}>Семейная</em>}</strong>
           <small>{formatDate(tx.date)} · {accountName(tx.account_id)} · {category}</small>
+          <small>Изменено: {formatDateTime(tx.updated_at || tx.created_at || tx.date)}</small>
           {(tx.tags || []).length > 0 && <small className="transaction-tags-mobile">{(tx.tags || []).map(tag => `#${tag.name}`).join(" ")}</small>}
         </span>
         <span className="mobile-transaction-amount" style={{ color: TYPE_COLOR[tx.type] }}>
@@ -952,7 +960,7 @@ function EditRow({ tx, accounts, accountGroups, categories, tags, canUseFamily, 
 
   return (
     <tr style={{ background: "#fefce8", borderTop: "2px solid #facc15" }}>
-      <td colSpan={7} style={{ padding: 12 }}>
+      <td colSpan={9} style={{ padding: 12 }}>
         {err && <div style={{ color: "#c0432b", fontSize: 13, marginBottom: 6 }}>{err}</div>}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />

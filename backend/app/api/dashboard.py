@@ -62,8 +62,15 @@ class RecentTransaction(BaseModel):
     date: datetime
     account_id: int
     account_name: str
+    category_id: Optional[int] = None
     category_name: Optional[str]
     category_icon: Optional[str]
+    to_account_id: Optional[int] = None
+    to_amount: Optional[float] = None
+    to_currency: Optional[str] = None
+    is_family_expense: bool = False
+    reimbursement_amount: float = 0
+    updated_at: Optional[datetime] = None
 
 
 class ForecastItem(BaseModel):
@@ -212,8 +219,15 @@ def get_dashboard(
             date=t.date,
             account_id=t.account_id,
             account_name=acc.name if acc else "—",
+            category_id=t.category_id,
             category_name=cat.name if cat else None,
             category_icon=cat.icon if cat else None,
+            to_account_id=t.to_account_id,
+            to_amount=t.to_amount,
+            to_currency=t.to_currency,
+            is_family_expense=t.is_family_expense,
+            reimbursement_amount=t.reimbursement_amount,
+            updated_at=t.updated_at,
         )
 
     recent_transactions = [_serialize_tx(t) for t in recent_rows]

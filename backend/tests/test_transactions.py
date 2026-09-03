@@ -1,4 +1,7 @@
-from tests.conftest import make_account, account_balance
+from datetime import datetime, timezone
+
+from tests.conftest import TestingSessionLocal, make_account, account_balance
+from app.models.transaction import Transaction
 
 
 def _add(client, auth, account_id, amount, type_, currency="RUB", category_id=None):
@@ -163,6 +166,45 @@ def test_edit_amount_recomputes_balance(client, auth):
     assert r.status_code == 200
     assert r.json()["amount"] == 400
     assert account_balance(client, auth, acc["id"]) == 600
+
+
+def test_transactions_are_sorted_by_last_change_and_expose_timestamp(client, auth):
+    acc = make_account(client, auth, balance=1000)
+    first = _add(client, auth, acc["id"], 100, "expense")
+    second = _add(client, auth, acc["id"], 200, "expense")
+    db = TestingSessionLocal()
+    try:
+        db.query(Transaction).filter(Transaction.id == first["id"]).update({
+            "updated_at": datetime(2026, 9, 2, 10, 0, tzinfo=timezone.utc),
+        })
+        db.query(Transaction).filter(Transaction.id == second["id"]).update({
+            "updated_at": datetime(2026, 9, 1, 10, 0, tzinfo=timezone.utc),
+        })
+        db.commit()
+    finally:
+        db.close()
+
+    rows = client.get("/api/transactions/", headers=auth).json()["items"]
+    assert [item["id"] for item in rows[:2]] == [first["id"], second["id"]]
+    assert rows[0]["updated_at"].startswith("2026-09-02")
+
+
+def test_dashboard_transfer_has_fields_required_for_editing(client, auth):
+    source = make_account(client, auth, name="Источник", balance=1000, currency="RUB")
+    target = make_account(client, auth, name="Получатель", balance=20, currency="EUR")
+    transfer = client.post("/api/transactions/", headers=auth, json={
+        "amount": 500, "type": "transfer", "currency": "RUB", "account_id": source["id"],
+        "to_account_id": target["id"], "to_amount": 5.25, "to_currency": "EUR",
+    })
+    assert transfer.status_code == 201, transfer.text
+
+    dashboard = client.get("/api/dashboard/", headers=auth)
+    assert dashboard.status_code == 200, dashboard.text
+    row = next(item for item in dashboard.json()["recently_changed"] if item["id"] == transfer.json()["id"])
+    assert row["to_account_id"] == target["id"]
+    assert row["to_amount"] == 5.25
+    assert row["to_currency"] == "EUR"
+    assert row["updated_at"]
 
 
 def test_history_records_events(client, auth):
