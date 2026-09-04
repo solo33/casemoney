@@ -87,8 +87,8 @@ class AccountAccessUpdate(BaseModel):
 
 class SettlementCreate(BaseModel):
     to_user_id: int
-    from_account_id: int
-    to_account_id: int
+    from_account_id: Optional[int] = None
+    to_account_id: Optional[int] = None
     amount: float = Field(gt=0)
     currency: str = Field(min_length=2, max_length=10)
     date: Optional[datetime] = None
@@ -97,6 +97,16 @@ class SettlementCreate(BaseModel):
 
 class FamilyExpenseAccept(BaseModel):
     owner_category_id: int
+
+
+class FamilyExpenseAcceptBatchItem(BaseModel):
+    id: int
+    owner_category_id: int
+    owner_account_id: int
+
+
+class FamilyExpenseAcceptBatch(BaseModel):
+    items: list[FamilyExpenseAcceptBatchItem] = Field(min_length=1, max_length=100)
 
 
 class FamilyAnalyticsExportRequest(BaseModel):
@@ -557,6 +567,10 @@ def pending_family_expense_accounting(
         Category.user_id == user_id,
         Category.type == "expense",
     ).order_by(Category.sort_order, Category.name).all()
+    owner_accounts = db.query(Account).filter(
+        Account.user_id == user_id,
+        Account.show_for_entries.is_(True),
+    ).order_by(Account.sort_order, Account.name).all()
     mappings = {
         (item.source_user_id, item.source_category_id): item.owner_category_id
         for item in db.query(FamilyCategoryMapping).filter(
@@ -585,6 +599,10 @@ def pending_family_expense_accounting(
         "categories": [
             {"id": category.id, "name": category.name, "parent_id": category.parent_id}
             for category in owner_categories
+        ],
+        "accounts": [
+            {"id": account.id, "name": account.name}
+            for account in owner_accounts
         ],
     }
 
@@ -645,6 +663,119 @@ def accept_family_expense_accounting(
         )
     db.commit()
     return {"id": item.id, "status": item.status, "owner_category_id": item.owner_category_id}
+
+
+@router.post("/expense-accounting/accept-batch")
+def accept_family_expense_accounting_batch(
+    data: FamilyExpenseAcceptBatch,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+):
+    """Create actual owner expenses for the selected common purchases in one commit."""
+    membership = _require_family_owner(db, user_id)
+    requested_ids = [entry.id for entry in data.items]
+    if len(set(requested_ids)) != len(requested_ids):
+        raise HTTPException(status_code=400, detail="Одна покупка указана дважды")
+    rows = _accounting_rows_query(db, membership.family_id).filter(
+        FamilyExpenseAccounting.id.in_(requested_ids),
+        FamilyExpenseAccounting.owner_user_id == user_id,
+        FamilyExpenseAccounting.status == "pending",
+    ).all()
+    if len(rows) != len(requested_ids):
+        raise HTTPException(status_code=409, detail="Часть покупок уже учтена или недоступна")
+    rows_by_id = {item.id: item for item in rows}
+    category_ids = {entry.owner_category_id for entry in data.items}
+    categories = {
+        category.id: category for category in db.query(Category).filter(
+            Category.id.in_(category_ids),
+            Category.user_id == user_id,
+            Category.type == "expense",
+        ).all()
+    }
+    account_ids = {entry.owner_account_id for entry in data.items}
+    accounts = {
+        account.id: account for account in db.query(Account).filter(
+            Account.id.in_(account_ids),
+            Account.user_id == user_id,
+            Account.show_for_entries.is_(True),
+        ).all()
+    }
+    if len(categories) != len(category_ids):
+        raise HTTPException(status_code=400, detail="Выберите свои расходные категории")
+    if len(accounts) != len(account_ids):
+        raise HTTPException(status_code=400, detail="Выберите свои счета для всех покупок")
+    source_ids = [item.source_transaction_id for item in rows]
+    sources = {
+        tx.id: tx for tx in db.query(Transaction).filter(Transaction.id.in_(source_ids)).all()
+    }
+    if len(sources) != len(source_ids):
+        raise HTTPException(status_code=409, detail="Не найдена исходная семейная покупка")
+
+    # The validation above happens before any balance changes, so the whole
+    # batch is accepted or rejected as one operation.
+    from app.api.transactions import _apply_tx_effect, _write_history
+    recipients: set[int] = set()
+    created_ids: list[int] = []
+    now = datetime.now(timezone.utc)
+    for entry in data.items:
+        item = rows_by_id[entry.id]
+        source = sources[item.source_transaction_id]
+        owner_tx = Transaction(
+            amount=source.amount,
+            currency=source.currency,
+            type=TransactionType.expense,
+            description=source.description or "Семейная покупка",
+            date=source.date,
+            account_id=accounts[entry.owner_account_id].id,
+            category_id=categories[entry.owner_category_id].id,
+            user_id=user_id,
+            # This is the owner's ordinary expense. The source entry remains
+            # the only family entry, therefore the family report does not
+            # double-count it.
+            is_family_expense=False,
+            reimbursement_amount=0,
+        )
+        db.add(owner_tx)
+        db.flush()
+        exchange_svc.snapshot_transaction_rates(db, user_id, owner_tx)
+        _apply_tx_effect(db, owner_tx)
+        _write_history(db, user_id, owner_tx, "created")
+        item.owner_category_id = owner_tx.category_id
+        item.owner_account_id = owner_tx.account_id
+        item.owner_transaction_id = owner_tx.id
+        item.status = "accepted"
+        item.accepted_at = now
+        created_ids.append(owner_tx.id)
+        recipients.add(item.source_user_id)
+        if item.source_category_id:
+            mapping = db.query(FamilyCategoryMapping).filter(
+                FamilyCategoryMapping.family_id == membership.family_id,
+                FamilyCategoryMapping.source_user_id == item.source_user_id,
+                FamilyCategoryMapping.source_category_id == item.source_category_id,
+                FamilyCategoryMapping.owner_user_id == user_id,
+            ).first()
+            if mapping:
+                mapping.owner_category_id = owner_tx.category_id
+            else:
+                db.add(FamilyCategoryMapping(
+                    family_id=membership.family_id,
+                    source_user_id=item.source_user_id,
+                    source_category_id=item.source_category_id,
+                    owner_user_id=user_id,
+                    owner_category_id=owner_tx.category_id,
+                ))
+    notify_family_members(
+        db,
+        family_id=membership.family_id,
+        actor_user_id=user_id,
+        recipient_ids=recipients,
+        event="family_expense_accounted",
+        title="Общие покупки учтены",
+        message="Владелец семьи перенёс общие покупки в свой учёт.",
+        link="/settings/family",
+    )
+    db.commit()
+    return {"accepted": len(created_ids), "transaction_ids": created_ids}
 
 
 @router.get("/members/{member_id}/settlement-accounts")
@@ -1341,9 +1472,8 @@ def create_settlement(
     membership = require_membership(db, user_id)
     if membership.role == "viewer":
         raise HTTPException(status_code=403, detail="Наблюдатель не может создавать возмещения")
-    # Владелец возвращает деньги одной настоящей операцией: его счёт
-    # уменьшается, счёт участника увеличивается. Это перевод, а не второй
-    # расход — общая покупка уже вошла в аналитику при подтверждении.
+    # Счёт владельца уже уменьшился при переносе покупок в его учёт. Поэтому
+    # возврат закрывает только внутренний долг и не создаёт второе списание.
     if membership.role != "owner":
         raise HTTPException(status_code=403, detail="Возмещение фиксирует владелец семейного пространства")
     recipient = db.query(FamilyMember).filter(
@@ -1355,21 +1485,7 @@ def create_settlement(
         raise HTTPException(status_code=404, detail="Участник семьи не найден")
     if data.to_user_id == user_id:
         raise HTTPException(status_code=400, detail="Нельзя возместить самому себе")
-    source_account = db.query(Account).filter(
-        Account.id == data.from_account_id,
-        Account.user_id == user_id,
-    ).first()
-    destination_account = db.query(Account).filter(
-        Account.id == data.to_account_id,
-        Account.user_id == data.to_user_id,
-    ).first()
-    if not source_account or not destination_account:
-        raise HTTPException(status_code=400, detail="Выберите свой счёт и счёт получателя")
     currency = data.currency.upper()
-    source_currencies = {balance.currency.upper() for balance in source_account.balances}
-    destination_currencies = {balance.currency.upper() for balance in destination_account.balances}
-    if currency not in source_currencies or currency not in destination_currencies:
-        raise HTTPException(status_code=400, detail="Оба счёта должны поддерживать валюту возмещения")
     accepted_rows = _accounting_rows_query(db, membership.family_id).filter(
         FamilyExpenseAccounting.status == "accepted",
         FamilyExpenseAccounting.source_user_id == data.to_user_id,
@@ -1402,32 +1518,10 @@ def create_settlement(
         date=data.date or datetime.now(timezone.utc),
         description=data.description,
         created_by_user_id=user_id,
-        from_account_id=source_account.id,
-        to_account_id=destination_account.id,
+        from_account_id=data.from_account_id,
+        to_account_id=data.to_account_id,
     )
     db.add(settlement)
-    db.flush()
-    # Import locally to avoid exposing this specialised cross-family transfer
-    # through the normal generic transfer form.
-    from app.api.transactions import _apply_tx_effect, _write_history
-    transfer = Transaction(
-        amount=data.amount,
-        currency=currency,
-        type=TransactionType.transfer,
-        description=data.description or "Возмещение семейных расходов",
-        date=settlement.date,
-        account_id=source_account.id,
-        to_account_id=destination_account.id,
-        to_amount=data.amount,
-        to_currency=currency,
-        user_id=user_id,
-    )
-    db.add(transfer)
-    db.flush()
-    exchange_svc.snapshot_transaction_rates(db, user_id, transfer)
-    _apply_tx_effect(db, transfer)
-    _write_history(db, user_id, transfer, "created")
-    settlement.transaction_id = transfer.id
     sender = db.query(User).filter(User.id == user_id).first()
     sender_name = sender.username if sender and sender.username else "Участник семьи"
     notify_family_members(

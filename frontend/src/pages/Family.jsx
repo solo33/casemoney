@@ -13,8 +13,9 @@ export default function Family() {
   const [recurringSuggestions, setRecurringSuggestions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [familyAccounts, setFamilyAccounts] = useState({ accounts: [], members: [] });
-  const [pendingExpenses, setPendingExpenses] = useState({ items: [], categories: [] });
+  const [pendingExpenses, setPendingExpenses] = useState({ items: [], categories: [], accounts: [] });
   const [pendingCategoryDrafts, setPendingCategoryDrafts] = useState({});
+  const [pendingAccountDrafts, setPendingAccountDrafts] = useState({});
   const [recipientAccounts, setRecipientAccounts] = useState([]);
   const [shareDraft, setShareDraft] = useState({ account_id: "", members: {} });
   const [analyticsPeriod, setAnalyticsPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 });
@@ -47,26 +48,28 @@ export default function Family() {
           api.get("/api/family/recurring-suggestions"),
           api.get("/api/accounts/"),
           api.get("/api/family/accounts"),
-          isOwner ? api.get("/api/family/expense-accounting/pending") : Promise.resolve({ data: { items: [], categories: [] } }),
+          isOwner ? api.get("/api/family/expense-accounting/pending") : Promise.resolve({ data: { items: [], categories: [], accounts: [] } }),
         ]);
         setReport(reportResponse.data);
         setAnalytics(analyticsResponse.data);
         setRecurringSuggestions(suggestionsResponse.data.items || []);
         setAccounts(accountsResponse.data || []);
         setFamilyAccounts(familyAccountsResponse.data || { accounts: [], members: [] });
-        const pendingData = pendingResponse.data || { items: [], categories: [] };
+        const pendingData = pendingResponse.data || { items: [], categories: [], accounts: [] };
         setPendingExpenses(pendingData);
         setPendingCategoryDrafts(Object.fromEntries(
           (pendingData.items || []).map(item => [item.id, String(item.suggested_owner_category_id || "")])
         ));
+        setPendingAccountDrafts({});
       } else {
         setReport(null);
         setAnalytics(null);
         setRecurringSuggestions([]);
         setAccounts([]);
         setFamilyAccounts({ accounts: [], members: [] });
-        setPendingExpenses({ items: [], categories: [] });
+        setPendingExpenses({ items: [], categories: [], accounts: [] });
         setPendingCategoryDrafts({});
+        setPendingAccountDrafts({});
         setRecipientAccounts([]);
       }
     } catch (err) {
@@ -91,6 +94,19 @@ export default function Family() {
 
   const activeMembers = state.family?.members?.filter(member => member.status === "active") || [];
   const ownAccounts = accounts.filter(account => account.user_id === state.family?.current_user_id);
+  const pendingTotalsByAccount = useMemo(() => {
+    const totals = {};
+    pendingExpenses.items.forEach(item => {
+      const accountId = pendingAccountDrafts[item.id];
+      if (!accountId) return;
+      const key = `${accountId}:${item.currency}`;
+      totals[key] = (totals[key] || 0) + Number(item.amount || 0);
+    });
+    return Object.entries(totals).map(([key, amount]) => {
+      const [accountId, currency] = key.split(":");
+      return { account: pendingExpenses.accounts.find(item => String(item.id) === accountId), currency, amount };
+    });
+  }, [pendingExpenses, pendingAccountDrafts]);
   const selectedSharedAccount = familyAccounts.accounts.find(account => account.id === Number(shareDraft.account_id));
   const roleLabel = (role) => ({ owner: "Владелец", editor: "Редактор", viewer: "Наблюдатель", member: "Редактор" }[role] || role);
 
@@ -146,14 +162,6 @@ export default function Family() {
   const selectSettlementRecipient = async (memberUserId) => {
     setSettlement(current => ({ ...current, to_user_id: memberUserId, to_account_id: "" }));
     setRecipientAccounts([]);
-    const member = activeMembers.find(item => String(item.user_id) === String(memberUserId));
-    if (!member) return;
-    try {
-      const response = await api.get(`/api/family/members/${member.id}/settlement-accounts`);
-      setRecipientAccounts(response.data.accounts || []);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Не удалось загрузить счета получателя");
-    }
   };
 
   const changeLabel = (change) => {
@@ -540,8 +548,8 @@ export default function Family() {
             </section>
 
             {state.family.current_user_role === "owner" && <section className="family-card">
-              <h2>Ожидают учёта у вас</h2>
-              <p>Подтвердите покупку и выберите свою категорию. Сопоставление запомнится для следующих покупок.</p>
+              <h2>Перенести общие покупки в мой учёт</h2>
+              <p>Назначьте свою категорию и счёт для каждой покупки. При подтверждении создадутся обычные расходы и остатки выбранных счетов уменьшатся.</p>
               <div className="family-pending-expenses">
                 {pendingExpenses.items.map(item => (
                   <article key={item.id}>
@@ -558,31 +566,51 @@ export default function Family() {
                       <option value="">Выберите категорию</option>
                       <CategoryOptions categories={pendingExpenses.categories} />
                     </select>
-                    <button type="button" onClick={() => {
-                      const categoryId = Number(pendingCategoryDrafts[item.id]);
-                      if (!categoryId) { setError("Выберите категорию для учёта покупки"); return; }
-                      submit(async () => {
-                        await api.post(`/api/family/expense-accounting/${item.id}/accept`, { owner_category_id: categoryId });
-                        setMessage("Покупка учтена в семейной аналитике");
-                      });
-                    }}>Учесть у меня</button>
+                    <select
+                      value={pendingAccountDrafts[item.id] || ""}
+                      onChange={event => setPendingAccountDrafts(current => ({ ...current, [item.id]: event.target.value }))}
+                      aria-label="Ваш счёт"
+                    >
+                      <option value="">Выберите свой счёт</option>
+                      {pendingExpenses.accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
+                    </select>
                   </article>
                 ))}
+                {pendingExpenses.items.length > 0 && <>
+                  <div className="family-pending-totals">
+                    <strong>Будет списано со счетов</strong>
+                    {pendingTotalsByAccount.length
+                      ? pendingTotalsByAccount.map(item => <span key={`${item.account?.id}-${item.currency}`}>{item.account?.name}: {formatMoney(item.amount)} {item.currency}</span>)
+                      : <span>Выберите счёт для каждой покупки.</span>}
+                  </div>
+                  <button type="button" onClick={() => {
+                    const incomplete = pendingExpenses.items.some(item => !pendingCategoryDrafts[item.id] || !pendingAccountDrafts[item.id]);
+                    if (incomplete) { setError("Для каждой покупки выберите свою категорию и счёт"); return; }
+                    submit(async () => {
+                      await api.post("/api/family/expense-accounting/accept-batch", {
+                        items: pendingExpenses.items.map(item => ({
+                          id: item.id,
+                          owner_category_id: Number(pendingCategoryDrafts[item.id]),
+                          owner_account_id: Number(pendingAccountDrafts[item.id]),
+                        })),
+                      });
+                      setMessage("Покупки перенесены в ваши расходы и списаны с выбранных счетов");
+                    });
+                  }}>Подтвердить перенос</button>
+                </>}
                 {!pendingExpenses.items.length && <p className="family-analytics-empty">Все общие покупки уже учтены.</p>}
               </div>
             </section>}
 
             {state.family.current_user_role === "owner" && <section className="family-card">
               <h2>Зафиксировать возмещение</h2>
-              <p>Это перевод между реальными счетами: расход в категориях повторно не появится.</p>
+              <p>Закрывает внутренний долг перед участником. Остатки и расходы не меняются: они уже учтены при переносе покупок.</p>
               <form onSubmit={event => {
                 event.preventDefault();
                 submit(async () => {
                   await api.post("/api/family/settlements", {
                     ...settlement,
                     to_user_id: Number(settlement.to_user_id),
-                    from_account_id: Number(settlement.from_account_id),
-                    to_account_id: Number(settlement.to_account_id),
                     amount: Number(settlement.amount),
                   });
                   setSettlement(current => ({ ...current, amount: "", description: "" }));
@@ -600,14 +628,6 @@ export default function Family() {
                     .map(member => (
                     <option key={member.id} value={member.user_id}>{member.name}</option>
                   ))}
-                </select>
-                <select value={settlement.from_account_id} onChange={event => setSettlement({ ...settlement, from_account_id: event.target.value })} required>
-                  <option value="">С какого моего счёта</option>
-                  {ownAccounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
-                </select>
-                <select value={settlement.to_account_id} onChange={event => setSettlement({ ...settlement, to_account_id: event.target.value })} required>
-                  <option value="">На какой счёт получателя</option>
-                  {recipientAccounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}
                 </select>
                 <div className="family-amount">
                   <input
@@ -760,9 +780,11 @@ export default function Family() {
         .family-member-remove:hover { background: #fff0ec; border-color: #e2a99a; }
         .family-amount { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
         .family-pending-expenses { display: grid; gap: 8px; margin-top: 14px; }
-        .family-pending-expenses article { display: grid; grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 220px) auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fff9e9; }
+        .family-pending-expenses article { display: grid; grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 220px) minmax(140px, 220px); align-items: center; gap: 10px; padding: 10px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fff9e9; }
         .family-pending-expenses article > div { display: grid; gap: 3px; min-width: 0; }
         .family-pending-expenses span { color: #7a8590; font-size: 12px; }
+        .family-pending-totals { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid #d8c078; border-radius: 9px; background: #fffdf4; }
+        .family-pending-totals strong { color: #173a54; }
         .family-shared-accounts { grid-column: 1 / -1; }
         .family-shared-accounts form { display: grid; gap: 9px; }
         .family-account-access { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px); gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid #eee8dc; }

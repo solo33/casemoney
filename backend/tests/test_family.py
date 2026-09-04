@@ -56,6 +56,44 @@ def test_family_features_are_free_when_billing_disabled(client):
     assert created.status_code == 201, created.text
 
 
+def test_batch_acceptance_creates_owner_expense_and_settlement_does_not_repeat_debit(client):
+    owner = register_and_login(client, "batch-owner@test.com")
+    member = register_and_login(client, "batch-member@test.com")
+    client.post("/api/family/", headers=owner, json={"name": "Перенос покупок"})
+    invitation = client.post("/api/family/invite", headers=owner, json={"email": "batch-member@test.com"}).json()
+    client.post(f"/api/family/invitations/{invitation['id']}/accept", headers=member)
+    owner_account = make_account(client, owner, name="Карта владельца", balance=5000)
+    member_account = make_account(client, member, name="Карта участника", balance=5000)
+    source = client.post("/api/transactions/", headers=member, json={
+        "amount": 1200, "type": "expense", "currency": "RUB", "account_id": member_account["id"],
+        "description": "Магазин", "is_family_expense": True, "reimbursement_amount": 1200,
+    })
+    assert source.status_code == 201, source.text
+    pending = client.get("/api/family/expense-accounting/pending", headers=owner).json()
+    assert {item["id"] for item in pending["accounts"]} >= {owner_account["id"]}
+    category_id = next(item["id"] for item in client.get("/api/categories/", headers=owner).json()
+                       if item["name"] == "Продукты" and item["type"] == "expense")
+    accepted = client.post("/api/family/expense-accounting/accept-batch", headers=owner, json={"items": [{
+        "id": pending["items"][0]["id"], "owner_category_id": category_id, "owner_account_id": owner_account["id"],
+    }]})
+    assert accepted.status_code == 200, accepted.text
+    owner_transactions = client.get("/api/transactions/", headers=owner).json()["items"]
+    imported = next(item for item in owner_transactions if item["id"] == accepted.json()["transaction_ids"][0])
+    assert imported["amount"] == 1200
+    assert imported["account_id"] == owner_account["id"]
+    assert imported["category_id"] == category_id
+    owner_balance = next(item for item in client.get("/api/accounts/", headers=owner).json() if item["id"] == owner_account["id"])
+    assert owner_balance["balances"][0]["balance"] == 3800
+    member_id = next(item["user_id"] for item in client.get("/api/family/", headers=owner).json()["family"]["members"]
+                     if item["email"] == "batch-member@test.com")
+    settlement = client.post("/api/family/settlements", headers=owner, json={
+        "to_user_id": member_id, "amount": 1200, "currency": "RUB",
+    })
+    assert settlement.status_code == 201, settlement.text
+    owner_balance_after = next(item for item in client.get("/api/accounts/", headers=owner).json() if item["id"] == owner_account["id"])
+    assert owner_balance_after["balances"][0]["balance"] == 3800
+
+
 def test_registration_saves_selected_mode_and_mode_can_be_changed(client):
     response = client.post("/api/auth/register", json={
         "email": "chosen-family@test.com",

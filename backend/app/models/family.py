@@ -114,6 +114,10 @@ class FamilyExpenseAccounting(Base):
     owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     source_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     owner_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    # The owner gets a real expense entry when accepting a family purchase.
+    # Keeping the links makes the import traceable and prevents duplicates.
+    owner_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    owner_transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
     status = Column(String(20), nullable=False, default="pending")  # pending | accepted
     accepted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
