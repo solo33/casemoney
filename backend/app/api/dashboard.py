@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends, Query
@@ -15,4 +16,4 @@ def get_dashboard(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return queries.get_dashboard(forecast_days=forecast_days, db=db, user_id=user_id)
+    return operation_response(queries.get_dashboard(forecast_days=forecast_days, db=db, user_id=user_id))

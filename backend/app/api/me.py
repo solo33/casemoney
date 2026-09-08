@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends
@@ -17,7 +18,7 @@ def get_me(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return queries.get_me(db=db, user_id=user_id)
+    return operation_response(queries.get_me(db=db, user_id=user_id))
 
 
 @router.put("/", response_model=UserResponse)
@@ -26,7 +27,7 @@ def update_me(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return commands.update_me(data=data, db=db, user_id=user_id)
+    return operation_response(commands.update_me(data=data, db=db, user_id=user_id))
 
 
 @router.post("/password", status_code=204)
@@ -35,7 +36,7 @@ def change_password(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return commands.change_password(data=data, db=db, user_id=user_id)
+    return operation_response(commands.change_password(data=data, db=db, user_id=user_id))
 
 
 @router.delete("/transactions", status_code=204)
@@ -44,7 +45,7 @@ def delete_all_transactions(
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаляет ВСЕ транзакции пользователя. Балансы счетов обнуляются.'
-    return commands.delete_all_transactions(db=db, user_id=user_id)
+    return operation_response(commands.delete_all_transactions(db=db, user_id=user_id))
 
 
 @router.post("/reset", status_code=204)
@@ -53,7 +54,7 @@ def reset_account(
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаляет ВСЕ данные пользователя кроме самого аккаунта.\n\n    Удаляются: транзакции, балансы, счета, группы счетов, категории, валюты.\n    '
-    return commands.reset_account(db=db, user_id=user_id)
+    return operation_response(commands.reset_account(db=db, user_id=user_id))
 
 
 @router.get("/limits")
@@ -62,7 +63,7 @@ def get_limits(
     user_id: int = Depends(get_current_user_id),
 ):
     'Текущее использование + активный тариф.'
-    return queries.get_limits(db=db, user_id=user_id)
+    return operation_response(queries.get_limits(db=db, user_id=user_id))
 
 
 @router.delete("/", status_code=204)
@@ -71,4 +72,4 @@ def delete_account(
     user_id: int = Depends(get_current_user_id),
 ):
     'Полностью удаляет пользователя и все его данные.'
-    return commands.delete_account(db=db, user_id=user_id)
+    return operation_response(commands.delete_account(db=db, user_id=user_id))

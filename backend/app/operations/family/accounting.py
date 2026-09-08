@@ -1,7 +1,7 @@
 """Family: accounting. Callers supply resolved user and database session."""
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.category import Category
@@ -87,14 +87,14 @@ def accept_family_expense_accounting_batch(data: FamilyExpenseAcceptBatch, db: S
     membership = require_family_owner(db, user_id)
     requested_ids = [entry.id for entry in data.items]
     if len(set(requested_ids)) != len(requested_ids):
-        raise HTTPException(status_code=400, detail="Одна покупка указана дважды")
+        raise ApplicationError(status_code=400, detail="Одна покупка указана дважды")
     rows = accounting_rows_query(db, membership.family_id).filter(
         FamilyExpenseAccounting.id.in_(requested_ids),
         FamilyExpenseAccounting.owner_user_id == user_id,
         FamilyExpenseAccounting.status == "pending",
     ).order_by(FamilyExpenseAccounting.id).with_for_update().all()
     if len(rows) != len(requested_ids):
-        raise HTTPException(status_code=409, detail="Часть покупок уже учтена или недоступна")
+        raise ApplicationError(status_code=409, detail="Часть покупок уже учтена или недоступна")
     rows_by_id = {item.id: item for item in rows}
     category_ids = {entry.owner_category_id for entry in data.items}
     categories = {
@@ -113,16 +113,16 @@ def accept_family_expense_accounting_batch(data: FamilyExpenseAcceptBatch, db: S
         ).all()
     }
     if len(categories) != len(category_ids):
-        raise HTTPException(status_code=400, detail="Выберите свои расходные категории")
+        raise ApplicationError(status_code=400, detail="Выберите свои расходные категории")
     if len(accounts) != len(account_ids):
-        raise HTTPException(status_code=400, detail="Выберите свои счета для всех покупок")
+        raise ApplicationError(status_code=400, detail="Выберите свои счета для всех покупок")
     source_ids = [item.source_transaction_id for item in rows]
     db.query(Account.id).filter(Account.id.in_(account_ids)).order_by(Account.id).with_for_update().all()
     sources = {
         tx.id: tx for tx in db.query(Transaction).filter(Transaction.id.in_(source_ids)).with_for_update().all()
     }
     if len(sources) != len(source_ids):
-        raise HTTPException(status_code=409, detail="Не найдена исходная семейная покупка")
+        raise ApplicationError(status_code=409, detail="Не найдена исходная семейная покупка")
 
     # The validation above happens before any balance changes, so the whole
     # batch is accepted or rejected as one operation.

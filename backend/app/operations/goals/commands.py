@@ -1,5 +1,5 @@
 """Goals: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.models.goal import Goal, GoalContribution
@@ -16,7 +16,7 @@ def create_goal(data: GoalCreate, db: Session=None, user_id: int=None):
     _validate_account(db, user_id, data.account_id)
     membership = _membership(db, user_id)
     if data.is_shared and not membership:
-        raise HTTPException(status_code=400, detail="Сначала создайте семейное пространство")
+        raise ApplicationError(status_code=400, detail="Сначала создайте семейное пространство")
     goal = Goal(
         user_id=user_id,
         name=data.name,
@@ -39,7 +39,7 @@ def update_goal(goal_id: int, data: GoalUpdate, db: Session=None, user_id: int=N
     ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise ApplicationError(status_code=404, detail="Goal not found")
 
     update = data.model_dump(exclude_unset=True)
     if "currency" in update and update["currency"]:
@@ -70,7 +70,7 @@ def delete_goal(goal_id: int, db: Session=None, user_id: int=None):
     ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise ApplicationError(status_code=404, detail="Goal not found")
     db.delete(goal)
     db.commit()
 
@@ -79,7 +79,7 @@ def archive_goal(goal_id: int, db: Session=None, user_id: int=None):
     ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise ApplicationError(status_code=404, detail="Goal not found")
     goal.is_archived = True
     goal.archived_at = datetime.now(timezone.utc)
     db.commit()
@@ -91,7 +91,7 @@ def restore_goal(goal_id: int, db: Session=None, user_id: int=None):
     ensure_family_plan(db, user_id)
     goal = db.query(Goal).filter(Goal.id == goal_id, Goal.user_id == user_id).first()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise ApplicationError(status_code=404, detail="Goal not found")
     goal.is_archived = False
     goal.archived_at = None
     db.commit()
@@ -104,7 +104,7 @@ def add_contribution(goal_id: int, data: ContributionCreate, db: Session=None, u
     goal = db.query(Goal).filter(Goal.id == goal_id).first()
     membership = _membership(db, user_id)
     if not goal or not membership or goal.family_id != membership.family_id:
-        raise HTTPException(status_code=404, detail="Общая цель не найдена")
+        raise ApplicationError(status_code=404, detail="Общая цель не найдена")
     db.add(GoalContribution(goal_id=goal.id, user_id=user_id, amount=data.amount))
     user = db.query(User).filter(User.id == user_id).first()
     actor_name = user.username if user and user.username else "Участник семьи"

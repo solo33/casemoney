@@ -1,5 +1,5 @@
 """Transactions: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
@@ -21,7 +21,7 @@ from app.operations.transactions.common import _ensure_own_category, _existing_i
 def create_transaction(data: TransactionCreate, idempotency_key: Optional[str]=None, db: Session=None, user_id: int=None):
     request_id = idempotency_key.strip() if idempotency_key else None
     if request_id and len(request_id) > 64:
-        raise HTTPException(status_code=400, detail="Слишком длинный ключ повтора.")
+        raise ApplicationError(status_code=400, detail="Слишком длинный ключ повтора.")
     request_hash = _request_hash(data) if request_id else None
     if request_id:
         existing = _existing_idempotent_transaction(
@@ -35,7 +35,7 @@ def create_transaction(data: TransactionCreate, idempotency_key: Optional[str]=N
     try:
         tx_type = TransactionType[data.type]
     except KeyError:
-        raise HTTPException(status_code=400, detail=f"Invalid type: {data.type}")
+        raise ApplicationError(status_code=400, detail=f"Invalid type: {data.type}")
 
     if data.currency:
         currency = data.currency.upper()
@@ -148,10 +148,10 @@ def bulk_update_category(data: TransactionBulkCategoryUpdate, db: Session=None, 
         .all()
     )
     if len(rows) != len(ids):
-        raise HTTPException(status_code=404, detail="Часть выбранных записей не найдена.")
+        raise ApplicationError(status_code=404, detail="Часть выбранных записей не найдена.")
     types = {row.type for row in rows}
     if len(types) != 1 or TransactionType.transfer in types:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Можно изменить категорию только у записей одного типа: доходов или расходов.",
         )
@@ -163,9 +163,9 @@ def bulk_update_category(data: TransactionBulkCategoryUpdate, db: Session=None, 
             Category.user_id == user_id,
         ).first()
         if not category:
-            raise HTTPException(status_code=404, detail="Категория не найдена.")
+            raise ApplicationError(status_code=404, detail="Категория не найдена.")
         if category.type != next(iter(types)).value:
-            raise HTTPException(status_code=400, detail="Тип категории не совпадает с выбранными записями.")
+            raise ApplicationError(status_code=400, detail="Тип категории не совпадает с выбранными записями.")
 
     for row in rows:
         if row.category_id == data.category_id:
@@ -186,7 +186,7 @@ def update_transaction(transaction_id: int, data: TransactionUpdate, db: Session
     откат старого эффекта → применение нового."""
     tx = db.query(Transaction).filter(Transaction.id == transaction_id).with_for_update().first()
     if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+        raise ApplicationError(status_code=404, detail="Transaction not found")
     family_accounts_svc.require_write_access(db, tx.account_id, user_id)
 
     update = data.model_dump(exclude_unset=True)
@@ -226,7 +226,7 @@ def update_transaction(transaction_id: int, data: TransactionUpdate, db: Session
         try:
             update["type"] = TransactionType[update["type"]]
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid type: {update['type']}")
+            raise ApplicationError(status_code=400, detail=f"Invalid type: {update['type']}")
     if "currency" in update and update["currency"]:
         update["currency"] = update["currency"].upper()
 
@@ -299,7 +299,7 @@ def update_transaction(transaction_id: int, data: TransactionUpdate, db: Session
 def delete_transaction(transaction_id: int, db: Session=None, user_id: int=None):
     tx = db.query(Transaction).filter(Transaction.id == transaction_id).with_for_update().first()
     if not tx:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+        raise ApplicationError(status_code=404, detail="Transaction not found")
     family_accounts_svc.require_write_access(db, tx.account_id, user_id)
     from app.services.linked_transactions import before_delete
     before_delete(db, tx)

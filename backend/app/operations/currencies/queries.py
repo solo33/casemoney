@@ -1,5 +1,5 @@
 """Currencies: queries. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.user_currency import UserCurrency
 from app.schemas.user_currency import CurrenciesResponse
@@ -35,7 +35,7 @@ def convert_currency(amount: float=..., from_currency: str=..., to_currency: str
             db, user_id, from_code, to_code,
         )
     except exchange_svc.ExchangeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise ApplicationError(status_code=502, detail=str(exc)) from exc
     return CurrencyConversionResponse(
         from_currency=from_code,
         to_currency=to_code,

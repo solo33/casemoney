@@ -1,5 +1,5 @@
 """Family: accounts. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.family import AccountFamilyAccess, FamilyMember
@@ -51,7 +51,7 @@ def update_account_access(account_id: int, data: AccountAccessUpdate, db: Sessio
         Account.user_id == user_id,
     ).first()
     if not account:
-        raise HTTPException(status_code=404, detail="Можно настраивать доступ только к своему счёту")
+        raise ApplicationError(status_code=404, detail="Можно настраивать доступ только к своему счёту")
 
     active_member_ids = {
         item.user_id for item in db.query(FamilyMember).filter(
@@ -62,7 +62,7 @@ def update_account_access(account_id: int, data: AccountAccessUpdate, db: Sessio
     }
     requested = {item.user_id: item.permission for item in data.members}
     if not set(requested).issubset(active_member_ids):
-        raise HTTPException(status_code=400, detail="Можно выбрать только активных участников этой семьи")
+        raise ApplicationError(status_code=400, detail="Можно выбрать только активных участников этой семьи")
 
     previous_recipient_ids = {
         item.user_id for item in db.query(AccountFamilyAccess).filter(
@@ -103,7 +103,7 @@ def member_settlement_accounts(member_id: int, db: Session=None, user_id: int=No
         FamilyMember.status == "active",
     ).first()
     if not member or not member.user_id or member.user_id == user_id:
-        raise HTTPException(status_code=404, detail="Участник семьи не найден")
+        raise ApplicationError(status_code=404, detail="Участник семьи не найден")
     accounts = db.query(Account).filter(
         Account.user_id == member.user_id,
         Account.show_for_entries.is_(True),

@@ -1,5 +1,5 @@
 """Recurring_transactions: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.recurring_transaction import RecurringTransaction, RecurringTransactionRun
 from app.models.transaction import TransactionType
@@ -11,11 +11,11 @@ from app.operations.recurring_transactions.common import _get_recurring, _valida
 def create_recurring_transaction(data: RecurringTransactionCreate, db: Session=None, user_id: int=None):
     ensure_family_plan(db, user_id)
     if not data.account_id:
-        raise HTTPException(status_code=400, detail="Для регулярной операции выберите счёт")
+        raise ApplicationError(status_code=400, detail="Для регулярной операции выберите счёт")
     if data.frequency == "custom" and not data.custom_interval_days:
-        raise HTTPException(status_code=400, detail="Укажите интервал повторения в днях")
+        raise ApplicationError(status_code=400, detail="Укажите интервал повторения в днях")
     if data.end_date and data.end_date < data.next_date:
-        raise HTTPException(status_code=400, detail="Дата окончания не может быть раньше первого повторения")
+        raise ApplicationError(status_code=400, detail="Дата окончания не может быть раньше первого повторения")
     _validate_refs(db, user_id, data.account_id, data.category_id)
     result = RecurringTransaction(
         user_id=user_id, name=data.name.strip(), type=TransactionType[data.type], amount=data.amount,
@@ -34,16 +34,16 @@ def update_recurring_transaction(recurring_id: int, data: RecurringTransactionUp
     ensure_family_plan(db, user_id)
     result = db.query(RecurringTransaction).filter(RecurringTransaction.id == recurring_id, RecurringTransaction.user_id == user_id).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Регулярная операция не найдена")
+        raise ApplicationError(status_code=404, detail="Регулярная операция не найдена")
     changes = data.model_dump(exclude_unset=True)
     frequency = changes.get("frequency", result.frequency)
     custom_interval_days = changes.get("custom_interval_days", result.custom_interval_days)
     if frequency == "custom" and not custom_interval_days:
-        raise HTTPException(status_code=400, detail="Укажите интервал повторения в днях")
+        raise ApplicationError(status_code=400, detail="Укажите интервал повторения в днях")
     next_date = changes.get("next_date", result.next_date)
     end_date = changes.get("end_date", result.end_date)
     if end_date and end_date < next_date:
-        raise HTTPException(status_code=400, detail="Дата окончания не может быть раньше следующего повторения")
+        raise ApplicationError(status_code=400, detail="Дата окончания не может быть раньше следующего повторения")
     _validate_refs(db, user_id, changes.get("account_id", result.account_id), changes.get("category_id", result.category_id))
     for field, value in changes.items():
         setattr(result, field, value.strip() if field == "name" else value.upper() if field == "currency" else value)
@@ -57,7 +57,7 @@ def skip_next_recurring_transaction(recurring_id: int, db: Session=None, user_id
     ensure_family_plan(db, user_id)
     result = _get_recurring(db, user_id, recurring_id)
     if not result.is_active:
-        raise HTTPException(status_code=400, detail="Сначала включите регулярную операцию")
+        raise ApplicationError(status_code=400, detail="Сначала включите регулярную операцию")
     db.add(RecurringTransactionRun(recurring_transaction_id=result.id, scheduled_for=result.next_date, status="skipped"))
     from app.services.recurring_transactions import next_occurrence
     result.last_generated_for = result.next_date
@@ -80,6 +80,6 @@ def delete_recurring_transaction(recurring_id: int, db: Session=None, user_id: i
     ensure_family_plan(db, user_id)
     result = db.query(RecurringTransaction).filter(RecurringTransaction.id == recurring_id, RecurringTransaction.user_id == user_id).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Регулярная операция не найдена")
+        raise ApplicationError(status_code=404, detail="Регулярная операция не найдена")
     db.delete(result)
     db.commit()

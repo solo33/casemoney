@@ -1,5 +1,5 @@
 """Protect linked financial records from partial edits through the generic API."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import or_
 from app.models.credit import CreditPayment
 from app.models.family import FamilyExpenseAccounting, FamilySettlement
@@ -20,7 +20,7 @@ def _require_unsettled(db, link):
         FamilySettlement.family_id == link.family_id,
         FamilySettlement.to_user_id == link.source_user_id,
     ).first():
-        raise HTTPException(409, "Покупка связана с возмещениями. Изменение суммы или удаление требует отдельной корректировки взаиморасчётов")
+        raise ApplicationError(409, "Покупка связана с возмещениями. Изменение суммы или удаление требует отдельной корректировки взаиморасчётов")
 
 
 def validate_edit(db, tx, updates):
@@ -28,14 +28,14 @@ def validate_edit(db, tx, updates):
     if not changed & ECONOMIC_FIELDS:
         return
     if db.query(CreditPayment.id).filter(CreditPayment.transaction_id == tx.id).first():
-        raise HTTPException(409, "Это платёж по обязательству. Нельзя менять его финансовые поля отдельно от истории кредита")
+        raise ApplicationError(409, "Это платёж по обязательству. Нельзя менять его финансовые поля отдельно от истории кредита")
     link = _link(db, tx)
     if link and link.owner_transaction_id:
         _require_unsettled(db, link)
         if link.owner_transaction_id == tx.id and changed & (ECONOMIC_FIELDS - {"account_id"}):
-            raise HTTPException(409, "Измените исходную семейную покупку: её сумма и дата синхронизируются с вашим расходом")
+            raise ApplicationError(409, "Измените исходную семейную покупку: её сумма и дата синхронизируются с вашим расходом")
         if changed & {"is_family_expense", "is_planned", "type"}:
-            raise HTTPException(409, "Сначала отмените перенос: удалите созданный расход из своего учёта")
+            raise ApplicationError(409, "Сначала отмените перенос: удалите созданный расход из своего учёта")
 
 
 def sync_copy(db, tx, link):
@@ -57,7 +57,7 @@ def sync_copy(db, tx, link):
 
 def before_delete(db, tx):
     if db.query(CreditPayment.id).filter(CreditPayment.transaction_id == tx.id).first():
-        raise HTTPException(409, "Это платёж по обязательству. Удаление отдельно от истории кредита запрещено")
+        raise ApplicationError(409, "Это платёж по обязательству. Удаление отдельно от истории кредита запрещено")
     link = _link(db, tx)
     if not link or not link.owner_transaction_id:
         return

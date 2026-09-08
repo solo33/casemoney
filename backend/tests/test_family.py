@@ -532,6 +532,19 @@ def test_family_analytics_recovers_legacy_owner_purchase(client):
             FamilyExpenseAccounting.source_transaction_id == transaction.id
         ).delete()
         db.commit()
+        from app.services.family_context import accounting_rows_query, active_membership
+        from app.services.family_accounting_repair import repair_family_accounting_rows
+        membership = active_membership(db, transaction.user_id)
+        assert accounting_rows_query(db, membership.family_id).count() == 0
+        assert transaction.family_id is None
+        assert not db.new and not db.dirty
+        assert repair_family_accounting_rows(db, membership.family_id)
+        db.flush()
+        assert accounting_rows_query(db, membership.family_id).count() == 1
+        db.rollback()
+        assert accounting_rows_query(db, membership.family_id).count() == 0
+        assert repair_family_accounting_rows(db, membership.family_id)
+        db.commit()
     finally:
         db.close()
 

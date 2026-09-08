@@ -1,5 +1,5 @@
 """Tags: queries. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.transaction_tag import Tag
@@ -15,7 +15,7 @@ def tag_report(tag_id: int, db: Session=None, user_id: int=None):
     """Compact all-time project report. Transfers do not form income/expense."""
     tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user_id).first()
     if not tag:
-        raise HTTPException(status_code=404, detail="Метка не найдена")
+        raise ApplicationError(status_code=404, detail="Метка не найдена")
     rows = (
         db.query(Transaction.type, Transaction.currency, func.sum(Transaction.amount).label("amount"))
         .join(Transaction.tags)

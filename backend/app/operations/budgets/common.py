@@ -1,7 +1,7 @@
 """Budgets: common. Callers supply resolved user and database session."""
 from calendar import monthrange
 from datetime import date, timedelta
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 from app.services.family_context import accounting_rows_query, active_membership
@@ -30,7 +30,7 @@ def _period_start(anchor: date, period: str) -> date:
         return anchor.replace(month=((anchor.month - 1) // 3) * 3 + 1, day=1)
     if period == "year":
         return anchor.replace(month=1, day=1)
-    raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
+    raise ApplicationError(status_code=400, detail="Неподдерживаемый период бюджета")
 
 
 def _period_range(anchor: date, period: str) -> tuple[date, date]:
@@ -54,9 +54,9 @@ def _previous_period_start(start: date, period: str) -> date:
 def _own_category(db: Session, user_id: int, category_id: int) -> Category:
     category = db.query(Category).filter(Category.id == category_id, Category.user_id == user_id).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
+        raise ApplicationError(status_code=404, detail="Категория не найдена")
     if category.type != "expense":
-        raise HTTPException(status_code=400, detail="Бюджет можно задать только для категории расходов")
+        raise ApplicationError(status_code=400, detail="Бюджет можно задать только для категории расходов")
     return category
 
 
@@ -92,7 +92,7 @@ def _transaction_scope_filter(db: Session, user_id: int, scope: str):
     membership = active_membership(db, user_id)
     family_id = membership.family_id if membership else None
     if family_id is None:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Сначала создайте семейное пространство или выберите личный бюджет",
         )

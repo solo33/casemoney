@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from app.api.dependencies import current_user_id
 from typing import Optional
@@ -30,7 +31,7 @@ def create_notification(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return commands.create_notification(data=data, db=db, _=_)
+    return operation_response(commands.create_notification(data=data, db=db, _=_))
 
 
 @router.get("/users", response_model=AdminUsersPage)
@@ -42,7 +43,7 @@ def list_users(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return queries.list_users(q=q, is_active=is_active, limit=limit, offset=offset, db=db, _=_)
+    return operation_response(queries.list_users(q=q, is_active=is_active, limit=limit, offset=offset, db=db, _=_))
 
 
 @router.get("/users/{user_id}", response_model=AdminUserSummary)
@@ -51,7 +52,7 @@ def get_user(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return queries.get_user(user_id=user_id, db=db, _=_)
+    return operation_response(queries.get_user(user_id=user_id, db=db, _=_))
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserSummary)
@@ -62,7 +63,7 @@ def update_user(
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_admin_user_id),
 ):
-    return commands.update_user(user_id=user_id, data=data, background=background, db=db, admin_id=admin_id)
+    return operation_response(commands.update_user(user_id=user_id, data=data, background=background, db=db, admin_id=admin_id))
 
 
 @router.post("/users/{user_id}/reset-password", status_code=204)
@@ -72,7 +73,7 @@ def reset_password(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return commands.reset_password(user_id=user_id, data=data, db=db, _=_)
+    return operation_response(commands.reset_password(user_id=user_id, data=data, db=db, _=_))
 
 
 @router.delete("/users/{user_id}", status_code=204)
@@ -81,7 +82,7 @@ def delete_user(
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_admin_user_id),
 ):
-    return commands.delete_user(user_id=user_id, db=db, admin_id=admin_id)
+    return operation_response(commands.delete_user(user_id=user_id, db=db, admin_id=admin_id))
 
 
 @router.get("/config", response_model=AdminConfig)
@@ -89,7 +90,7 @@ def get_app_config(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return queries.get_app_config(db=db, _=_)
+    return operation_response(queries.get_app_config(db=db, _=_))
 
 
 @router.patch("/config", response_model=AdminConfig)
@@ -98,7 +99,7 @@ def update_app_config(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return commands.update_app_config(data=data, db=db, _=_)
+    return operation_response(commands.update_app_config(data=data, db=db, _=_))
 
 
 @router.get("/stats", response_model=AdminStats)
@@ -106,4 +107,4 @@ def get_stats(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return queries.get_stats(db=db, _=_)
+    return operation_response(queries.get_stats(db=db, _=_))

@@ -1,7 +1,7 @@
 """Transactions: common. Callers supply resolved user and database session."""
 import hashlib
 import json
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.models.transaction import Transaction, TransactionType
@@ -37,7 +37,7 @@ def _existing_idempotent_transaction(
         Transaction.client_request_id == request_id,
     ).first()
     if transaction and transaction.client_request_hash != request_hash:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=409,
             detail="Ключ повтора уже использован для другой операции.",
         )
@@ -50,7 +50,7 @@ def _ensure_own_category(db: Session, user_id: int, category_id: int) -> None:
         Category.id == category_id, Category.user_id == user_id
     ).first()
     if not cat:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise ApplicationError(status_code=404, detail="Category not found")
 
 
 def _ensure_expense_category(db: Session, user_id: int, category_id: int) -> None:
@@ -58,19 +58,19 @@ def _ensure_expense_category(db: Session, user_id: int, category_id: int) -> Non
         Category.id == category_id, Category.user_id == user_id
     ).first()
     if not category or category.type != "expense":
-        raise HTTPException(status_code=400, detail="Для комиссии выберите категорию расхода")
+        raise ApplicationError(status_code=400, detail="Для комиссии выберите категорию расхода")
 
 
 def _resolve_tags(db: Session, user_id: int, tag_ids: list[int]) -> list[Tag]:
     """Return only the current user's explicitly selected personal tags."""
     ids = list(dict.fromkeys(tag_ids))
     if len(ids) > 20:
-        raise HTTPException(status_code=400, detail="Можно указать не более 20 меток")
+        raise ApplicationError(status_code=400, detail="Можно указать не более 20 меток")
     if not ids:
         return []
     tags = db.query(Tag).filter(Tag.user_id == user_id, Tag.id.in_(ids)).all()
     if len(tags) != len(ids):
-        raise HTTPException(status_code=400, detail="Одна или несколько меток недоступны")
+        raise ApplicationError(status_code=400, detail="Одна или несколько меток недоступны")
     return tags
 
 
@@ -88,7 +88,7 @@ def _sync_transfer_fee(
     fee = fees[0] if fees else None
     active = fee_amount is not None and float(fee_amount) > 0
     if active and not fee_category_id:
-        raise HTTPException(status_code=400, detail="Укажите категорию комиссии")
+        raise ApplicationError(status_code=400, detail="Укажите категорию комиссии")
     if active:
         _ensure_expense_category(db, transfer.user_id, fee_category_id)
     transfer.fee_amount = round(float(fee_amount), 2) if active else None
@@ -136,7 +136,7 @@ def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amo
     та же валюта → та же сумма; иначе конвертирует по курсу пользователя.
     """
     if not to_account_id:
-        raise HTTPException(status_code=400, detail="Для перевода укажите счёт-получатель")
+        raise ApplicationError(status_code=400, detail="Для перевода укажите счёт-получатель")
     dst = family_accounts_svc.require_write_access(db, to_account_id, user_id)
     cur = (to_currency or src_currency).upper()
     if to_amount is None:
@@ -146,7 +146,7 @@ def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amo
             try:
                 to_amount = exchange_svc.convert_for_user(db, user_id, src_amount, src_currency, cur)
             except exchange_svc.ExchangeError:
-                raise HTTPException(422, "Курс недоступен. Укажите фактическую сумму зачисления в валюте получателя")
+                raise ApplicationError(422, "Курс недоступен. Укажите фактическую сумму зачисления в валюте получателя")
     return to_account_id, cur, round(float(to_amount), 2)
 
 
@@ -203,7 +203,7 @@ def _family_fields(
     # paid-owner access rule as every other Family endpoint.
     ensure_family_plan(db, user_id)
     if tx_type != TransactionType.expense:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Семейной можно отметить только расходную операцию",
         )
@@ -212,13 +212,13 @@ def _family_fields(
         FamilyMember.status == "active",
     ).first()
     if not membership:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Сначала создайте или примите семейное пространство",
         )
     reimbursable = amount if reimbursement_amount is None else reimbursement_amount
     if reimbursable < 0 or reimbursable > amount:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Сумма к возмещению должна быть от 0 до суммы расхода",
         )

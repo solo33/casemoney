@@ -1,5 +1,5 @@
 """Categories: common. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -45,29 +45,29 @@ def _validate_parent(
         return
 
     if self_id is not None and parent_id == self_id:
-        raise HTTPException(status_code=400, detail="Категория не может быть родителем самой себе")
+        raise ApplicationError(status_code=400, detail="Категория не может быть родителем самой себе")
 
     parent = db.query(Category).filter(
         Category.id == parent_id,
         Category.user_id == user_id,
     ).first()
     if not parent:
-        raise HTTPException(status_code=400, detail="Родительская категория не найдена")
+        raise ApplicationError(status_code=400, detail="Родительская категория не найдена")
 
     if parent.parent_id is not None:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Максимальная глубина иерархии — 2 уровня. Нельзя вложить в подкатегорию.",
         )
 
     if child_type is not None and parent.type != child_type:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail=f"Тип категории ({child_type}) не совпадает с типом родителя ({parent.type})",
         )
 
     if has_children:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Категория содержит дочерние — её нельзя сделать дочерней (превысит глубину 2)",
         )

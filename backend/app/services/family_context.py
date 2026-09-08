@@ -1,11 +1,10 @@
 """Family membership, payloads and the legacy accounting projection."""
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import HTTPException
-from sqlalchemy import or_
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.family import Family, FamilyExpenseAccounting, FamilyMember
-from app.models.transaction import Transaction, TransactionType
+from app.models.transaction import Transaction
 from app.models.user import User
 
 
@@ -17,7 +16,7 @@ def _filter_month(query, year, month):
     if year is None and month is None:
         return query
     if year is None or month is None or not 2000 <= year <= 2200 or not 1 <= month <= 12:
-        raise HTTPException(status_code=422, detail="Укажите корректные год и месяц")
+        raise ApplicationError(status_code=422, detail="Укажите корректные год и месяц")
     start = datetime(year, month, 1, tzinfo=timezone.utc)
     end = datetime(year + (month == 12), 1 if month == 12 else month + 1, 1, tzinfo=timezone.utc)
     return query.filter(Transaction.date >= start, Transaction.date < end)
@@ -33,7 +32,7 @@ def active_membership(db: Session, user_id: int) -> Optional[FamilyMember]:
 def require_membership(db: Session, user_id: int) -> FamilyMember:
     member = active_membership(db, user_id)
     if not member:
-        raise HTTPException(status_code=404, detail="Семейное пространство не настроено")
+        raise ApplicationError(status_code=404, detail="Семейное пространство не настроено")
     return member
 
 
@@ -78,64 +77,12 @@ def family_payload(db: Session, family: Family, current_user_id: int) -> dict:
 def require_family_owner(db: Session, user_id: int) -> FamilyMember:
     membership = require_membership(db, user_id)
     if membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Это действие доступно владельцу семейного пространства")
+        raise ApplicationError(status_code=403, detail="Это действие доступно владельцу семейного пространства")
     return membership
 
 
-def _ensure_family_accounting_rows(db: Session, family_id: int) -> bool:
-    """Backfill queue rows for common purchases created before this feature."""
-    family = db.query(Family).filter(Family.id == family_id).first()
-    if not family:
-        return False
-    created = False
-    existing_ids = {
-        item[0]
-        for item in db.query(FamilyExpenseAccounting.source_transaction_id).filter(
-            FamilyExpenseAccounting.family_id == family_id
-        ).all()
-    }
-    member_user_ids = [item[0] for item in db.query(FamilyMember.user_id).filter(
-        FamilyMember.family_id == family_id,
-        FamilyMember.status == "active",
-        FamilyMember.user_id.isnot(None),
-    ).all()]
-    rows = db.query(Transaction).filter(
-        Transaction.is_family_expense.is_(True),
-        Transaction.type == TransactionType.expense,
-        Transaction.is_planned.is_(False),
-        or_(
-            Transaction.family_id == family_id,
-            # Before the accounting queue existed some valid shared purchases
-            # were only marked by the flag.  Attach those legacy rows to the
-            # member's active family once, so they do not vanish from reports.
-            Transaction.family_id.is_(None) & Transaction.user_id.in_(member_user_ids),
-        ),
-    ).all()
-    for tx in rows:
-        if tx.id in existing_ids:
-            continue
-        if tx.family_id is None:
-            tx.family_id = family_id
-        is_owner_purchase = tx.user_id == family.owner_user_id
-        db.add(FamilyExpenseAccounting(
-            family_id=family_id,
-            source_transaction_id=tx.id,
-            source_user_id=tx.user_id,
-            owner_user_id=family.owner_user_id,
-            source_category_id=tx.category_id,
-            owner_category_id=tx.category_id if is_owner_purchase else None,
-            status="accepted" if is_owner_purchase else "pending",
-            accepted_at=datetime.now(timezone.utc) if is_owner_purchase else None,
-        ))
-        created = True
-    return created
-
-
 def accounting_rows_query(db: Session, family_id: int):
-    # Legacy common purchases need a durable queue record, otherwise the item
-    # would disappear between the GET request and the owner's confirmation.
-    if _ensure_family_accounting_rows(db, family_id):
-        db.commit()
+    """Read existing accounting rows without writing or committing anything."""
     return db.query(FamilyExpenseAccounting).filter(
         FamilyExpenseAccounting.family_id == family_id
     )

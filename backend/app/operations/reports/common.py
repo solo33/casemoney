@@ -1,5 +1,5 @@
 """Reports: common. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timezone
 from typing import Optional
@@ -53,14 +53,14 @@ def resolve_period(
     if period == "month":
         m = month or now.month
         if not 1 <= m <= 12:
-            raise HTTPException(status_code=400, detail="month должен быть 1..12")
+            raise ApplicationError(status_code=400, detail="month должен быть 1..12")
         last_day = monthrange(y, m)[1]
         return date(y, m, 1), date(y, m, last_day), f"{RU_MONTHS[m].capitalize()} {y}"
 
     if period == "quarter":
         q = quarter or ((now.month - 1) // 3 + 1)
         if not 1 <= q <= 4:
-            raise HTTPException(status_code=400, detail="quarter должен быть 1..4")
+            raise ApplicationError(status_code=400, detail="quarter должен быть 1..4")
         start_month = (q - 1) * 3 + 1
         end_month = start_month + 2
         last_day = monthrange(y, end_month)[1]
@@ -71,12 +71,12 @@ def resolve_period(
 
     if period == "custom":
         if not date_from or not date_to:
-            raise HTTPException(status_code=400, detail="date_from и date_to обязательны для custom")
+            raise ApplicationError(status_code=400, detail="date_from и date_to обязательны для custom")
         if date_from > date_to:
-            raise HTTPException(status_code=400, detail="date_from > date_to")
+            raise ApplicationError(status_code=400, detail="date_from > date_to")
         return date_from, date_to, f"{date_from.strftime('%d.%m.%Y')} — {date_to.strftime('%d.%m.%Y')}"
 
-    raise HTTPException(status_code=400, detail=f"Неизвестный period: {period}")
+    raise ApplicationError(status_code=400, detail=f"Неизвестный period: {period}")
 
 
 def _parse_ids(csv: Optional[str]) -> Optional[set[int]]:

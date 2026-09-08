@@ -1,5 +1,5 @@
 """Categories: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.category import Category
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryReorder
@@ -34,7 +34,7 @@ def update_category(category_id: int, data: CategoryUpdate, db: Session=None, us
         Category.user_id == user_id,
     ).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise ApplicationError(status_code=404, detail="Category not found")
 
     update_fields = data.model_dump(exclude_unset=True)
 
@@ -44,7 +44,7 @@ def update_category(category_id: int, data: CategoryUpdate, db: Session=None, us
         update_fields.get("is_hidden") is True
         and category.name.strip().casefold() == "без категории"
     ):
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Категорию «Без категории» нельзя скрыть при вводе",
         )
@@ -71,7 +71,7 @@ def update_category(category_id: int, data: CategoryUpdate, db: Session=None, us
     if "type" in update_fields and "parent_id" not in update_fields and category.parent_id is not None:
         parent = db.query(Category).filter(Category.id == category.parent_id).first()
         if parent and parent.type != update_fields["type"]:
-            raise HTTPException(
+            raise ApplicationError(
                 status_code=400,
                 detail=f"Тип не совпадает с родителем ({parent.type}). Сначала измените родителя.",
             )
@@ -88,20 +88,20 @@ def reorder_categories(data: CategoryReorder, db: Session=None, user_id: int=Non
     if not data.category_ids:
         return None
     if len(data.category_ids) != len(set(data.category_ids)):
-        raise HTTPException(status_code=400, detail="Категории в списке не должны повторяться")
+        raise ApplicationError(status_code=400, detail="Категории в списке не должны повторяться")
 
     categories = db.query(Category).filter(
         Category.user_id == user_id,
         Category.id.in_(data.category_ids),
     ).all()
     if len(categories) != len(data.category_ids):
-        raise HTTPException(status_code=404, detail="Одна или несколько категорий не найдены")
+        raise ApplicationError(status_code=404, detail="Одна или несколько категорий не найдены")
 
     expected_parent = data.parent_id
     if any(category.parent_id != expected_parent for category in categories):
-        raise HTTPException(status_code=400, detail="Можно менять порядок только у категорий одного уровня")
+        raise ApplicationError(status_code=400, detail="Можно менять порядок только у категорий одного уровня")
     if len({category.type for category in categories}) != 1:
-        raise HTTPException(status_code=400, detail="Нельзя смешивать доходы и расходы")
+        raise ApplicationError(status_code=400, detail="Нельзя смешивать доходы и расходы")
 
     by_id = {category.id: category for category in categories}
     for index, category_id in enumerate(data.category_ids):
@@ -117,6 +117,6 @@ def delete_category(category_id: int, db: Session=None, user_id: int=None):
         Category.user_id == user_id,
     ).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise ApplicationError(status_code=404, detail="Category not found")
     db.delete(category)
     db.commit()

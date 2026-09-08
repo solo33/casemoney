@@ -1,7 +1,7 @@
 """Calendar: common. Callers supply resolved user and database session."""
 import secrets
 from datetime import date, timedelta
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.services.email import app_url
@@ -56,5 +56,5 @@ def _rrule(frequency: str) -> str:
 def _require_user(db: Session, user_id: int) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApplicationError(status_code=404, detail="Пользователь не найден")
     return user

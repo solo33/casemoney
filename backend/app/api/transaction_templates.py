@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from typing import List
 from fastapi import APIRouter, Depends
@@ -12,14 +13,14 @@ router = APIRouter(prefix="/api/transaction-templates", tags=["transaction templ
 
 @router.get("/", response_model=List[TransactionTemplateResponse])
 def list_templates(db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
-    return queries.list_templates(db=db, user_id=user_id)
+    return operation_response(queries.list_templates(db=db, user_id=user_id))
 
 
 @router.post("/", response_model=TransactionTemplateResponse, status_code=201)
 def create_template(data: TransactionTemplateCreate, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
-    return commands.create_template(data=data, db=db, user_id=user_id)
+    return operation_response(commands.create_template(data=data, db=db, user_id=user_id))
 
 
 @router.delete("/{template_id}", status_code=204)
 def delete_template(template_id: int, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
-    return commands.delete_template(template_id=template_id, db=db, user_id=user_id)
+    return operation_response(commands.delete_template(template_id=template_id, db=db, user_id=user_id))

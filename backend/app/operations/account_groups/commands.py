@@ -1,5 +1,5 @@
 """Account_groups: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account_group import AccountGroup
 from app.schemas.account_group import AccountGroupCreate, AccountGroupUpdate
@@ -20,7 +20,7 @@ def update_group(group_id: int, data: AccountGroupUpdate, db: Session=None, user
         AccountGroup.user_id == user_id,
     ).first()
     if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+        raise ApplicationError(status_code=404, detail="Group not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(group, key, value)
     db.commit()
@@ -35,6 +35,6 @@ def delete_group(group_id: int, db: Session=None, user_id: int=None):
         AccountGroup.user_id == user_id,
     ).first()
     if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+        raise ApplicationError(status_code=404, detail="Group not found")
     db.delete(group)
     db.commit()

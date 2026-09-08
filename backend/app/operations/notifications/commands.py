@@ -1,6 +1,6 @@
 """Notifications: commands. Callers supply resolved user and database session."""
 from datetime import datetime, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.notification import Notification
 from app.schemas.notification import NotificationSettingsUpdate
@@ -36,7 +36,7 @@ def unsubscribe_push(data: PushSubscriptionDelete, db: Session=None, user_id: in
 def update_notification_settings(data: NotificationSettingsUpdate, db: Session=None, user_id: int=None):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApplicationError(status_code=404, detail="Пользователь не найден")
     known = {key: value.model_dump() for key, value in data.preferences.items() if key in NOTIFICATION_EVENTS}
     # Always persist a full, normalized map — the UI can safely render new
     # events after a deployment without requiring a separate migration.
@@ -57,7 +57,7 @@ def mark_notification_read(notification_id: int, db: Session=None, user_id: int=
         Notification.user_id == user_id,
     ).first()
     if not notification:
-        raise HTTPException(status_code=404, detail="Уведомление не найдено")
+        raise ApplicationError(status_code=404, detail="Уведомление не найдено")
     if notification.read_at is None:
         notification.read_at = datetime.now(timezone.utc)
         db.commit()

@@ -1,27 +1,29 @@
+import { useTransactionBulkCategory } from "./useTransactionBulkCategory";
+import { useTransactionTransferSuggestions } from "./useTransactionTransferSuggestions";
+import { useTransactionCategorySuggestions } from "./useTransactionCategorySuggestions";
 import { useUser } from "../contexts/UserContext";
-import { useSearchParams } from "react-router-dom";
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useTransactionFilters } from "./useTransactionFilters";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 import api from "../api/client";
 
 import { entryAccountGroups } from "../components/AccountOptions";
-import { preferredAccountCurrency, accountCurrencies as currenciesForAccount, isSameTransferCurrency, transferDisplayRate, swapTransferFields } from "../utils/transactionForm";
+import { preferredAccountCurrency } from "../utils/transactionForm";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 
-import { formatMoney, currencySymbol } from "../utils/money";
 
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 
-import useTransferQuote from "./useTransferQuote";
+import { useTransactionTransferDraft } from "./useTransactionTransferDraft";
 
 import { idempotencyKeyFor, clearIdempotencyKey } from "../utils/idempotency";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 
-import { isoToday, PAGE_SIZE, dateRangeForPreset, toLocalIsoDate } from "../utils/transactionsView";
+import { isoToday, PAGE_SIZE } from "../utils/transactionsView";
 
 export function useTransactionsController() {
   const { user } = useUser();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { filters, page, setPage, setFilter, applyDatePreset, resetFilters, hasFilters } = useTransactionFilters();
   const [data, setData] = useState({ items: [], total: 0 });
   const [accounts, setAccounts] = useState([]);
   const [accountGroups, setAccountGroups] = useState([]);
@@ -29,47 +31,12 @@ export function useTransactionsController() {
   const [tags, setTags] = useState([]);
   const [tagReport, setTagReport] = useState(null);
   const [frequentCategories, setFrequentCategories] = useState([]);
-  const [categorySuggestion, setCategorySuggestion] = useState(null);
-  const [transferSuggestions, setTransferSuggestions] = useState([]);
-  const [transferFees, setTransferFees] = useState({});
-  const [matchingTransferId, setMatchingTransferId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [editing, setEditing] = useState(null);    // tx id или 'new'
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [bulkCategoryId, setBulkCategoryId] = useState("");
-  const [bulkSaving, setBulkSaving] = useState(false);
   const createRequestRef = useRef(null);
-
-  // Фильтры — инициализируются из URL (для глубоких ссылок из Annual)
-  const [filters, setFilters] = useState(() => ({
-    account_id: searchParams.get("account_id") || "",
-    currency: searchParams.get("currency") || "",
-    category_id: searchParams.get("category_id") || "",
-    tag_id: searchParams.get("tag_id") || "",
-    type: searchParams.get("type") || "",
-    date_from: searchParams.get("date_from") || "",
-    date_to: searchParams.get("date_to") || "",
-    q: searchParams.get("q") || "",
-  }));
-  const [page, setPage] = useState(0);
-
-  // При смене URL — обновим фильтры (например, переход с Annual)
-  useEffect(() => {
-    setFilters({
-      account_id: searchParams.get("account_id") || "",
-      currency: searchParams.get("currency") || "",
-      category_id: searchParams.get("category_id") || "",
-      tag_id: searchParams.get("tag_id") || "",
-      type: searchParams.get("type") || "",
-      date_from: searchParams.get("date_from") || "",
-      date_to: searchParams.get("date_to") || "",
-      q: searchParams.get("q") || "",
-    });
-    setPage(0);
-  }, [searchParams]);
 
   // Форма создания
   const [newTx, setNewTx] = useState({
@@ -80,43 +47,7 @@ export function useTransactionsController() {
     date: isoToday(),
   });
 
-  useEffect(() => {
-    if (newTx.type === "transfer" || newTx.category_id || newTx.description.trim().length < 2 || navigator.onLine === false) {
-      setCategorySuggestion(null);
-      return undefined;
-    }
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await api.get("/api/automation/category-suggestion", {
-          params: { description: newTx.description, transaction_type: newTx.type },
-        });
-        if (!cancelled) setCategorySuggestion(response.data || null);
-      } catch {
-        if (!cancelled) setCategorySuggestion(null);
-      }
-    }, 350);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [newTx.description, newTx.type, newTx.category_id]);
-
-  const applyCategorySuggestion = () => {
-    if (!categorySuggestion) return;
-    setNewTx(current => ({ ...current, category_id: String(categorySuggestion.category_id) }));
-    setCategorySuggestion(null);
-  };
-
-  const saveSuggestedCategoryRule = async () => {
-    if (!categorySuggestion || newTx.description.trim().length < 2) return;
-    try {
-      await api.post("/api/automation/rules", {
-        pattern: newTx.description,
-        category_id: categorySuggestion.category_id,
-      });
-      setNotice(`Правило «${newTx.description.trim()} → ${categorySuggestion.category_name}» сохранено.`);
-    } catch (requestError) {
-      setNotice(requestError.response?.data?.detail || "Не удалось сохранить правило.");
-    }
-  };
+  const { categorySuggestion, applyCategorySuggestion, saveSuggestedCategoryRule } = useTransactionCategorySuggestions(newTx, setNewTx, setNotice);
 
   const loadAccounts = useCallback(async () => {
     const applyOptions = (groups, nextCategories) => {
@@ -126,9 +57,9 @@ export function useTransactionsController() {
       setAccountGroups(groups);
       setAccounts(flatAccounts);
       setCategories(nextCategories);
-      if (visibleAccounts.length > 0 && !newTx.account_id) {
+      if (visibleAccounts.length > 0) {
         const first = visibleAccounts[0];
-        setNewTx(t => ({
+        setNewTx(t => t.account_id ? t : ({
           ...t,
           account_id: String(first.id),
           currency: preferredAccountCurrency(first) || "RUB",
@@ -152,7 +83,7 @@ export function useTransactionsController() {
     } catch (error) {
       if (!cached) throw error;
     }
-  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
@@ -179,18 +110,6 @@ export function useTransactionsController() {
     api.get(`/api/tags/${filters.tag_id}/report`).then(response => setTagReport(response.data)).catch(() => setTagReport(null));
   }, [filters.tag_id]);
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
-  const showTransferSuggestions = Boolean(user?.show_transfer_suggestions);
-  const loadTransferSuggestions = useCallback(() => {
-    if (!showTransferSuggestions) {
-      setTransferSuggestions([]);
-      return;
-    }
-    api.get("/api/transactions/transfer-suggestions")
-      .then(response => setTransferSuggestions(response.data || []))
-      .catch(() => setTransferSuggestions([]));
-  }, [showTransferSuggestions]);
-  useEffect(() => { loadTransferSuggestions(); }, [loadTransferSuggestions]);
-  useEffect(() => { setSelectedIds([]); setBulkCategoryId(""); }, [filters, page]);
   useEffect(() => {
     if (newTx.type === "transfer") { setFrequentCategories([]); return; }
     api.get("/api/transactions/frequent-categories", { params: { tx_type: newTx.type } })
@@ -198,80 +117,16 @@ export function useTransactionsController() {
       .catch(() => setFrequentCategories([]));
   }, [newTx.type]);
 
-  const confirmTransferSuggestion = async (suggestion) => {
-    const message = `Связать списание ${formatMoney(suggestion.amount)} ${currencySymbol(suggestion.currency)} со счёта «${suggestion.account_name}» и поступление на «${suggestion.to_account_name}» как перевод?`;
-    if (!window.confirm(message)) return;
-    setMatchingTransferId(suggestion.expense_id);
-    try {
-      const feeCategoryId = transferFees[suggestion.expense_id];
-      await api.post(`/api/transactions/${suggestion.expense_id}/confirm-transfer-match`, {
-        income_transaction_id: suggestion.income_id,
-        ...(feeCategoryId ? { fee_category_id: Number(feeCategoryId) } : {}),
-      });
-      setNotice("Операции объединены в перевод между своими счетами.");
-      loadTransactions();
-      loadAccounts();
-      loadTransferSuggestions();
-    } catch (requestError) {
-      setNotice(requestError.response?.data?.detail || "Не удалось сопоставить операции.");
-    } finally {
-      setMatchingTransferId(null);
-    }
-  };
+  const { showTransferSuggestions, transferSuggestions, transferFees, setTransferFees, matchingTransferId, confirmTransferSuggestion } = useTransactionTransferSuggestions(user, loadTransactions, loadAccounts, setNotice);
 
   // Reload on FAB add
   useEffect(() => {
     const onAdded = () => { setPage(0); loadTransactions(); };
     window.addEventListener(TX_ADDED_EVENT, onAdded);
     return () => window.removeEventListener(TX_ADDED_EVENT, onAdded);
-  }, [loadTransactions]);
+  }, [loadTransactions, setPage]);
 
-  // Когда меняется выбранный счёт в форме создания — подкорректировать валюту
-  useEffect(() => {
-    if (!newTx.account_id || !accounts.length) return;
-    const acc = accounts.find(a => String(a.id) === String(newTx.account_id));
-    if (!acc?.balances?.length) return;
-    const currency = preferredAccountCurrency(acc, newTx.currency);
-    if (currency !== newTx.currency) {
-      setNewTx(t => ({ ...t, currency }));
-    }
-  }, [newTx.account_id, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const selectedAccount = useMemo(
-    () => accounts.find(a => String(a.id) === String(newTx.account_id)),
-    [accounts, newTx.account_id]
-  );
-  const newTxCurrencies = currenciesForAccount(selectedAccount);
-  const selectedTargetAccount = useMemo(
-    () => accounts.find(a => String(a.id) === String(newTx.to_account_id)),
-    [accounts, newTx.to_account_id]
-  );
-  const newTxTargetCurrencies = currenciesForAccount(selectedTargetAccount);
-  const sameNewTransferCurrency = isSameTransferCurrency(newTx.type, newTx.currency, newTx.to_currency);
-
-  useEffect(() => {
-    if (newTx.type !== "transfer" || !selectedTargetAccount) return;
-    if (!newTxTargetCurrencies.includes(newTx.to_currency)) {
-      setNewTx(current => ({ ...current, to_currency: newTxTargetCurrencies[0] || "", to_amount: "" }));
-    }
-  }, [newTx.type, selectedTargetAccount, newTxTargetCurrencies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const applyNewTransferQuote = useCallback(toAmount => {
-    setNewTx(current => current.to_amount === toAmount ? current : { ...current, to_amount: toAmount });
-  }, []);
-  const { loading: newQuoteLoading } = useTransferQuote({
-    enabled: newTx.type === "transfer" && !sameNewTransferCurrency,
-    amount: newTx.amount,
-    fromCurrency: newTx.currency,
-    toCurrency: newTx.to_currency,
-    onQuote: applyNewTransferQuote,
-  });
-  const newDisplayedRate = transferDisplayRate({ amount: newTx.amount, toAmount: newTx.to_amount });
-
-  const swapNewTransferAccounts = () => {
-    if (!newTx.account_id || !newTx.to_account_id) return;
-    setNewTx(current => swapTransferFields(current, sameNewTransferCurrency));
-  };
+  const { newTxCurrencies, newTxTargetCurrencies, sameNewTransferCurrency, newQuoteLoading, newDisplayedRate, swapNewTransferAccounts } = useTransactionTransferDraft(newTx, setNewTx, accounts);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -330,36 +185,7 @@ export function useTransactionsController() {
     }
   };
 
-  const selectedTransactions = data.items.filter(item => selectedIds.includes(item.id));
-  const selectedType = selectedTransactions.length ? selectedTransactions[0].type : null;
-  const canBulkCategorize = selectedTransactions.length > 0
-    && selectedTransactions.every(item => item.type === selectedType)
-    && selectedType !== "transfer";
-  const bulkCategories = selectedType ? categories.filter(item => item.type === selectedType) : [];
-  const toggleSelection = (id) => setSelectedIds(current => current.includes(id)
-    ? current.filter(item => item !== id)
-    : [...current, id]);
-  const toggleAllPage = () => setSelectedIds(current => {
-    const ids = data.items.map(item => item.id);
-    return ids.length > 0 && ids.every(id => current.includes(id)) ? [] : ids;
-  });
-  const applyBulkCategory = async () => {
-    if (!canBulkCategorize || !bulkCategoryId) return;
-    setBulkSaving(true);
-    setError(null);
-    try {
-      const response = await api.patch("/api/transactions/bulk/category", {
-        transaction_ids: selectedIds,
-        category_id: Number(bulkCategoryId),
-      });
-      setSelectedIds([]);
-      setBulkCategoryId("");
-      setNotice(`Категория обновлена у ${response.data.updated} ${response.data.updated === 1 ? "записи" : "записей"}.`);
-      loadTransactions();
-    } catch (requestError) {
-      setError(requestError.response?.data?.detail || "Не удалось изменить категории.");
-    } finally { setBulkSaving(false); }
-  };
+  const { selectedIds, setSelectedIds, bulkCategoryId, setBulkCategoryId, bulkSaving, canBulkCategorize, bulkCategories, toggleSelection, toggleAllPage, applyBulkCategory } = useTransactionBulkCategory({ data, categories, filters, page, loadTransactions, setError, setNotice });
 
   const accountName = (id) => accounts.find(a => a.id === id)?.name || id;
   const categoryNameFor = (id) => {
@@ -382,36 +208,5 @@ export function useTransactionsController() {
   const showingFrom = data.total === 0 ? 0 : page * PAGE_SIZE + 1;
   const showingTo = Math.min((page + 1) * PAGE_SIZE, data.total);
 
-  const setFilter = (key, value) => {
-    const next = { ...filters, [key]: value };
-    setFilters(next);
-    setPage(0);
-    // отражаем активные фильтры в URL
-    const params = {};
-    Object.entries(next).forEach(([k, v]) => { if (v) params[k] = v; });
-    setSearchParams(params, { replace: true });
-  };
-
-  const applyDatePreset = (preset) => {
-    const range = dateRangeForPreset(preset);
-    const next = {
-      ...filters,
-      date_from: toLocalIsoDate(range.from),
-      date_to: toLocalIsoDate(range.to),
-    };
-    setFilters(next);
-    setPage(0);
-    const params = {};
-    Object.entries(next).forEach(([key, value]) => { if (value) params[key] = value; });
-    setSearchParams(params, { replace: true });
-  };
-
-  const resetFilters = () => {
-    setFilters({ account_id: "", currency: "", category_id: "", tag_id: "", type: "", date_from: "", date_to: "", q: "" });
-    setPage(0);
-    setSearchParams({}, { replace: true });
-  };
-
-  const hasFilters = Object.values(filters).some(v => v);
   return { user, data, accounts, accountGroups, categories, setCategories, tags, setTags, tagReport, frequentCategories, categorySuggestion, transferSuggestions, transferFees, setTransferFees, matchingTransferId, loading, error, setError, notice, setNotice, editing, setEditing, filtersOpen, setFiltersOpen, selectedIds, setSelectedIds, bulkCategoryId, setBulkCategoryId, bulkSaving, filters, page, setPage, newTx, setNewTx, applyCategorySuggestion, saveSuggestedCategoryRule, loadAccounts, loadTransactions, showTransferSuggestions, confirmTransferSuggestion, newTxCurrencies, newTxTargetCurrencies, sameNewTransferCurrency, newQuoteLoading, newDisplayedRate, swapNewTransferAccounts, handleCreate, handleDelete, canBulkCategorize, bulkCategories, toggleSelection, toggleAllPage, applyBulkCategory, accountName, categoryNameFor, formatDate, formatDateTime, filteredCategoriesForCreate, totalPages, showingFrom, showingTo, setFilter, applyDatePreset, resetFilters, hasFilters };
 }

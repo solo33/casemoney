@@ -1,5 +1,5 @@
 """Automation: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models.category import Category
@@ -24,17 +24,17 @@ def update_settings(data: AutomationSettingsUpdate, db: Session=None, user_id: i
 def create_rule(data: CategoryRuleCreate, db: Session=None, user_id: int=None):
     pattern = normalize_rule_pattern(data.pattern)
     if len(pattern) < 2:
-        raise HTTPException(status_code=400, detail="Укажите не менее двух символов из назначения операции.")
+        raise ApplicationError(status_code=400, detail="Укажите не менее двух символов из назначения операции.")
     category = db.query(Category).filter(Category.id == data.category_id, Category.user_id == user_id).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена.")
+        raise ApplicationError(status_code=404, detail="Категория не найдена.")
     rule = CategoryRule(user_id=user_id, category_id=category.id, pattern=pattern)
     db.add(rule)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Такое правило уже есть.")
+        raise ApplicationError(status_code=409, detail="Такое правило уже есть.")
     db.refresh(rule)
     return _rule_response(rule, category)
 
@@ -42,6 +42,6 @@ def create_rule(data: CategoryRuleCreate, db: Session=None, user_id: int=None):
 def delete_rule(rule_id: int, db: Session=None, user_id: int=None):
     rule = db.query(CategoryRule).filter(CategoryRule.id == rule_id, CategoryRule.user_id == user_id).first()
     if not rule:
-        raise HTTPException(status_code=404, detail="Правило не найдено.")
+        raise ApplicationError(status_code=404, detail="Правило не найдено.")
     db.delete(rule)
     db.commit()

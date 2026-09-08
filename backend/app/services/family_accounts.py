@@ -6,7 +6,7 @@
 
 from typing import Optional
 
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -48,12 +48,12 @@ def accessible_accounts(db: Session, user_id: int):
 def require_read_access(db: Session, account_id: int, user_id: int) -> Account:
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account or not access_level(db, account, user_id):
-        raise HTTPException(status_code=404, detail="Счёт не найден")
+        raise ApplicationError(status_code=404, detail="Счёт не найден")
     return account
 
 
 def require_write_access(db: Session, account_id: int, user_id: int) -> Account:
     account = require_read_access(db, account_id, user_id)
     if access_level(db, account, user_id) not in {"owner", "editor"}:
-        raise HTTPException(status_code=403, detail="Для этого счёта доступно только чтение")
+        raise ApplicationError(status_code=403, detail="Для этого счёта доступно только чтение")
     return account

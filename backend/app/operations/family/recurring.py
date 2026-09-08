@@ -1,5 +1,5 @@
 """Family: recurring. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.family_recurring_suggestion import FamilyRecurringSuggestionDecision
 from app.models.recurring_transaction import RecurringTransaction
@@ -26,7 +26,7 @@ def _family_recurring_suggestion_or_404(
     ):
         if item["fingerprint"] == fingerprint:
             return item
-    raise HTTPException(status_code=404, detail="Предложение регулярного платежа не найдено")
+    raise ApplicationError(status_code=404, detail="Предложение регулярного платежа не найдено")
 
 
 def dismiss_family_recurring_suggestion(fingerprint: str, db: Session=None, user_id: int=None):
@@ -52,7 +52,7 @@ def create_family_recurring_suggestion(fingerprint: str, db: Session=None, user_
     membership = require_membership(db, user_id)
     suggestion = _family_recurring_suggestion_or_404(db, membership.family_id, user_id, fingerprint)
     if not suggestion["can_create"]:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=403,
             detail="Регулярную операцию может создать участник, с чьего счёта проходили эти расходы",
         )
@@ -61,7 +61,7 @@ def create_family_recurring_suggestion(fingerprint: str, db: Session=None, user_
         FamilyRecurringSuggestionDecision.fingerprint == fingerprint,
     ).first()
     if existing:
-        raise HTTPException(status_code=409, detail="Это предложение уже обработано")
+        raise ApplicationError(status_code=409, detail="Это предложение уже обработано")
 
     schedule = RecurringTransaction(
         user_id=user_id,

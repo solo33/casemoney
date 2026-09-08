@@ -1,5 +1,5 @@
 """Accounts: balances. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from math import isfinite
@@ -23,7 +23,7 @@ def add_balance(account_id: int, data: AccountBalanceCreate, db: Session=None, u
         AccountBalance.currency == currency,
     ).first()
     if exists:
-        raise HTTPException(status_code=400, detail=f"Баланс в {currency} уже существует")
+        raise ApplicationError(status_code=400, detail=f"Баланс в {currency} уже существует")
 
     bal = AccountBalance(
         account_id=account.id,
@@ -50,7 +50,7 @@ def update_balance(account_id: int, currency: str, data: AccountBalanceUpdate, d
         AccountBalance.currency == currency,
     ).first()
     if not bal:
-        raise HTTPException(status_code=404, detail="Balance not found")
+        raise ApplicationError(status_code=404, detail="Balance not found")
     bal.balance = data.balance
     db.commit()
     db.refresh(bal)
@@ -66,7 +66,7 @@ def update_balance(account_id: int, currency: str, data: AccountBalanceUpdate, d
 def adjust_balance(account_id: int, currency: str, data: AccountBalanceAdjustmentCreate, db: Session=None, user_id: int=None):
     """Создаёт доход/расход на разницу между фактическим и указанным остатком."""
     if not isfinite(data.balance):
-        raise HTTPException(status_code=400, detail="Некорректный остаток")
+        raise ApplicationError(status_code=400, detail="Некорректный остаток")
 
     account = family_accounts_svc.require_write_access(db, account_id, user_id)
 
@@ -76,13 +76,13 @@ def adjust_balance(account_id: int, currency: str, data: AccountBalanceAdjustmen
         AccountBalance.currency == normalized_currency,
     ).with_for_update().first()
     if not balance:
-        raise HTTPException(status_code=404, detail="Balance not found")
+        raise ApplicationError(status_code=404, detail="Balance not found")
 
     old_balance = round(float(balance.balance), 2)
     new_balance = round(float(data.balance), 2)
     difference = round(new_balance - old_balance, 2)
     if abs(difference) < 0.005:
-        raise HTTPException(status_code=400, detail="Остаток не изменился")
+        raise ApplicationError(status_code=400, detail="Остаток не изменился")
 
     tx_type = TransactionType.income if difference > 0 else TransactionType.expense
     category = None
@@ -92,9 +92,9 @@ def adjust_balance(account_id: int, currency: str, data: AccountBalanceAdjustmen
             Category.user_id == user_id,
         ).first()
         if not category:
-            raise HTTPException(status_code=404, detail="Category not found")
+            raise ApplicationError(status_code=404, detail="Category not found")
         if category.type != tx_type.value:
-            raise HTTPException(
+            raise ApplicationError(
                 status_code=400,
                 detail="Категория не соответствует типу корректировки",
             )
@@ -153,9 +153,9 @@ def delete_balance(account_id: int, currency: str, db: Session=None, user_id: in
         AccountBalance.currency == currency,
     ).first()
     if not bal:
-        raise HTTPException(status_code=404, detail="Balance not found")
+        raise ApplicationError(status_code=404, detail="Balance not found")
     if abs(bal.balance) > 0.005:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail=f"Нельзя удалить баланс с ненулевой суммой ({bal.balance} {currency})",
         )

@@ -1,5 +1,5 @@
 """Accounts: common. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from typing import Optional
 from app.models.account import Account
@@ -16,7 +16,7 @@ def _validate_group(db: Session, user_id: int, group_id: Optional[int]) -> None:
         AccountGroup.user_id == user_id,
     ).first()
     if not exists:
-        raise HTTPException(status_code=400, detail="Group not found")
+        raise ApplicationError(status_code=400, detail="Group not found")
 
 
 def _get_account(db: Session, account_id: int, user_id: int) -> Account:
@@ -29,5 +29,5 @@ def _get_owned_account(db: Session, account_id: int, user_id: int) -> Account:
         Account.user_id == user_id,
     ).first()
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise ApplicationError(status_code=404, detail="Account not found")
     return account

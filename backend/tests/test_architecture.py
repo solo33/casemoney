@@ -29,6 +29,19 @@ def test_application_operations_do_not_resolve_http_dependencies():
     assert not violations, violations
 
 
+def test_application_layers_do_not_import_web_frameworks():
+    violations = []
+    paths = [APP_ROOT / 'application.py']
+    for layer in ('operations', 'services'):
+        paths.extend((APP_ROOT / layer).rglob('*.py'))
+    for path in paths:
+        for node in ast.walk(ast.parse(path.read_text(encoding='utf-8-sig'))):
+            modules = [node.module or ''] if isinstance(node, ast.ImportFrom) else [item.name for item in node.names] if isinstance(node, ast.Import) else []
+            if any(module.split('.')[0] in {'fastapi', 'starlette'} for module in modules):
+                violations.append(f'{path.relative_to(APP_ROOT)}:{node.lineno}')
+    assert not violations, violations
+
+
 def test_refactor_preserves_public_http_contract():
     """Intentional API changes must update the versioned contract fixture."""
     expected = json.loads((Path(__file__).parent / 'fixtures' / 'openapi_contract.json').read_text(encoding='utf-8'))

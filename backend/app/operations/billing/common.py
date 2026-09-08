@@ -1,7 +1,7 @@
 """Billing: common. Callers supply resolved user and database session."""
 import os
 from decimal import Decimal
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.family import FamilyMember
@@ -14,7 +14,7 @@ def _test_price(period: str) -> Decimal:
     try:
         return max(Decimal("0"), Decimal(os.getenv(variable, default))).quantize(Decimal("0.01"))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail="Некорректно задана тестовая стоимость Family") from exc
+        raise ApplicationError(status_code=500, detail="Некорректно задана тестовая стоимость Family") from exc
 
 
 def _ensure_user_can_purchase_family(db: Session, user: User) -> None:
@@ -24,4 +24,4 @@ def _ensure_user_can_purchase_family(db: Session, user: User) -> None:
         FamilyMember.status == "active",
     ).first()
     if membership and membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Оплату Family оформляет владелец семейного пространства")
+        raise ApplicationError(status_code=403, detail="Оплату Family оформляет владелец семейного пространства")

@@ -1,6 +1,6 @@
 """Transactions: queries. Callers supply resolved user and database session."""
 from datetime import date, datetime, timedelta, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Optional
@@ -104,14 +104,14 @@ def get_transactions(account_id: Optional[int]=None, currency: Optional[str]=Non
         try:
             query = query.filter(Transaction.type == TransactionType[type])
         except KeyError:
-            raise HTTPException(status_code=400, detail=f"Invalid type: {type}")
+            raise ApplicationError(status_code=400, detail=f"Invalid type: {type}")
     if category_id is not None:
         cat_ids = _expand_categories(db, user_id, category_id)
         query = query.filter(Transaction.category_id.in_(cat_ids))
     if tag_id is not None:
         tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user_id).first()
         if not tag:
-            raise HTTPException(status_code=404, detail="Метка не найдена")
+            raise ApplicationError(status_code=404, detail="Метка не найдена")
         query = query.join(Transaction.tags).filter(Tag.id == tag.id)
     if date_from:
         query = query.filter(func.date(Transaction.date) >= date_from)

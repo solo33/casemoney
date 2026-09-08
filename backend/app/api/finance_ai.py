@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from app.api.dependencies import current_user_id as _user_id
 from fastapi import APIRouter, Depends
@@ -15,4 +16,4 @@ async def finance_ai_insight(
     db: Session = Depends(get_db),
     user_id: int = Depends(_user_id),
 ):
-    return await commands.finance_ai_insight(data=data, db=db, user_id=user_id)
+    return operation_response(await commands.finance_ai_insight(data=data, db=db, user_id=user_id))

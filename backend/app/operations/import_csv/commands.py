@@ -1,6 +1,6 @@
 """Import_csv: commands. Callers supply resolved user and database session."""
 from app.operations.import_csv.common import MAX_IMPORT_BYTES
-from fastapi import HTTPException, UploadFile
+from app.application import ApplicationError, UploadedFile
 from sqlalchemy.orm import Session
 from app.services import import_csv as svc
 from app.services import tbank_import as tbank_svc
@@ -9,17 +9,17 @@ from app.schemas.import_csv import ConfirmResponse, ImportTotals
 from app.schemas.import_csv_views import ConfirmRequest, PreviewResponseWithToken, TBankConfirmRequest
 
 
-async def preview(file: UploadFile=..., db: Session=None, user_id: int=None):
+async def preview(file: UploadedFile=..., db: Session=None, user_id: int=None):
     content = await file.read()
     if len(content) > MAX_IMPORT_BYTES:
-        raise HTTPException(status_code=413, detail="Файл слишком большой. Максимум 10 МБ.")
+        raise ApplicationError(status_code=413, detail="Файл слишком большой. Максимум 10 МБ.")
     try:
         rows = svc.parse_file(file.filename or "", content)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise ApplicationError(status_code=400, detail=str(e))
 
     if not rows:
-        raise HTTPException(status_code=400, detail="Файл пустой или не содержит данных")
+        raise ApplicationError(status_code=400, detail="Файл пустой или не содержит данных")
 
     preview = svc.build_preview(db, user_id, rows)
 
@@ -63,24 +63,24 @@ def confirm(data: ConfirmRequest, db: Session=None, user_id: int=None):
     return ConfirmResponse(**result)
 
 
-async def preview_tbank(file: UploadFile=..., db: Session=None, user_id: int=None):
+async def preview_tbank(file: UploadedFile=..., db: Session=None, user_id: int=None):
     content = await file.read()
     if len(content) > MAX_IMPORT_BYTES:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=413,
             detail="Файл слишком большой. Максимум 10 МБ.",
         )
     try:
         items = tbank_svc.prepare_tbank_items(content)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise ApplicationError(status_code=400, detail=str(exc)) from exc
     if not items:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="Файл пустой или не содержит операций",
         )
     if len(items) > 5000:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="В одном файле можно импортировать не более 5000 операций",
         )
@@ -108,7 +108,7 @@ def confirm_tbank(data: TBankConfirmRequest, db: Session=None, user_id: int=None
             commit=False,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise ApplicationError(status_code=400, detail=str(exc)) from exc
     session.result, session.confirmation = result, confirmation
     db.commit()
     return result

@@ -1,6 +1,6 @@
 """Family: settlements. Callers supply resolved user and database session."""
 from datetime import datetime, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.family import FamilyExpenseAccounting, FamilyMember, FamilySettlement
@@ -14,20 +14,20 @@ from app.schemas.family_views import SettlementCreate
 def create_settlement(data: SettlementCreate, db: Session=None, user_id: int=None):
     membership = require_membership(db, user_id)
     if membership.role == "viewer":
-        raise HTTPException(status_code=403, detail="Наблюдатель не может создавать возмещения")
+        raise ApplicationError(status_code=403, detail="Наблюдатель не может создавать возмещения")
     # Счёт владельца уже уменьшился при переносе покупок в его учёт. Поэтому
     # возврат закрывает только внутренний долг и не создаёт второе списание.
     if membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Возмещение фиксирует владелец семейного пространства")
+        raise ApplicationError(status_code=403, detail="Возмещение фиксирует владелец семейного пространства")
     recipient = db.query(FamilyMember).filter(
         FamilyMember.family_id == membership.family_id,
         FamilyMember.user_id == data.to_user_id,
         FamilyMember.status == "active",
     ).first()
     if not recipient:
-        raise HTTPException(status_code=404, detail="Участник семьи не найден")
+        raise ApplicationError(status_code=404, detail="Участник семьи не найден")
     if data.to_user_id == user_id:
-        raise HTTPException(status_code=400, detail="Нельзя возместить самому себе")
+        raise ApplicationError(status_code=400, detail="Нельзя возместить самому себе")
     currency = data.currency.upper()
     accepted_rows = accounting_rows_query(db, membership.family_id).filter(
         FamilyExpenseAccounting.status == "accepted",
@@ -51,7 +51,7 @@ def create_settlement(data: SettlementCreate, db: Session=None, user_id: int=Non
         FamilySettlement.currency == currency,
     ).scalar() or 0
     if data.amount > float(owed) - float(reimbursed) + 0.005:
-        raise HTTPException(status_code=400, detail="Сумма больше подтверждённого долга к возмещению")
+        raise ApplicationError(status_code=400, detail="Сумма больше подтверждённого долга к возмещению")
     settlement = FamilySettlement(
         family_id=membership.family_id,
         from_user_id=user_id,

@@ -1,5 +1,5 @@
 """Goals: common. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date, timedelta
@@ -135,4 +135,4 @@ def _validate_account(db: Session, user_id: int, account_id: Optional[int]):
         Account.id == account_id, Account.user_id == user_id,
     ).first()
     if not acc:
-        raise HTTPException(status_code=400, detail="Account not found")
+        raise ApplicationError(status_code=400, detail="Account not found")

@@ -1,5 +1,5 @@
 """Tags: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models.transaction_tag import Tag
@@ -14,7 +14,7 @@ def create_tag(data: TagCreate, db: Session=None, user_id: int=None):
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Такая метка уже есть")
+        raise ApplicationError(status_code=409, detail="Такая метка уже есть")
     db.refresh(tag)
     return tag
 
@@ -22,7 +22,7 @@ def create_tag(data: TagCreate, db: Session=None, user_id: int=None):
 def update_tag(tag_id: int, data: TagUpdate, db: Session=None, user_id: int=None):
     tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user_id).first()
     if not tag:
-        raise HTTPException(status_code=404, detail="Метка не найдена")
+        raise ApplicationError(status_code=404, detail="Метка не найдена")
     if data.name is not None:
         tag.name = _normalise_name(data.name)
     if data.color is not None:
@@ -31,7 +31,7 @@ def update_tag(tag_id: int, data: TagUpdate, db: Session=None, user_id: int=None
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Такая метка уже есть")
+        raise ApplicationError(status_code=409, detail="Такая метка уже есть")
     db.refresh(tag)
     return tag
 
@@ -39,6 +39,6 @@ def update_tag(tag_id: int, data: TagUpdate, db: Session=None, user_id: int=None
 def delete_tag(tag_id: int, db: Session=None, user_id: int=None):
     tag = db.query(Tag).filter(Tag.id == tag_id, Tag.user_id == user_id).first()
     if not tag:
-        raise HTTPException(status_code=404, detail="Метка не найдена")
+        raise ApplicationError(status_code=404, detail="Метка не найдена")
     db.delete(tag)
     db.commit()

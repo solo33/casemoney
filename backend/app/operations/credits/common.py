@@ -3,7 +3,7 @@ import calendar
 import math
 from datetime import date, datetime, time, timezone
 from typing import Optional
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.category import Category
@@ -18,7 +18,7 @@ def _own_account(db: Session, user_id: int, account_id: Optional[int]) -> Option
         return None
     account = db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
     if not account:
-        raise HTTPException(status_code=404, detail="Счёт не найден")
+        raise ApplicationError(status_code=404, detail="Счёт не найден")
     return account
 
 
@@ -27,7 +27,7 @@ def _own_category(db: Session, user_id: int, category_id: Optional[int]) -> Opti
         return None
     category = db.query(Category).filter(Category.id == category_id, Category.user_id == user_id).first()
     if not category:
-        raise HTTPException(status_code=404, detail="Категория не найдена")
+        raise ApplicationError(status_code=404, detail="Категория не найдена")
     return category
 
 
@@ -37,7 +37,7 @@ def _validate_cashflow_category(category: Optional[Category], kind: str) -> None
     expected = "income" if kind == "deposit" else "expense"
     if category.type != expected:
         label = "дохода" if expected == "income" else "расхода"
-        raise HTTPException(status_code=400, detail=f"Выберите категорию {label}")
+        raise ApplicationError(status_code=400, detail=f"Выберите категорию {label}")
 
 
 def _initial_payment_date(due_day: Optional[int]) -> Optional[date]:
@@ -184,14 +184,14 @@ def _annuity_payment(balance: float, months: int, monthly_rate: float) -> Option
 
 def _mortgage_schedule(credit: CreditObligation) -> list[MortgageScheduleItem]:
     if credit.kind != "mortgage":
-        raise HTTPException(status_code=400, detail="График доступен только для ипотеки")
+        raise ApplicationError(status_code=400, detail="График доступен только для ипотеки")
     balance = round(max(0.0, float(credit.current_balance or 0)), 2)
     payment = round(float(credit.monthly_payment or 0), 2)
     rate = _monthly_rate(credit)
     if payment <= 0:
-        raise HTTPException(status_code=400, detail="Укажите регулярный платёж, чтобы построить график")
+        raise ApplicationError(status_code=400, detail="Укажите регулярный платёж, чтобы построить график")
     if payment <= balance * rate and balance > 0:
-        raise HTTPException(status_code=400, detail="Регулярный платёж не покрывает проценты по текущей ставке")
+        raise ApplicationError(status_code=400, detail="Регулярный платёж не покрывает проценты по текущей ставке")
 
     payment_date = credit.next_payment_date or _initial_payment_date(credit.due_day) or date.today()
     items: list[MortgageScheduleItem] = []

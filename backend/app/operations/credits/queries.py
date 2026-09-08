@@ -1,5 +1,5 @@
 """Credits: queries. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.credit import CreditObligation
 from app.schemas.credit import MortgagePaymentPreview, CreditSummary, MortgageScheduleResponse
@@ -38,7 +38,7 @@ def mortgage_schedule(credit_id: int, db: Session=None, user_id: int=None):
         CreditObligation.user_id == user_id,
     ).first()
     if not credit:
-        raise HTTPException(status_code=404, detail="Ипотека не найдена")
+        raise ApplicationError(status_code=404, detail="Ипотека не найдена")
     return MortgageScheduleResponse(
         credit_id=credit.id,
         currency=credit.currency,
@@ -51,17 +51,17 @@ def mortgage_schedule(credit_id: int, db: Session=None, user_id: int=None):
 def mortgage_payment_preview(credit_id: int, amount: float, db: Session=None, user_id: int=None):
     """Server-side source of truth for the mortgage payment split."""
     if amount <= 0:
-        raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
+        raise ApplicationError(status_code=400, detail="Сумма должна быть больше нуля")
     credit = db.query(CreditObligation).filter(
         CreditObligation.id == credit_id,
         CreditObligation.user_id == user_id,
         CreditObligation.kind == "mortgage",
     ).first()
     if not credit:
-        raise HTTPException(status_code=404, detail="Ипотека не найдена")
+        raise ApplicationError(status_code=404, detail="Ипотека не найдена")
     principal, interest = _calculate_mortgage_split(credit, amount)
     if principal is None or interest is None:
-        raise HTTPException(status_code=400, detail="Укажите годовую ставку в настройках ипотеки")
+        raise ApplicationError(status_code=400, detail="Укажите годовую ставку в настройках ипотеки")
     return MortgagePaymentPreview(
         principal_amount=principal,
         interest_amount=interest,

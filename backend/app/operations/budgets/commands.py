@@ -1,6 +1,6 @@
 """Budgets: commands. Callers supply resolved user and database session."""
 from datetime import date
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.budget import Budget
 from app.schemas.budget import BudgetCreate, BudgetUpdate
@@ -16,7 +16,7 @@ def create_budget(data: BudgetCreate, db: Session=None, user_id: int=None):
         Budget.period == data.period, Budget.period_start == start,
     ).first()
     if existing:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail="В этом периоде уже задан бюджет для этой категории или её группы",
         )
@@ -37,7 +37,7 @@ def create_budget(data: BudgetCreate, db: Session=None, user_id: int=None):
 def update_budget(budget_id: int, data: BudgetUpdate, db: Session=None, user_id: int=None):
     budget = db.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
     if not budget:
-        raise HTTPException(status_code=404, detail="Бюджет не найден")
+        raise ApplicationError(status_code=404, detail="Бюджет не найден")
     changes = data.model_dump(exclude_unset=True)
     if "scope" in changes and changes["scope"] != "personal":
         _transaction_scope_filter(db, user_id, changes["scope"])
@@ -52,6 +52,6 @@ def update_budget(budget_id: int, data: BudgetUpdate, db: Session=None, user_id:
 def delete_budget(budget_id: int, db: Session=None, user_id: int=None):
     budget = db.query(Budget).filter(Budget.id == budget_id, Budget.user_id == user_id).first()
     if not budget:
-        raise HTTPException(status_code=404, detail="Бюджет не найден")
+        raise ApplicationError(status_code=404, detail="Бюджет не найден")
     db.delete(budget)
     db.commit()

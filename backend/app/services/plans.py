@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -39,7 +39,7 @@ def has_family_plan(db: Session, user_id: int) -> bool:
 
 def ensure_family_plan(db: Session, user_id: int) -> None:
     if not has_family_plan(db, user_id):
-        raise HTTPException(
+        raise ApplicationError(
             status_code=403,
             detail="Семейные функции доступны только на тарифе Family",
         )

@@ -1,7 +1,7 @@
 """Calendar: queries. Callers supply resolved user and database session."""
 from datetime import date, timedelta
-from fastapi import HTTPException
-from fastapi.responses import Response
+from app.application import ApplicationError
+from app.application import ResponseData
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.services.plans import ensure_family_plan
@@ -28,7 +28,7 @@ def calendar_events(days: int=366, db: Session=None, user_id: int=None):
 def calendar_feed(token: str, db: Session=None):
     user = db.query(User).filter(User.calendar_token == token).first()
     if not user or user.plan != "family":
-        raise HTTPException(status_code=404, detail="Календарь не найден")
+        raise ApplicationError(status_code=404, detail="Календарь не найден")
 
     start = date.today()
     end = start + timedelta(days=366)
@@ -50,4 +50,4 @@ def calendar_feed(token: str, db: Session=None):
             item.get("description") or "Будущая операция CaseMoney", rrule=rrule,
         ))
     lines.append("END:VCALENDAR")
-    return Response("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8", headers={"Cache-Control": "private, max-age=300"})
+    return ResponseData("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8", headers={"Cache-Control": "private, max-age=300"})

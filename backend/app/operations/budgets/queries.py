@@ -1,6 +1,6 @@
 """Budgets: queries. Callers supply resolved user and database session."""
 from datetime import date, timedelta
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.budget import Budget
@@ -14,7 +14,7 @@ from app.operations.budgets.common import _period_start, _serialize, PERIODS
 
 def list_budgets(period: str='month', anchor: date | None=None, db: Session=None, user_id: int=None):
     if period not in PERIODS:
-        raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
+        raise ApplicationError(status_code=400, detail="Неподдерживаемый период бюджета")
     selected_start = _period_start(anchor or date.today(), period)
     budgets = db.query(Budget).filter(
         Budget.user_id == user_id,
@@ -27,7 +27,7 @@ def list_budgets(period: str='month', anchor: date | None=None, db: Session=None
 
 def budget_suggestions(period: str='month', anchor: date | None=None, db: Session=None, user_id: int=None):
     if period not in PERIODS:
-        raise HTTPException(status_code=400, detail="Неподдерживаемый период бюджета")
+        raise ApplicationError(status_code=400, detail="Неподдерживаемый период бюджета")
     main_currency = accounts_svc.get_user_main_currency(db, user_id)
     selected_start = _period_start(anchor or date.today(), period)
     # Берём 12 полных календарных месяцев до выбранного периода. Делим всегда

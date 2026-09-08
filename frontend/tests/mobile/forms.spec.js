@@ -1,6 +1,23 @@
 import { test, expect } from '@playwright/test';
 import { mockApi } from './fixtures';
 
+test('mobile bulk category change submits selected records and clears selection', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 550 });
+  await mockApi(page);
+  let saved;
+  await page.route(/\/api\/transactions\/bulk\/category$/, async route => {
+    saved = route.request().postDataJSON();
+    await route.fulfill({ json: { updated: 1 } });
+  });
+  await page.goto('/transactions', { waitUntil: 'networkidle' });
+  await page.locator('.mobile-transaction-select input').first().check();
+  await page.getByLabel('Новая категория для выбранных записей').selectOption('2');
+  await page.getByRole('button', { name: 'Изменить категорию', exact: true }).click();
+  await expect.poll(() => saved).toEqual({ transaction_ids: [1], category_id: 2 });
+  await expect(page.locator('.transactions-bulk-bar')).not.toBeVisible();
+  await expect(page.locator('.mobile-transaction-select input').first()).not.toBeChecked();
+});
+
 test('mobile edit saves amount and category creation remains reachable', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 550 });
   await mockApi(page);

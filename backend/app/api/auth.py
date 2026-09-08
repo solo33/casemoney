@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from fastapi import APIRouter, Depends, BackgroundTasks, Query, Request
 from sqlalchemy.orm import Session
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.get("/config", response_model=PublicConfig)
 def public_config(db: Session = Depends(get_db)):
     'Публичные флаги для неавторизованных страниц (логин/регистрация).'
-    return queries.public_config(db=db)
+    return operation_response(queries.public_config(db=db))
 
 
 @router.post("/register", response_model=RegisterResponse)
@@ -27,7 +28,7 @@ def register(
     background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    return commands.register(request=request, data=data, background=background, db=db)
+    return operation_response(commands.register(request=request, data=data, background=background, db=db))
 
 
 @router.post("/verify-code", response_model=Token)
@@ -39,7 +40,7 @@ def verify_code(
     db: Session = Depends(get_db),
 ):
     'Проверяет код и создаёт пользователя. Возвращает токен (автологин).'
-    return commands.verify_code(request=request, data=data, background=background, db=db)
+    return operation_response(commands.verify_code(request=request, data=data, background=background, db=db))
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
@@ -51,25 +52,25 @@ def forgot_password(
     db: Session = Depends(get_db),
 ):
     'Запрос сброса пароля. Всегда отвечаем ok=True (не раскрываем, есть ли\n    такой email), но письмо шлём только если пользователь реально существует.'
-    return commands.forgot_password(request=request, data=data, background=background, db=db)
+    return operation_response(commands.forgot_password(request=request, data=data, background=background, db=db))
 
 
 @router.post("/reset-password")
 def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
-    return commands.reset_password(data=data, db=db)
+    return operation_response(commands.reset_password(data=data, db=db))
 
 
 @router.post("/login", response_model=Token)
 @limiter.limit("20/minute;200/hour")
 def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
-    return commands.login(request=request, data=data, db=db)
+    return operation_response(commands.login(request=request, data=data, db=db))
 
 
 @router.post("/demo", response_model=Token)
 @limiter.limit("20/hour")
 def demo_login(request: Request, db: Session = Depends(get_db)):
     'Публичная кнопка «Заполнить демо-вход»: создаёт изолированный\n    одноразовый аккаунт с каноничным набором демо-данных и сразу логинит в\n    него. Отдельно от статического test@test.com (см. app/seeds.py) —\n    каждый посетитель получает свою песочницу, не видит чужих правок.'
-    return commands.demo_login(request=request, db=db)
+    return operation_response(commands.demo_login(request=request, db=db))
 
 
 @router.get("/activate", response_model=ActivationResult)
@@ -78,7 +79,7 @@ def activate_get(
     db: Session = Depends(get_db),
 ):
     'Активация email по токену из письма (GET — чтобы по клику работало).'
-    return queries.activate_get(token=token, db=db)
+    return operation_response(queries.activate_get(token=token, db=db))
 
 
 @router.post("/resend-activation", response_model=ResendResponse)
@@ -90,4 +91,4 @@ def resend_activation(
     db: Session = Depends(get_db),
 ):
     'Повторно отправить письмо активации. Не раскрываем существует ли email.'
-    return commands.resend_activation(request=request, data=data, background=background, db=db)
+    return operation_response(commands.resend_activation(request=request, data=data, background=background, db=db))

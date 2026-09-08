@@ -199,6 +199,10 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
+from app.application import ApplicationError
+from app.api.responses import application_error_response
+app.add_exception_handler(ApplicationError, application_error_response)
+
 @app.get("/health")
 def health():
     """Healthcheck для хостинга/мониторинга."""

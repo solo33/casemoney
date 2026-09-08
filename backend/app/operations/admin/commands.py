@@ -1,5 +1,5 @@
 """Admin: commands. Callers supply resolved user and database session."""
-from fastapi import BackgroundTasks, HTTPException
+from app.application import TaskScheduler, ApplicationError
 from sqlalchemy.orm import Session
 from app.models.user import User
 from app.models.notification import Notification
@@ -21,7 +21,7 @@ def create_notification(data: AdminNotificationCreate, db: Session=None, _: int=
         query = query.filter(User.id == data.user_id)
     recipients = query.all()
     if data.user_id is not None and not recipients:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApplicationError(status_code=404, detail="Пользователь не найден")
     notifications = [
         Notification(
             user_id=user.id,
@@ -39,10 +39,10 @@ def create_notification(data: AdminNotificationCreate, db: Session=None, _: int=
     return {"recipients_count": len(notifications)}
 
 
-def update_user(user_id: int, data: AdminUserUpdate, background: BackgroundTasks, db: Session=None, admin_id: int=None):
+def update_user(user_id: int, data: AdminUserUpdate, background: TaskScheduler, db: Session=None, admin_id: int=None):
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApplicationError(status_code=404, detail="User not found")
 
     update = data.model_dump(exclude_unset=True)
 
@@ -50,7 +50,7 @@ def update_user(user_id: int, data: AdminUserUpdate, background: BackgroundTasks
     if u.id == admin_id and "is_admin" in update and update["is_admin"] is False:
         admins_left = db.query(User).filter(User.is_admin == True, User.id != admin_id).count()
         if admins_left == 0:
-            raise HTTPException(status_code=400, detail="Нельзя снять admin с последнего администратора")
+            raise ApplicationError(status_code=400, detail="Нельзя снять admin с последнего администратора")
 
     family_activated = update.get("plan") == "family" and u.plan != "family"
     if "plan" in update:
@@ -86,19 +86,19 @@ def update_user(user_id: int, data: AdminUserUpdate, background: BackgroundTasks
 def reset_password(user_id: int, data: AdminPasswordReset, db: Session=None, _: int=None):
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApplicationError(status_code=404, detail="User not found")
     if len(data.new_password) < 4:
-        raise HTTPException(status_code=400, detail="Пароль слишком короткий (мин. 4)")
+        raise ApplicationError(status_code=400, detail="Пароль слишком короткий (мин. 4)")
     u.hashed_password = hash_password(data.new_password)
     db.commit()
 
 
 def delete_user(user_id: int, db: Session=None, admin_id: int=None):
     if user_id == admin_id:
-        raise HTTPException(status_code=400, detail="Удалить себя нельзя — используйте обычные настройки")
+        raise ApplicationError(status_code=400, detail="Удалить себя нельзя — используйте обычные настройки")
     u = db.query(User).filter(User.id == user_id).first()
     if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ApplicationError(status_code=404, detail="User not found")
     delete_user_completely(db, user_id)
     db.commit()
 

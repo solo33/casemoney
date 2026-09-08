@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -25,4 +26,4 @@ def finance_summary(
     user_id: int = Depends(current_user_id),
 ):
     'Return bounded, explainable financial observations for a fixed period.'
-    return commands.finance_summary(data=data, db=db, user_id=user_id)
+    return operation_response(commands.finance_summary(data=data, db=db, user_id=user_id))

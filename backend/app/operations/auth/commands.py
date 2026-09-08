@@ -1,5 +1,5 @@
 """Auth: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException, BackgroundTasks, Request
+from app.application import ApplicationError, TaskScheduler, RequestContext
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,14 +16,14 @@ from app.operations.auth.common import _build_activation_url, _can_resend_verifi
 from app.schemas.auth_views import ForgotPasswordRequest, ForgotPasswordResponse, RegisterResponse, ResendRequest, ResendResponse, ResetPasswordRequest, VerifyCodeRequest
 
 
-def register(request: Request, data: UserRegister, background: BackgroundTasks, db: Session=None):
+def register(request: RequestContext, data: UserRegister, background: TaskScheduler, db: Session=None):
     cfg = get_config(db)
     if not cfg.registration_enabled:
-        raise HTTPException(status_code=403, detail="Регистрация временно закрыта")
+        raise ApplicationError(status_code=403, detail="Регистрация временно закрыта")
 
     email = normalize_email(str(data.email))
     if db.query(User).filter(func.lower(func.trim(User.email)) == email).first():
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+        raise ApplicationError(status_code=400, detail="Email уже зарегистрирован")
 
     hashed = hash_password(data.password)
 
@@ -41,7 +41,7 @@ def register(request: Request, data: UserRegister, background: BackgroundTasks, 
         )
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+        raise ApplicationError(status_code=400, detail="Email уже зарегистрирован")
     _create_pending_family_invitation_notifications(db, user)
     background.add_task(
         _notify_registration,
@@ -66,28 +66,28 @@ def register(request: Request, data: UserRegister, background: BackgroundTasks, 
     )
 
 
-def verify_code(request: Request, data: VerifyCodeRequest, background: BackgroundTasks, db: Session=None):
+def verify_code(request: RequestContext, data: VerifyCodeRequest, background: TaskScheduler, db: Session=None):
     """Проверяет код и создаёт пользователя. Возвращает токен (автологин)."""
     email = normalize_email(str(data.email))
     pending = db.query(PendingRegistration).filter(
         func.lower(func.trim(PendingRegistration.email)) == email
     ).first()
     if not pending:
-        raise HTTPException(status_code=400, detail="Заявка не найдена. Запросите код заново.")
+        raise ApplicationError(status_code=400, detail="Заявка не найдена. Запросите код заново.")
 
     exp = pending.expires_at
     if exp.tzinfo is None:
         exp = exp.replace(tzinfo=timezone.utc)
     if _now() > exp:
-        raise HTTPException(status_code=400, detail="Код истёк. Запросите новый.")
+        raise ApplicationError(status_code=400, detail="Код истёк. Запросите новый.")
 
     if pending.attempts >= MAX_CODE_ATTEMPTS:
-        raise HTTPException(status_code=429, detail="Слишком много попыток. Запросите новый код.")
+        raise ApplicationError(status_code=429, detail="Слишком много попыток. Запросите новый код.")
 
     if data.code.strip() != pending.code:
         pending.attempts += 1
         db.commit()
-        raise HTTPException(status_code=400, detail="Неверный код")
+        raise ApplicationError(status_code=400, detail="Неверный код")
 
     # На случай гонки — проверим, что email ещё не занят
     if db.query(User).filter(
@@ -95,13 +95,13 @@ def verify_code(request: Request, data: VerifyCodeRequest, background: Backgroun
     ).first():
         db.delete(pending)
         db.commit()
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+        raise ApplicationError(status_code=400, detail="Email уже зарегистрирован")
 
     try:
         user = _create_user(db, pending.email, pending.username, pending.hashed_password)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
+        raise ApplicationError(status_code=400, detail="Email уже зарегистрирован")
     background.add_task(
         _notify_registration,
         user.email,
@@ -115,7 +115,7 @@ def verify_code(request: Request, data: VerifyCodeRequest, background: Backgroun
     return {"access_token": token, "token_type": "bearer"}
 
 
-def forgot_password(request: Request, data: ForgotPasswordRequest, background: BackgroundTasks, db: Session=None):
+def forgot_password(request: RequestContext, data: ForgotPasswordRequest, background: TaskScheduler, db: Session=None):
     """Запрос сброса пароля. Всегда отвечаем ok=True (не раскрываем, есть ли
     такой email), но письмо шлём только если пользователь реально существует."""
     email = normalize_email(str(data.email))
@@ -128,31 +128,31 @@ def forgot_password(request: Request, data: ForgotPasswordRequest, background: B
 def reset_password(data: ResetPasswordRequest, db: Session=None):
     user_id = verify_reset_token(data.token)
     if not user_id:
-        raise HTTPException(status_code=400, detail="Ссылка недействительна или истекла")
+        raise ApplicationError(status_code=400, detail="Ссылка недействительна или истекла")
     if len(data.new_password) < 4:
-        raise HTTPException(status_code=400, detail="Пароль слишком короткий (мин. 4 символа)")
+        raise ApplicationError(status_code=400, detail="Пароль слишком короткий (мин. 4 символа)")
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApplicationError(status_code=404, detail="Пользователь не найден")
     if not user.is_active or not verify_reset_token(data.token, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Ссылка недействительна или уже использована")
+        raise ApplicationError(status_code=400, detail="Ссылка недействительна или уже использована")
     user.hashed_password = hash_password(data.new_password)
     db.commit()
     return {"ok": True}
 
 
-def login(request: Request, data: UserLogin, db: Session=None):
+def login(request: RequestContext, data: UserLogin, db: Session=None):
     email = normalize_email(str(data.email))
     user = db.query(User).filter(func.lower(func.trim(User.email)) == email).first()
     if not user or not verify_password(data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Неверный email или пароль")
+        raise ApplicationError(status_code=401, detail="Неверный email или пароль")
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="Аккаунт заблокирован")
+        raise ApplicationError(status_code=403, detail="Аккаунт заблокирован")
 
     cfg = get_config(db)
     if cfg.require_email_verification and not user.email_verified:
         if _verification_time_left(user) <= timedelta(0):
-            raise HTTPException(
+            raise ApplicationError(
                 status_code=403,
                 detail=(
                     "Email не подтверждён. Семидневный период истёк — "
@@ -164,7 +164,7 @@ def login(request: Request, data: UserLogin, db: Session=None):
     return {"access_token": token, "token_type": "bearer"}
 
 
-def demo_login(request: Request, db: Session=None):
+def demo_login(request: RequestContext, db: Session=None):
     """Публичная кнопка «Заполнить демо-вход»: создаёт изолированный
     одноразовый аккаунт с каноничным набором демо-данных и сразу логинит в
     него. Отдельно от статического test@test.com (см. app/seeds.py) —
@@ -174,7 +174,7 @@ def demo_login(request: Request, db: Session=None):
     return {"access_token": token, "token_type": "bearer"}
 
 
-def resend_activation(request: Request, data: ResendRequest, background: BackgroundTasks, db: Session=None):
+def resend_activation(request: RequestContext, data: ResendRequest, background: TaskScheduler, db: Session=None):
     """Повторно отправить письмо активации. Не раскрываем существует ли email."""
     email = normalize_email(str(data.email))
     user = db.query(User).filter(func.lower(func.trim(User.email)) == email).first()

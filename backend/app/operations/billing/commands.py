@@ -2,7 +2,7 @@
 import os
 from datetime import timedelta
 from decimal import Decimal
-from fastapi import HTTPException, Request
+from app.application import ApplicationError, RequestContext
 from sqlalchemy.orm import Session
 from app.models.billing import BillingPayment, Subscription
 from app.models.notification import Notification
@@ -16,14 +16,14 @@ from app.operations.billing.common import _ensure_user_can_purchase_family, _tes
 
 def activate_test_family(data: TestFamilyCheckoutRequest, db: Session=None, user: User=None):
     if not app_config_svc.is_billing_enabled(db):
-        raise HTTPException(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
+        raise ApplicationError(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
     _ensure_user_can_purchase_family(db, user)
     if user.plan == "family":
-        raise HTTPException(status_code=409, detail="Family уже активирован")
+        raise ApplicationError(status_code=409, detail="Family уже активирован")
     if data.period == "trial" and not data.acknowledge_family_data_cleanup:
-        raise HTTPException(status_code=400, detail="Подтвердите предупреждение о данных Family")
+        raise ApplicationError(status_code=400, detail="Подтвердите предупреждение о данных Family")
     if data.period in {"month", "year"} and not data.accept_test_payment:
-        raise HTTPException(status_code=400, detail="Подтвердите тестовую оплату")
+        raise ApplicationError(status_code=400, detail="Подтвердите тестовую оплату")
 
     now = utcnow()
     if data.period == "trial":
@@ -83,12 +83,12 @@ def activate_test_family(data: TestFamilyCheckoutRequest, db: Session=None, user
 
 def checkout(data: CheckoutRequest, db: Session=None, user: User=None):
     if not app_config_svc.is_billing_enabled(db):
-        raise HTTPException(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
+        raise ApplicationError(status_code=409, detail="Во время бесплатного запуска Family доступен без оплаты")
     _ensure_user_can_purchase_family(db, user)
     if not data.accept_recurring:
-        raise HTTPException(status_code=400, detail="Подтвердите согласие на автоматическое продление")
+        raise ApplicationError(status_code=400, detail="Подтвердите согласие на автоматическое продление")
     if not yookassa.billing_configured():
-        raise HTTPException(status_code=503, detail="Оплата пока не настроена")
+        raise ApplicationError(status_code=503, detail="Оплата пока не настроена")
     existing = db.query(BillingPayment).filter(
         BillingPayment.user_id == user.id,
         BillingPayment.kind == "initial",
@@ -114,13 +114,13 @@ def checkout(data: CheckoutRequest, db: Session=None, user: User=None):
         payment.status = "canceled"
         payment.failure_reason = str(exc)
         db.commit()
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApplicationError(status_code=503, detail=str(exc)) from exc
     payment.provider_payment_id = provider["id"]
     payment.confirmation_url = (provider.get("confirmation") or {}).get("confirmation_url")
     db.commit()
     if not payment.confirmation_url:
         apply_provider_payment(db, provider)
-        raise HTTPException(status_code=409, detail="Платёж не требует перехода или уже обработан")
+        raise ApplicationError(status_code=409, detail="Платёж не требует перехода или уже обработан")
     return CheckoutResponse(payment_id=payment.id, confirmation_url=payment.confirmation_url)
 
 
@@ -131,14 +131,14 @@ def refresh_payment(db: Session=None, user: User=None):
     try:
         payment = apply_provider_payment(db, yookassa.get_payment(payment.provider_payment_id))
     except yookassa.YooKassaError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApplicationError(status_code=503, detail=str(exc)) from exc
     return BillingActionResponse(status=payment.status)
 
 
 def cancel(db: Session=None, user: User=None):
     subscription = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     if not subscription:
-        raise HTTPException(status_code=404, detail="Подписка не найдена")
+        raise ApplicationError(status_code=404, detail="Подписка не найдена")
     subscription.cancel_at_period_end = True
     db.commit()
     return BillingActionResponse(status="cancel_at_period_end")
@@ -147,13 +147,13 @@ def cancel(db: Session=None, user: User=None):
 def resume(db: Session=None, user: User=None):
     subscription = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     if not subscription or not subscription.provider_payment_method_id:
-        raise HTTPException(status_code=400, detail="Сохранённый способ оплаты не найден")
+        raise ApplicationError(status_code=400, detail="Сохранённый способ оплаты не найден")
     subscription.cancel_at_period_end = False
     db.commit()
     return BillingActionResponse(status="active")
 
 
-async def yookassa_webhook(request: Request, db: Session=None):
+async def yookassa_webhook(request: RequestContext, db: Session=None):
     payload = await request.json()
     provider_id = ((payload.get("object") or {}).get("id"))
     if not provider_id:
@@ -164,5 +164,5 @@ async def yookassa_webhook(request: Request, db: Session=None):
     except ValueError:
         return {"ok": True}
     except yookassa.YooKassaError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise ApplicationError(status_code=503, detail=str(exc)) from exc
     return {"ok": True}

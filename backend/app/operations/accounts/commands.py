@@ -1,5 +1,5 @@
 """Accounts: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.account_balance import AccountBalance
@@ -51,7 +51,7 @@ def reorder_accounts(payload: dict, db: Session=None, user_id: int=None):
     одновременно переносит все эти счета в указанную группу."""
     account_ids = payload.get("account_ids") or []
     if not isinstance(account_ids, list):
-        raise HTTPException(status_code=400, detail="account_ids должен быть списком")
+        raise ApplicationError(status_code=400, detail="account_ids должен быть списком")
 
     target_group = payload.get("group_id", "__keep__")
     if target_group != "__keep__":

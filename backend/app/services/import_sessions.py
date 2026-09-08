@@ -4,7 +4,7 @@ from decimal import Decimal
 import json
 import time
 import uuid
-from fastapi import HTTPException
+from app.application import ApplicationError
 from app.models.import_session import ImportSession
 
 
@@ -20,11 +20,11 @@ def save_preview(db, user_id, kind, rows):
 def claim_preview(db, user_id, kind, token, confirmation):
     session = db.query(ImportSession).filter(ImportSession.token == token).with_for_update().first()
     if not session or session.kind != kind or session.expires_at < time.time():
-        raise HTTPException(404, "Предпросмотр истёк. Загрузите файл ещё раз")
+        raise ApplicationError(404, "Предпросмотр истёк. Загрузите файл ещё раз")
     if session.user_id != user_id:
-        raise HTTPException(403, "Чужой предпросмотр")
+        raise ApplicationError(403, "Чужой предпросмотр")
     if session.result is not None and session.confirmation != confirmation:
-        raise HTTPException(409, "Этот импорт уже подтверждён с другими настройками")
+        raise ApplicationError(409, "Этот импорт уже подтверждён с другими настройками")
     return session
 
 

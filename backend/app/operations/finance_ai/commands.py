@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime, timezone
 import httpx
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.ai_usage import AiUsage
 from app.models.user import User
@@ -16,15 +16,15 @@ async def finance_ai_insight(data: FinanceAiRequest, db: Session=None, user_id: 
     ensure_family_plan(db, user_id)
     api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
-        raise HTTPException(status_code=503, detail="Финансовый помощник временно не настроен.")
+        raise ApplicationError(status_code=503, detail="Финансовый помощник временно не настроен.")
     user = db.query(User).filter(User.id == user_id).with_for_update().first()
     if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise ApplicationError(status_code=404, detail="Пользователь не найден")
     now = datetime.now(timezone.utc)
     period_key = now.strftime("%Y-%m")
     usage = db.query(AiUsage).filter(AiUsage.user_id == user_id, AiUsage.period_key == period_key).first()
     if usage and usage.request_count >= MONTHLY_LIMIT:
-        raise HTTPException(status_code=429, detail="Лимит финансовых подсказок на этот месяц исчерпан.")
+        raise ApplicationError(status_code=429, detail="Лимит финансовых подсказок на этот месяц исчерпан.")
     if usage and usage.last_requested_at:
         last_requested_at = usage.last_requested_at
         # PostgreSQL returns an aware timestamp, while a local SQLite test
@@ -33,7 +33,7 @@ async def finance_ai_insight(data: FinanceAiRequest, db: Session=None, user_id: 
         if last_requested_at.tzinfo is None:
             last_requested_at = last_requested_at.replace(tzinfo=timezone.utc)
         if (now - last_requested_at).total_seconds() < MIN_REQUEST_SECONDS:
-            raise HTTPException(status_code=429, detail="Подождите несколько секунд перед следующей подсказкой.")
+            raise ApplicationError(status_code=429, detail="Подождите несколько секунд перед следующей подсказкой.")
 
     currency, snapshot = _aggregate_snapshot(db, user_id, data.period_days)
     # Reserve before awaiting the provider. A synchronous row lock held across
@@ -66,7 +66,7 @@ async def finance_ai_insight(data: FinanceAiRequest, db: Session=None, user_id: 
             AiUsage.request_count > 0,
         ).update({AiUsage.request_count: AiUsage.request_count - 1}, synchronize_session=False)
         db.commit()
-        raise HTTPException(status_code=502, detail="Не удалось подготовить финансовую подсказку. Попробуйте позже.")
+        raise ApplicationError(status_code=502, detail="Не удалось подготовить финансовую подсказку. Попробуйте позже.")
     return FinanceAiResponse(
         scenario=data.scenario,
         period_days=data.period_days,

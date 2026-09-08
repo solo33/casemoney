@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from fastapi import APIRouter, Request
 from slowapi import Limiter
@@ -13,4 +14,4 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 @limiter.limit("30/hour")
 async def chat(data: ChatRequest, request: Request):
-    return await commands.chat(data=data, request=request)
+    return operation_response(await commands.chat(data=data, request=request))

@@ -1,6 +1,6 @@
 """Automation: queries. Callers supply resolved user and database session."""
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.category import Category
@@ -30,7 +30,7 @@ def get_rules(db: Session=None, user_id: int=None):
 
 def category_suggestion(description: str, transaction_type: str='expense', db: Session=None, user_id: int=None):
     if transaction_type not in {"income", "expense"}:
-        raise HTTPException(status_code=400, detail="Подсказка доступна только для дохода или расхода.")
+        raise ApplicationError(status_code=400, detail="Подсказка доступна только для дохода или расхода.")
     return suggest_category_from_history(db, user_id, description, transaction_type)
 
 

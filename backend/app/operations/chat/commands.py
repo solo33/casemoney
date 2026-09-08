@@ -1,11 +1,11 @@
 """Chat: commands. Callers supply resolved user and database session."""
 import asyncio
-from fastapi import Request
+from app.application import RequestContext
 from app.operations.chat.common import _get_history, _get_model, _save_history
 from app.schemas.chat_views import ChatRequest, ChatResponse
 
 
-async def chat(data: ChatRequest, request: Request):
+async def chat(data: ChatRequest, request: RequestContext):
     model = _get_model()
     if model is None:
         return ChatResponse(

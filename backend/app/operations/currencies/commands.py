@@ -1,5 +1,5 @@
 """Currencies: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.user_currency import UserCurrency
 from app.schemas.user_currency import UserCurrencyCreate, UserCurrencyUpdate
@@ -17,7 +17,7 @@ def add_currency(data: UserCurrencyCreate, db: Session=None, user_id: int=None):
         UserCurrency.currency == currency,
     ).first()
     if exists:
-        raise HTTPException(status_code=400, detail=f"Валюта {currency} уже добавлена")
+        raise ApplicationError(status_code=400, detail=f"Валюта {currency} уже добавлена")
     # Ограничения тарифов сейчас не блокируют добавление пользовательских валют.
     limits_svc.enforce_limit(db, user_id, "user_currencies")
 
@@ -41,7 +41,7 @@ def update_currency(currency_id: int, data: UserCurrencyUpdate, db: Session=None
         UserCurrency.user_id == user_id,
     ).first()
     if not uc:
-        raise HTTPException(status_code=404, detail="Валюта не найдена")
+        raise ApplicationError(status_code=404, detail="Валюта не найдена")
 
     update = data.model_dump(exclude_unset=True)
     for k, v in update.items():
@@ -60,11 +60,11 @@ def delete_currency(currency_id: int, db: Session=None, user_id: int=None):
         UserCurrency.user_id == user_id,
     ).first()
     if not uc:
-        raise HTTPException(status_code=404, detail="Валюта не найдена")
+        raise ApplicationError(status_code=404, detail="Валюта не найдена")
 
     main = _get_main(db, user_id)
     if uc.currency.upper() == main:
-        raise HTTPException(status_code=400, detail="Нельзя удалить основную валюту")
+        raise ApplicationError(status_code=400, detail="Нельзя удалить основную валюту")
 
     db.delete(uc)
     db.commit()

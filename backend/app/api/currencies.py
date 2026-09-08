@@ -1,3 +1,4 @@
+from app.api.responses import operation_response
 """HTTP routes; application operations own validation and transaction boundaries."""
 from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends, Query
@@ -15,7 +16,7 @@ def list_currencies(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return queries.list_currencies(db=db, user_id=user_id)
+    return operation_response(queries.list_currencies(db=db, user_id=user_id))
 
 
 @router.get("/convert", response_model=CurrencyConversionResponse)
@@ -27,7 +28,7 @@ def convert_currency(
     user_id: int = Depends(get_current_user_id),
 ):
     'Preview a transfer using the same user-specific rate as transaction creation.'
-    return queries.convert_currency(amount=amount, from_currency=from_currency, to_currency=to_currency, db=db, user_id=user_id)
+    return operation_response(queries.convert_currency(amount=amount, from_currency=from_currency, to_currency=to_currency, db=db, user_id=user_id))
 
 
 @router.post("/", response_model=UserCurrencyResponse, status_code=201)
@@ -36,7 +37,7 @@ def add_currency(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return commands.add_currency(data=data, db=db, user_id=user_id)
+    return operation_response(commands.add_currency(data=data, db=db, user_id=user_id))
 
 
 @router.patch("/{currency_id}", response_model=UserCurrencyResponse)
@@ -46,7 +47,7 @@ def update_currency(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return commands.update_currency(currency_id=currency_id, data=data, db=db, user_id=user_id)
+    return operation_response(commands.update_currency(currency_id=currency_id, data=data, db=db, user_id=user_id))
 
 
 @router.delete("/{currency_id}", status_code=204)
@@ -55,4 +56,4 @@ def delete_currency(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return commands.delete_currency(currency_id=currency_id, db=db, user_id=user_id)
+    return operation_response(commands.delete_currency(currency_id=currency_id, db=db, user_id=user_id))

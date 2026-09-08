@@ -1,6 +1,6 @@
 """Transactions: transfers. Callers supply resolved user and database session."""
 from datetime import datetime, timedelta, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.transaction import Transaction, TransactionType
 from app.models.account import Account
@@ -81,14 +81,14 @@ def confirm_transfer_match(transaction_id: int, data: TransferMatchConfirm, db: 
         Transaction.is_planned.is_(False),
     ).first()
     if not expense or not income:
-        raise HTTPException(status_code=404, detail="Одна из операций уже недоступна для сопоставления.")
+        raise ApplicationError(status_code=404, detail="Одна из операций уже недоступна для сопоставления.")
     pair = _transfer_pair_confidence(expense, income)
     if not pair:
-        raise HTTPException(status_code=400, detail="Эти операции не похожи на перевод между своими счетами.")
+        raise ApplicationError(status_code=400, detail="Эти операции не похожи на перевод между своими счетами.")
     _, possible_fee = pair
     if data.fee_category_id is not None:
         if not possible_fee:
-            raise HTTPException(status_code=400, detail="Комиссию можно указать только при разнице сумм в одной валюте.")
+            raise ApplicationError(status_code=400, detail="Комиссию можно указать только при разнице сумм в одной валюте.")
         _ensure_expense_category(db, user_id, data.fee_category_id)
 
     previous_amount, previous_currency = expense.amount, expense.currency

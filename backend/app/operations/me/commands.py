@@ -1,5 +1,5 @@
 """Me: commands. Callers supply resolved user and database session."""
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -30,7 +30,7 @@ def update_me(data: UserUpdate, db: Session=None, user_id: int=None):
         ).first()
         if membership:
             if not confirm_family_data_cleanup:
-                raise HTTPException(
+                raise ApplicationError(
                     status_code=400,
                     detail="Подтвердите выход из Family: общие данные этого пространства будут недоступны",
                 )
@@ -52,7 +52,7 @@ def update_me(data: UserUpdate, db: Session=None, user_id: int=None):
             User.id != user_id,
         ).first()
         if other:
-            raise HTTPException(status_code=400, detail="Email уже занят")
+            raise ApplicationError(status_code=400, detail="Email уже занят")
     if "notification_preferences" in update_fields:
         # Same sanitization as PUT /api/notifications/settings — drop unknown
         # event keys and coerce to bool, regardless of which endpoint wrote it.
@@ -65,7 +65,7 @@ def update_me(data: UserUpdate, db: Session=None, user_id: int=None):
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Email уже занят")
+        raise ApplicationError(status_code=400, detail="Email уже занят")
     db.refresh(user)
     if "main_currency" in update_fields:
         from app.services import exchange as exchange_svc
@@ -76,7 +76,7 @@ def update_me(data: UserUpdate, db: Session=None, user_id: int=None):
 def change_password(data: PasswordChange, db: Session=None, user_id: int=None):
     user = _get_user(db, user_id)
     if not verify_password(data.current_password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Текущий пароль неверен")
+        raise ApplicationError(status_code=400, detail="Текущий пароль неверен")
     user.hashed_password = hash_password(data.new_password)
     db.commit()
 

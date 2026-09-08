@@ -3,7 +3,7 @@ import csv
 import io
 from datetime import date, datetime
 from typing import Optional
-from fastapi.responses import StreamingResponse
+from app.application import StreamData
 from sqlalchemy.orm import Session
 from app.models.transaction import Transaction, TransactionType
 from app.models.account import Account
@@ -63,7 +63,7 @@ def export_csv(date_from: Optional[date]=None, date_to: Optional[date]=None, db:
     def iterate():
         yield buf.read().encode("utf-8")
 
-    return StreamingResponse(
+    return StreamData(
         iterate(),
         media_type="text/csv; charset=utf-8",
         headers={

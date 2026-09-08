@@ -1,6 +1,6 @@
 """Shopping: commands. Callers supply resolved user and database session."""
 from datetime import datetime, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.shopping import ShoppingItem, ShoppingList
 from app.schemas.shopping import ShoppingItemCreate, ShoppingItemUpdate, ShoppingListCreate, ShoppingListUpdate
@@ -11,7 +11,7 @@ def create_list(data: ShoppingListCreate, db: Session=None, user_id: int=None):
     _default_list(db, user_id)
     family_id = _family_id(db, user_id)
     if data.is_shared and not family_id:
-        raise HTTPException(status_code=400, detail="Сначала создайте семейное пространство")
+        raise ApplicationError(status_code=400, detail="Сначала создайте семейное пространство")
     result = ShoppingList(user_id=user_id, name=data.name.strip(), is_default=False, family_id=family_id if data.is_shared else None)
     db.add(result)
     db.commit()
@@ -34,7 +34,7 @@ def update_list(list_id: int, data: ShoppingListUpdate, db: Session=None, user_i
 def delete_list(list_id: int, db: Session=None, user_id: int=None):
     result = _get_list(db, user_id, list_id)
     if result.is_default:
-        raise HTTPException(status_code=400, detail="Основной список нельзя удалить — переименуйте его или выберите другой основным")
+        raise ApplicationError(status_code=400, detail="Основной список нельзя удалить — переименуйте его или выберите другой основным")
     db.delete(result)
     db.commit()
 

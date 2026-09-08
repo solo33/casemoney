@@ -1,6 +1,6 @@
 """Credits: commands. Callers supply resolved user and database session."""
 from datetime import date, datetime, time, timezone
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.services.ledger import apply_transaction_effect, write_transaction_history
 from app.models.credit import CreditObligation, CreditPayment
@@ -79,7 +79,7 @@ def update_credit(credit_id: int, data: CreditUpdate, db: Session=None, user_id:
         CreditObligation.user_id == user_id,
     ).first()
     if not credit:
-        raise HTTPException(status_code=404, detail="Кредит или долг не найден")
+        raise ApplicationError(status_code=404, detail="Кредит или долг не найден")
     update = data.model_dump(exclude_unset=True)
     if "source_account_id" in update:
         _own_account(db, user_id, update["source_account_id"])
@@ -111,7 +111,7 @@ def delete_credit(credit_id: int, db: Session=None, user_id: int=None):
         CreditObligation.user_id == user_id,
     ).first()
     if not credit:
-        raise HTTPException(status_code=404, detail="Кредит или долг не найден")
+        raise ApplicationError(status_code=404, detail="Кредит или долг не найден")
 
     transaction_ids = [
         payment.transaction_id
@@ -145,7 +145,7 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
         CreditObligation.status == "active",
     ).first()
     if not credit:
-        raise HTTPException(status_code=404, detail="Активное обязательство или депозит не найден")
+        raise ApplicationError(status_code=404, detail="Активное обязательство или депозит не найден")
     account = _own_account(db, user_id, data.account_id)
     linked = _own_account(db, user_id, credit.linked_account_id)
     paid_at = data.paid_at or datetime.now(timezone.utc)
@@ -167,7 +167,7 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
         to_currency = None
     elif credit.kind == "credit_card":
         if not linked or linked.id == account.id:
-            raise HTTPException(status_code=400, detail="Выберите другой счёт для погашения кредитной карты")
+            raise ApplicationError(status_code=400, detail="Выберите другой счёт для погашения кредитной карты")
         tx_type = TransactionType.transfer
         to_account_id = linked.id
         to_amount = data.amount
@@ -207,7 +207,7 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
 
     if data.is_early_payment:
         if credit.kind not in {"mortgage", "loan", "private_debt"} or credit.direction != "owe":
-            raise HTTPException(status_code=400, detail="Досрочное погашение доступно только для вашего кредита или займа")
+            raise ApplicationError(status_code=400, detail="Досрочное погашение доступно только для вашего кредита или займа")
         principal_amount = min(float(data.amount), max(0.0, float(credit.current_balance or 0)))
         interest_amount = 0.0
         mode = data.early_repayment_mode or credit.early_repayment_mode

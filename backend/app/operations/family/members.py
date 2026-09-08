@@ -1,7 +1,7 @@
 """Family: members. Callers supply resolved user and database session."""
 from datetime import datetime, timezone
 import html
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.family import Family, FamilyMember
@@ -44,13 +44,13 @@ def get_family(db: Session=None, user_id: int=None):
 
 def create_family(data: FamilyCreate, db: Session=None, user_id: int=None):
     if active_membership(db, user_id):
-        raise HTTPException(status_code=409, detail="Вы уже состоите в семье")
+        raise ApplicationError(status_code=409, detail="Вы уже состоите в семье")
     user = db.query(User).filter(User.id == user_id).first()
     if db.query(FamilyMember).filter(
         FamilyMember.status == "pending",
         func.lower(FamilyMember.email) == user.email.lower(),
     ).first():
-        raise HTTPException(status_code=409, detail="Сначала примите или отклоните приглашение в семью")
+        raise ApplicationError(status_code=409, detail="Сначала примите или отклоните приглашение в семью")
     family = Family(name=data.name.strip(), owner_user_id=user_id)
     db.add(family)
     db.flush()
@@ -71,7 +71,7 @@ def create_family(data: FamilyCreate, db: Session=None, user_id: int=None):
 def invite_member(data: InviteCreate, db: Session=None, user_id: int=None):
     membership = require_membership(db, user_id)
     if membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Приглашать участников может владелец")
+        raise ApplicationError(status_code=403, detail="Приглашать участников может владелец")
     email = data.email.strip().lower()
     user = db.query(User).filter(func.lower(User.email) == email).first()
     existing = db.query(FamilyMember).filter(
@@ -79,12 +79,12 @@ def invite_member(data: InviteCreate, db: Session=None, user_id: int=None):
         func.lower(FamilyMember.email) == email,
     ).first()
     if existing:
-        raise HTTPException(status_code=409, detail="Пользователь уже приглашён")
+        raise ApplicationError(status_code=409, detail="Пользователь уже приглашён")
     if user and active_membership(db, user.id):
-        raise HTTPException(status_code=409, detail="Пользователь уже состоит в другой семье")
+        raise ApplicationError(status_code=409, detail="Пользователь уже состоит в другой семье")
     member_count = db.query(FamilyMember).filter(FamilyMember.family_id == membership.family_id).count()
     if app_config_svc.is_billing_enabled(db) and member_count >= FAMILY_MAX_MEMBERS:
-        raise HTTPException(
+        raise ApplicationError(
             status_code=400,
             detail=f"В семейном пространстве уже максимум участников ({FAMILY_MAX_MEMBERS})",
         )
@@ -142,9 +142,9 @@ def update_member_role(member_id: int, data: MemberRoleUpdate, db: Session=None,
         FamilyMember.family_id == membership.family_id,
     ).first()
     if not target:
-        raise HTTPException(status_code=404, detail="Участник не найден")
+        raise ApplicationError(status_code=404, detail="Участник не найден")
     if target.role == "owner":
-        raise HTTPException(status_code=400, detail="Роль владельца нельзя изменить")
+        raise ApplicationError(status_code=400, detail="Роль владельца нельзя изменить")
     target.role = data.role
     notify_family_members(
         db,
@@ -169,13 +169,13 @@ def remove_member(member_id: int, db: Session=None, user_id: int=None):
         FamilyMember.family_id == membership.family_id,
     ).first()
     if not target:
-        raise HTTPException(status_code=404, detail="Участник не найден")
+        raise ApplicationError(status_code=404, detail="Участник не найден")
 
     is_self = target.user_id == user_id
     if not is_self and membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Удалять участников может только владелец")
+        raise ApplicationError(status_code=403, detail="Удалять участников может только владелец")
     if target.role == "owner":
-        raise HTTPException(status_code=400, detail="Нельзя удалить владельца семьи")
+        raise ApplicationError(status_code=400, detail="Нельзя удалить владельца семьи")
 
     db.delete(target)
     db.commit()
@@ -189,9 +189,9 @@ def accept_invitation(invitation_id: int, db: Session=None, user_id: int=None):
         func.lower(FamilyMember.email) == user.email.lower(),
     ).first()
     if not invitation:
-        raise HTTPException(status_code=404, detail="Приглашение не найдено")
+        raise ApplicationError(status_code=404, detail="Приглашение не найдено")
     if active_membership(db, user_id):
-        raise HTTPException(status_code=409, detail="Вы уже состоите в семье")
+        raise ApplicationError(status_code=409, detail="Вы уже состоите в семье")
     invitation.user_id = user_id
     invitation.status = "active"
     invitation.accepted_at = datetime.now(timezone.utc)

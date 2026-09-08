@@ -1,6 +1,6 @@
 """Shopping: common. Callers supply resolved user and database session."""
 from typing import Optional
-from fastapi import HTTPException
+from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.category import Category
 from app.models.shopping import ShoppingItem, ShoppingList
@@ -33,7 +33,7 @@ def _get_list(db: Session, user_id: int, list_id: int) -> ShoppingList:
         ShoppingList.id == list_id, (ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else -1)
     ).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Список покупок не найден")
+        raise ApplicationError(status_code=404, detail="Список покупок не найден")
     return result
 
 
@@ -42,7 +42,7 @@ def _get_item(db: Session, user_id: int, item_id: int) -> ShoppingItem:
         ShoppingItem.id == item_id, ShoppingList.user_id == user_id
     ).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Позиция списка не найдена")
+        raise ApplicationError(status_code=404, detail="Позиция списка не найдена")
     return result
 
 
@@ -50,7 +50,7 @@ def _validate_category(db: Session, user_id: int, category_id: Optional[int]) ->
     if category_id is None:
         return
     if not db.query(Category.id).filter(Category.id == category_id, Category.user_id == user_id).first():
-        raise HTTPException(status_code=404, detail="Категория не найдена")
+        raise ApplicationError(status_code=404, detail="Категория не найдена")
 
 
 def _validate_transaction(db: Session, user_id: int, transaction_id: Optional[int]) -> None:
@@ -60,4 +60,4 @@ def _validate_transaction(db: Session, user_id: int, transaction_id: Optional[in
         Transaction.id == transaction_id, Transaction.user_id == user_id
     ).first()
     if not transaction:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+        raise ApplicationError(status_code=404, detail="Transaction not found")
