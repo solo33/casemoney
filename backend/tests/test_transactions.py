@@ -137,7 +137,7 @@ def test_edit_cross_currency_transfer_updates_both_currencies(client, auth):
 
 def test_user_currency_conversion_preview(client, auth, monkeypatch):
     monkeypatch.setattr(
-        "app.api.currencies.exchange_svc.get_rate_for_user",
+        "app.services.exchange.get_rate_for_user",
         lambda db, user_id, source, target: (0.0125, "manual"),
     )
 
@@ -189,7 +189,8 @@ def test_transactions_are_sorted_by_last_change_and_expose_timestamp(client, aut
     assert rows[0]["updated_at"].startswith("2026-09-02")
 
 
-def test_dashboard_transfer_has_fields_required_for_editing(client, auth):
+def test_dashboard_transfer_has_fields_required_for_editing(client, auth, monkeypatch):
+    monkeypatch.setattr("app.services.exchange.get_rate_to_rub", lambda _db, currency: 100 if currency == "EUR" else 1)
     source = make_account(client, auth, name="Источник", balance=1000, currency="RUB")
     target = make_account(client, auth, name="Получатель", balance=20, currency="EUR")
     transfer = client.post("/api/transactions/", headers=auth, json={

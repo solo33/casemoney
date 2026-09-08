@@ -1,57 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
+"""HTTP routes; application operations own validation and transaction boundaries."""
+from app.api.dependencies import current_user_id as get_current_user_id
+from fastapi import APIRouter, Depends
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
-
 from app.database import get_db
-from app.models.user import User
-from app.models.account import Account
-from app.models.account_balance import AccountBalance
-from app.models.transaction import Transaction
-from app.models.category import Category
-from app.models.account_group import AccountGroup
-from app.models.user_currency import UserCurrency
-from app.models.shopping import ShoppingList
-from app.models.family import Family, FamilyMember
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
-from app.services.auth import decode_token, hash_password, normalize_email, verify_password
-from app.services import limits as limits_svc
-from app.services import plans as plans_svc
-from app.services.notifications import normalized_preferences
+from app.operations.me import queries, commands
 
-router = APIRouter(prefix="/api/me", tags=["me"])
+
 security = HTTPBearer()
 
-
-def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(payload["sub"])
-
-
-def _get_user(db: Session, user_id: int) -> User:
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
-
-
-def _serialize(db: Session, user: User) -> UserResponse:
-    data = UserResponse.model_validate(user)
-    data.family_access = plans_svc.has_family_plan(db, user.id)
-    return data
-
+router = APIRouter(prefix="/api/me", tags=["me"])
 
 @router.get("/", response_model=UserResponse)
 def get_me(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    return _serialize(db, _get_user(db, user_id))
+    return queries.get_me(db=db, user_id=user_id)
 
 
 @router.put("/", response_model=UserResponse)
@@ -60,58 +26,7 @@ def update_me(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    user = _get_user(db, user_id)
-    update_fields = data.model_dump(exclude_unset=True)
-    confirm_family_data_cleanup = update_fields.pop("confirm_family_data_cleanup", False)
-    requested_mode = update_fields.get("preferred_mode")
-    if requested_mode == "personal" and user.preferred_mode != "personal":
-        membership = db.query(FamilyMember).filter(
-            FamilyMember.user_id == user_id,
-            FamilyMember.status == "active",
-        ).first()
-        if membership:
-            if not confirm_family_data_cleanup:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Подтвердите выход из Family: общие данные этого пространства будут недоступны",
-                )
-            if membership.role == "owner":
-                family = db.query(Family).filter(Family.id == membership.family_id).first()
-                if family:
-                    # Общие списки, цели и взаиморасчёты каскадно удаляются;
-                    # личные операции сохраняются, их family_id станет NULL.
-                    db.delete(family)
-            else:
-                db.delete(membership)
-    if "main_currency" in update_fields and update_fields["main_currency"]:
-        update_fields["main_currency"] = update_fields["main_currency"].upper()
-    if "email" in update_fields and update_fields["email"]:
-        update_fields["email"] = normalize_email(str(update_fields["email"]))
-        # проверим уникальность
-        other = db.query(User).filter(
-            func.lower(func.trim(User.email)) == update_fields["email"],
-            User.id != user_id,
-        ).first()
-        if other:
-            raise HTTPException(status_code=400, detail="Email уже занят")
-    if "notification_preferences" in update_fields:
-        # Same sanitization as PUT /api/notifications/settings — drop unknown
-        # event keys and coerce to bool, regardless of which endpoint wrote it.
-        update_fields["notification_preferences"] = normalized_preferences(
-            update_fields["notification_preferences"]
-        )
-    for k, v in update_fields.items():
-        setattr(user, k, v)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=400, detail="Email уже занят")
-    db.refresh(user)
-    if "main_currency" in update_fields:
-        from app.services import exchange as exchange_svc
-        exchange_svc.invalidate_user_rates(user_id)
-    return _serialize(db, user)
+    return commands.update_me(data=data, db=db, user_id=user_id)
 
 
 @router.post("/password", status_code=204)
@@ -120,11 +35,7 @@ def change_password(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    user = _get_user(db, user_id)
-    if not verify_password(data.current_password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Текущий пароль неверен")
-    user.hashed_password = hash_password(data.new_password)
-    db.commit()
+    return commands.change_password(data=data, db=db, user_id=user_id)
 
 
 @router.delete("/transactions", status_code=204)
@@ -132,15 +43,8 @@ def delete_all_transactions(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Удаляет ВСЕ транзакции пользователя. Балансы счетов обнуляются."""
-    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
-    # Сбрасываем балансы всех счетов в 0
-    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
-    if acc_ids:
-        db.query(AccountBalance).filter(
-            AccountBalance.account_id.in_(acc_ids)
-        ).update({AccountBalance.balance: 0}, synchronize_session=False)
-    db.commit()
+    'Удаляет ВСЕ транзакции пользователя. Балансы счетов обнуляются.'
+    return commands.delete_all_transactions(db=db, user_id=user_id)
 
 
 @router.post("/reset", status_code=204)
@@ -148,23 +52,8 @@ def reset_account(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Удаляет ВСЕ данные пользователя кроме самого аккаунта.
-
-    Удаляются: транзакции, балансы, счета, группы счетов, категории, валюты.
-    """
-    # Порядок важен из-за FK
-    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
-    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
-    if acc_ids:
-        db.query(AccountBalance).filter(
-            AccountBalance.account_id.in_(acc_ids)
-        ).delete(synchronize_session=False)
-    db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
-    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
-    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
-    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
-    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
-    db.commit()
+    'Удаляет ВСЕ данные пользователя кроме самого аккаунта.\n\n    Удаляются: транзакции, балансы, счета, группы счетов, категории, валюты.\n    '
+    return commands.reset_account(db=db, user_id=user_id)
 
 
 @router.get("/limits")
@@ -172,8 +61,8 @@ def get_limits(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Текущее использование + активный тариф."""
-    return limits_svc.get_limits_status(db, user_id)
+    'Текущее использование + активный тариф.'
+    return queries.get_limits(db=db, user_id=user_id)
 
 
 @router.delete("/", status_code=204)
@@ -181,17 +70,5 @@ def delete_account(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Полностью удаляет пользователя и все его данные."""
-    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
-    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
-    if acc_ids:
-        db.query(AccountBalance).filter(
-            AccountBalance.account_id.in_(acc_ids)
-        ).delete(synchronize_session=False)
-    db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
-    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
-    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
-    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
-    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
-    db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
-    db.commit()
+    'Полностью удаляет пользователя и все его данные.'
+    return commands.delete_account(db=db, user_id=user_id)

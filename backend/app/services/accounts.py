@@ -22,10 +22,12 @@ def get_or_create_balance(
 ) -> AccountBalance:
     """Возвращает существующий AccountBalance или создаёт новый с балансом 0."""
     currency = currency.upper()
+    db.flush()
+    db.query(Account.id).filter(Account.id == account_id).with_for_update().first()
     bal = db.query(AccountBalance).filter(
         AccountBalance.account_id == account_id,
         AccountBalance.currency == currency,
-    ).first()
+    ).populate_existing().with_for_update().first()
     if bal is None:
         bal = AccountBalance(account_id=account_id, currency=currency, balance=0.0)
         db.add(bal)
@@ -65,7 +67,7 @@ def serialize_account(
                     b.balance, b.currency, main_currency,
                 )
             except exchange_svc.ExchangeError:
-                in_main = 0.0
+                in_main = None
         else:
             # Быстрый вариант для форм выбора счёта: сырые валютные остатки
             # нужны сразу, а сетевой пересчёт в основную валюту будет позже.
@@ -77,7 +79,10 @@ def serialize_account(
                 balance_in_main=in_main,
             )
         )
-        total_in_main += in_main
+        if in_main is None:
+            total_in_main = None
+        elif total_in_main is not None:
+            total_in_main += in_main
 
     return AccountResponse(
         id=account.id,
@@ -94,7 +99,7 @@ def serialize_account(
         is_shared=account.is_shared,
         access_level=access_level,
         balances=balances_out,
-        total_in_main=round(total_in_main, 2),
+        total_in_main=round(total_in_main, 2) if total_in_main is not None else None,
     )
 
 

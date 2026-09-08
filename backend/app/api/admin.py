@@ -1,53 +1,28 @@
-"""Admin API.
-
-Доступ только пользователям с is_admin=True.
-По принципу — НЕ даём админу прямого доступа к чужим транзакциям/счетам.
-Только метаданные юзеров: счётчики, план, активность.
-"""
-from datetime import datetime, timedelta, timezone
+"""HTTP routes; application operations own validation and transaction boundaries."""
+from app.api.dependencies import current_user_id
 from typing import Optional
-
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy import func, or_
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
-
 from app.database import get_db
 from app.models.user import User
-from app.models.account import Account
-from app.models.category import Category
-from app.models.transaction import Transaction
-from app.models.notification import Notification
-from app.models.billing import Subscription
-from app.schemas.admin import (
-    AdminUserSummary, AdminUsersPage, AdminUserUpdate,
-    AdminPasswordReset, AdminStats, AdminConfig, AdminConfigUpdate,
-)
+from app.schemas.admin import AdminUserSummary, AdminUsersPage, AdminUserUpdate, AdminPasswordReset, AdminStats, AdminConfig, AdminConfigUpdate
 from app.schemas.notification import AdminNotificationCreate
-from app.services.auth import decode_token, hash_password
-from app.services.user_cleanup import delete_user_completely
-from app.services import app_config as app_config_svc
-from app.services.email import is_smtp_configured, send_email
-from app.services.notifications import is_enabled
-from app.services.web_push import send_web_pushes
+from app.operations.admin import commands, queries
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+
 security = HTTPBearer()
 
+router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def get_admin_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user_id: int = Depends(current_user_id),
     db: Session = Depends(get_db),
 ) -> int:
-    payload = decode_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user_id = int(payload["sub"])
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin only")
     return user_id
-
 
 @router.post("/notifications", status_code=201)
 def create_notification(
@@ -55,49 +30,7 @@ def create_notification(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    query = db.query(User)
-    if data.user_id is not None:
-        query = query.filter(User.id == data.user_id)
-    recipients = query.all()
-    if data.user_id is not None and not recipients:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    notifications = [
-        Notification(
-            user_id=user.id,
-            title=data.title.strip(),
-            message=data.message.strip(),
-            link=data.link,
-        )
-        for user in recipients
-    ]
-    db.add_all(notifications)
-    for user in recipients:
-        if is_enabled(user, "subscription", "push"):
-            send_web_pushes(db, user, title=data.title.strip(), link=data.link)
-    db.commit()
-    return {"recipients_count": len(notifications)}
-
-
-def _summary(db: Session, u: User) -> AdminUserSummary:
-    acc_count = db.query(Account).filter(Account.user_id == u.id).count()
-    cat_count = db.query(Category).filter(Category.user_id == u.id).count()
-    tx_count = db.query(Transaction).filter(Transaction.user_id == u.id).count()
-    return AdminUserSummary(
-        id=u.id,
-        email=u.email,
-        username=u.username,
-        is_active=u.is_active,
-        is_admin=u.is_admin,
-        main_currency=u.main_currency,
-        plan=u.plan,
-        plan_source=u.plan_source,
-        plan_expires_at=u.plan_expires_at,
-        family_upgrade_enabled=u.family_upgrade_enabled,
-        created_at=u.created_at,
-        accounts_count=acc_count,
-        categories_count=cat_count,
-        transactions_count=tx_count,
-    )
+    return commands.create_notification(data=data, db=db, _=_)
 
 
 @router.get("/users", response_model=AdminUsersPage)
@@ -109,21 +42,7 @@ def list_users(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    query = db.query(User)
-    if q:
-        like = f"%{q.lower()}%"
-        query = query.filter(or_(
-            func.lower(User.email).like(like),
-            func.lower(User.username).like(like),
-        ))
-    if is_active is not None:
-        query = query.filter(User.is_active == is_active)
-    total = query.count()
-    users = query.order_by(User.created_at.desc().nullslast(), User.id.desc()).offset(offset).limit(limit).all()
-    return AdminUsersPage(
-        items=[_summary(db, u) for u in users],
-        total=total, limit=limit, offset=offset,
-    )
+    return queries.list_users(q=q, is_active=is_active, limit=limit, offset=offset, db=db, _=_)
 
 
 @router.get("/users/{user_id}", response_model=AdminUserSummary)
@@ -132,10 +51,7 @@ def get_user(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    u = db.query(User).filter(User.id == user_id).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="User not found")
-    return _summary(db, u)
+    return queries.get_user(user_id=user_id, db=db, _=_)
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserSummary)
@@ -146,47 +62,7 @@ def update_user(
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_admin_user_id),
 ):
-    u = db.query(User).filter(User.id == user_id).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    update = data.model_dump(exclude_unset=True)
-
-    # Защита: нельзя снять admin с самого себя если он последний админ
-    if u.id == admin_id and "is_admin" in update and update["is_admin"] is False:
-        admins_left = db.query(User).filter(User.is_admin == True, User.id != admin_id).count()
-        if admins_left == 0:
-            raise HTTPException(status_code=400, detail="Нельзя снять admin с последнего администратора")
-
-    family_activated = update.get("plan") == "family" and u.plan != "family"
-    if "plan" in update:
-        u.plan_source = "admin"
-        u.plan_expires_at = None
-        subscription = db.query(Subscription).filter(Subscription.user_id == u.id).first()
-        if subscription:
-            # Администраторская выдача тарифа не должна приводить к скрытому
-            # следующему списанию по ранее оплаченной подписке.
-            subscription.cancel_at_period_end = True
-    for k, v in update.items():
-        setattr(u, k, v)
-    if family_activated:
-        db.add(Notification(
-            user_id=u.id,
-            title="Тариф Family активирован",
-            message="Для вашего аккаунта подключён Family. Теперь доступны семейное пространство, обязательства, депозиты и расширенные возможности.",
-            link="/billing",
-        ))
-    db.commit()
-    db.refresh(u)
-    if family_activated:
-        background.add_task(
-            send_email,
-            u.email,
-            "CaseMoney — тариф Family активирован",
-            "Для вашего аккаунта подключён тариф Family. Войдите в CaseMoney, чтобы настроить семейное пространство, обязательства и депозиты.",
-            "<p>Для вашего аккаунта подключён тариф <strong>Family</strong>.</p><p>Войдите в CaseMoney, чтобы настроить семейное пространство, обязательства и депозиты.</p>",
-        )
-    return _summary(db, u)
+    return commands.update_user(user_id=user_id, data=data, background=background, db=db, admin_id=admin_id)
 
 
 @router.post("/users/{user_id}/reset-password", status_code=204)
@@ -196,13 +72,7 @@ def reset_password(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    u = db.query(User).filter(User.id == user_id).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="User not found")
-    if len(data.new_password) < 4:
-        raise HTTPException(status_code=400, detail="Пароль слишком короткий (мин. 4)")
-    u.hashed_password = hash_password(data.new_password)
-    db.commit()
+    return commands.reset_password(user_id=user_id, data=data, db=db, _=_)
 
 
 @router.delete("/users/{user_id}", status_code=204)
@@ -211,22 +81,7 @@ def delete_user(
     db: Session = Depends(get_db),
     admin_id: int = Depends(get_admin_user_id),
 ):
-    if user_id == admin_id:
-        raise HTTPException(status_code=400, detail="Удалить себя нельзя — используйте обычные настройки")
-    u = db.query(User).filter(User.id == user_id).first()
-    if not u:
-        raise HTTPException(status_code=404, detail="User not found")
-    delete_user_completely(db, user_id)
-    db.commit()
-
-
-def _config_out(cfg) -> AdminConfig:
-    return AdminConfig(
-        require_email_verification=cfg.require_email_verification,
-        smtp_configured=is_smtp_configured(),
-        registration_enabled=cfg.registration_enabled,
-        billing_enabled=cfg.billing_enabled,
-    )
+    return commands.delete_user(user_id=user_id, db=db, admin_id=admin_id)
 
 
 @router.get("/config", response_model=AdminConfig)
@@ -234,7 +89,7 @@ def get_app_config(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    return _config_out(app_config_svc.get_config(db))
+    return queries.get_app_config(db=db, _=_)
 
 
 @router.patch("/config", response_model=AdminConfig)
@@ -243,15 +98,7 @@ def update_app_config(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    cfg = app_config_svc.get_config(db)
-    update = data.model_dump(exclude_unset=True)
-
-    for k, v in update.items():
-        setattr(cfg, k, v)
-    db.commit()
-    db.refresh(cfg)
-    app_config_svc.invalidate_cache()
-    return _config_out(cfg)
+    return commands.update_app_config(data=data, db=db, _=_)
 
 
 @router.get("/stats", response_model=AdminStats)
@@ -259,45 +106,4 @@ def get_stats(
     db: Session = Depends(get_db),
     _: int = Depends(get_admin_user_id),
 ):
-    now = datetime.now(timezone.utc)
-    last_7d = now - timedelta(days=7)
-    last_30d = now - timedelta(days=30)
-
-    total = db.query(User).count()
-    active = db.query(User).filter(User.is_active == True).count()
-    admins = db.query(User).filter(User.is_admin == True).count()
-
-    accs = db.query(Account).count()
-    cats = db.query(Category).count()
-    txs = db.query(Transaction).count()
-
-    new_7d = db.query(User).filter(User.created_at >= last_7d).count()
-    new_30d = db.query(User).filter(User.created_at >= last_30d).count()
-
-    # Регистрации по дням за последние 30 дней
-    by_day = (
-        db.query(
-            func.date(User.created_at).label("day"),
-            func.count(User.id).label("count"),
-        )
-        .filter(User.created_at >= last_30d)
-        .group_by("day")
-        .order_by("day")
-        .all()
-    )
-    new_signups_by_day = [
-        {"date": row.day.isoformat() if row.day else "", "count": row.count}
-        for row in by_day
-    ]
-
-    return AdminStats(
-        total_users=total,
-        active_users=active,
-        admin_users=admins,
-        total_accounts=accs,
-        total_categories=cats,
-        total_transactions=txs,
-        new_users_last_7d=new_7d,
-        new_users_last_30d=new_30d,
-        new_signups_by_day=new_signups_by_day,
-    )
+    return queries.get_stats(db=db, _=_)

@@ -9,6 +9,7 @@ from app.models.billing import BillingPayment, Subscription
 from app.models.notification import Notification
 from app.models.user import User
 from app.services import yookassa
+from app.services.app_config import is_billing_enabled
 
 
 def utcnow() -> datetime:
@@ -80,10 +81,22 @@ def apply_provider_payment(db: Session, provider_data: dict) -> BillingPayment:
 
 
 def process_subscription_renewals(db: Session) -> tuple[int, int]:
+    if not is_billing_enabled(db):
+        return 0, 0
     now = utcnow()
     renewed = expired = 0
-    subscriptions = db.query(Subscription).filter(Subscription.status.in_(["active", "past_due"])).all()
-    for subscription in subscriptions:
+    subscription_ids = [row.id for row in db.query(Subscription.id).filter(
+        Subscription.status.in_(["active", "past_due"])
+    ).order_by(Subscription.id).all()]
+    for subscription_id in subscription_ids:
+        # A payment commit releases locks. Reacquire and reread each candidate
+        # so another worker's renewal is visible before checking pending rows.
+        subscription = db.query(Subscription).filter(
+            Subscription.id == subscription_id,
+            Subscription.status.in_(["active", "past_due"]),
+        ).populate_existing().with_for_update().first()
+        if subscription is None:
+            continue
         end = subscription.current_period_end
         if end and end.tzinfo is None:
             end = end.replace(tzinfo=timezone.utc)

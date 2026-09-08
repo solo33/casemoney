@@ -1,54 +1,23 @@
-from datetime import datetime
-from typing import List, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+"""HTTP routes; application operations own validation and transaction boundaries."""
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-
 from app.database import get_db
-from app.models.exchange_rate import ExchangeRate
-from app.services import exchange as exchange_svc
+from app.operations.exchange import queries, commands
+from app.schemas.exchange_views import ConvertResponse, RatesResponse
+
 
 router = APIRouter(prefix="/api/exchange-rates", tags=["exchange-rates"])
 
-
-class RateItem(BaseModel):
-    from_currency: str
-    to_currency: str
-    rate: float
-    source: str
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class RatesResponse(BaseModel):
-    rates: List[RateItem]
-
-
 @router.get("/", response_model=RatesResponse)
 def list_rates(db: Session = Depends(get_db)):
-    """Все закэшированные курсы."""
-    rows = db.query(ExchangeRate).all()
-    return RatesResponse(rates=[RateItem.model_validate(r) for r in rows])
+    'Все закэшированные курсы.'
+    return queries.list_rates(db=db)
 
 
 @router.post("/refresh", response_model=dict)
 def refresh_rates(db: Session = Depends(get_db)):
-    """Принудительно обновить все ходовые курсы (CBR + CoinGecko)."""
-    try:
-        return exchange_svc.refresh_all_rates(db)
-    except exchange_svc.ExchangeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-class ConvertResponse(BaseModel):
-    from_currency: str
-    to_currency: str
-    amount: float
-    converted: float
-    rate: float
+    'Принудительно обновить все ходовые курсы (CBR + CoinGecko).'
+    return commands.refresh_rates(db=db)
 
 
 @router.get("/convert", response_model=ConvertResponse)
@@ -58,15 +27,5 @@ def convert_amount(
     to_currency: str = Query(..., alias="to"),
     db: Session = Depends(get_db),
 ):
-    """Конверсия суммы между двумя валютами по текущему курсу (с кэшем)."""
-    try:
-        rate = exchange_svc.get_rate(db, from_currency, to_currency)
-    except exchange_svc.ExchangeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    return ConvertResponse(
-        from_currency=from_currency.upper(),
-        to_currency=to_currency.upper(),
-        amount=amount,
-        converted=round(amount * rate, 2),
-        rate=rate,
-    )
+    'Конверсия суммы между двумя валютами по текущему курсу (с кэшем).'
+    return queries.convert_amount(amount=amount, from_currency=from_currency, to_currency=to_currency, db=db)

@@ -1,0 +1,127 @@
+
+        .family-page { max-width: 1120px; }
+        .family-intro, .family-card, .family-heading, .family-stat {
+          background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px;
+        }
+        .family-intro { padding: 16px 18px; margin-bottom: 18px; }
+        .family-intro p, .family-card p { color: #6f7b86; margin: 6px 0 0; }
+        .family-error, .family-success { padding: 12px 14px; border-radius: 8px; margin: 12px 0; }
+        .family-error { color: #a83220; background: #fff0ec; }
+        .family-success { color: #12683e; background: #edf8f1; }
+        .family-heading { padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .family-heading span { color: #7a8590; font-size: 12px; }
+        .family-heading h2 { margin: 3px 0 0; }
+        .family-role { background: #f1eadb; color: #173a54 !important; padding: 6px 10px; border-radius: 999px; font-weight: 700; }
+        .family-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .family-stat { padding: 15px 17px; display: grid; gap: 5px; }
+        .family-stat span { color: #7a8590; font-size: 12px; }
+        .family-stat strong { color: #173a54; font-size: 21px; }
+        .family-stat-accent { border-color: #d8b96f; background: #fff9e9; }
+        .family-stat-negative { border-color: #e8b4a7; background: #fff3ef; }
+        .family-analytics-heading { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+        .family-eyebrow { color: #9c6f1d !important; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 800; margin: 0 0 4px !important; }
+        .family-analytics-heading input { width: auto; }
+        .family-report-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .family-report-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .family-report-actions button { padding: 8px 11px; font-size: 12px; }
+        .family-report-secondary { background: #fffdf7; color: #173a54; border: 1px solid #d6cdbb; }
+        .family-report-secondary:hover { background: #f7eed9; }
+        .family-analytics-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .family-analytics-stats-four { grid-template-columns: repeat(4, 1fr); }
+        .family-analytics-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 12px; display: grid; gap: 4px; }
+        .family-analytics-stats span { color: #7a8590; font-size: 12px; }
+        .family-analytics-stats strong { color: #173a54; font-size: 18px; }
+        .family-month-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+        .family-month-summary-item { display: grid; gap: 5px; padding: 12px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fffcf4; }
+        .family-month-summary-item span { color: #173a54; font-size: 13px; font-weight: 800; }
+        .family-month-summary-item strong { color: #173a54; font-size: 18px; }
+        .family-month-summary-item small { color: #7a8590; font-size: 12px; line-height: 1.35; }
+        .family-month-summary-item--deficit { border-color: #e2a99a; background: #fff3ef; }
+        .family-month-summary-item--deficit strong, .family-month-summary-item--budget_risk strong { color: #b6402b; }
+        .family-month-summary-item--budget_risk { border-color: #e5c67a; background: #fff9e9; }
+        .family-month-summary-item--reserve { border-color: #b8d9c8; background: #edf8f1; }
+        .family-month-summary-item--reserve strong { color: #17704b; }
+        .family-forecast-block { margin-top: 18px; padding: 15px; border: 1px solid #ded5c2; border-radius: 10px; background: #fffcf4; }
+        .family-forecast-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+        .family-forecast-heading h3 { margin: 0; color: #173a54; font-size: 16px; }
+        .family-forecast-heading p { margin: 4px 0 0; color: #7a8590; font-size: 12px; }
+        .family-forecast-days { flex-shrink: 0; color: #9c6f1d; font-size: 12px; font-weight: 800; background: #f7eed9; border-radius: 999px; padding: 5px 8px; }
+        .family-forecast-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 13px; }
+        .family-forecast-stats article { border: 1px solid #e4ddcd; border-radius: 9px; padding: 11px; display: grid; gap: 4px; background: #fffdf7; }
+        .family-forecast-stats span { color: #7a8590; font-size: 12px; }
+        .family-forecast-stats strong { color: #173a54; font-size: 17px; }
+        .family-forecast-details { margin-top: 13px; }
+        .family-expense-amount { color: #b6402b !important; }
+        .family-income-amount { color: #17704b !important; }
+        .family-analytics-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
+        .family-analytics-details { padding-top: 4px; border-top: 1px solid #eee8dc; }
+        .family-goals-section { max-width: 680px; margin-top: 18px; }
+        .family-analytics-columns h3, .family-goals-section h3 { font-size: 14px; margin: 0 0 7px; color: #173a54; }
+        .family-analytics-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #eee8dc; color: #596572; font-size: 13px; }
+        .family-analytics-row strong { color: #173a54; white-space: nowrap; text-align: right; }
+        .family-analytics-row small { display: block; color: #7a8590; margin-top: 2px; }
+        .family-analytics-empty, .family-analytics-note { color: #7a8590 !important; font-size: 13px; }
+        .family-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .family-card { padding: 18px; margin-bottom: 14px; }
+        .family-card h2 { margin: 0 0 10px; font-size: 19px; }
+        .family-recurring-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .family-recurring-badge { display: grid; place-items: center; flex: 0 0 auto; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 999px; background: #f7eed9; color: #9c6f1d; font-weight: 800; }
+        .family-recurring-list { display: grid; gap: 8px; margin-top: 14px; }
+        .family-recurring-item { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; align-items: center; gap: 16px; padding: 12px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fffcf4; }
+        .family-recurring-copy, .family-recurring-amount { display: grid; gap: 3px; min-width: 0; }
+        .family-recurring-copy strong { color: #173a54; }
+        .family-recurring-copy span, .family-recurring-copy small, .family-recurring-amount span { color: #7a8590; font-size: 12px; }
+        .family-recurring-amount { text-align: right; }
+        .family-recurring-amount strong { color: #173a54; white-space: nowrap; }
+        .family-recurring-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .family-recurring-owner { color: #7a8590; font-size: 12px; max-width: 145px; text-align: right; }
+        .family-card form { display: grid; gap: 9px; margin-top: 15px; }
+        .family-card form button { justify-self: start; }
+        .family-members > div, .family-expenses article {
+          display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 11px 0; border-bottom: 1px solid #eee8dc;
+        }
+        .family-members span:first-child, .family-expenses article > div { display: grid; gap: 3px; min-width: 0; }
+        .family-members span:first-child strong, .family-members span:first-child small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .family-members small, .family-expenses span { color: #7a8590; font-size: 12px; }
+        .family-member-actions { display: flex !important; align-items: center; gap: 10px; color: #7a8590; font-size: 13px; flex-shrink: 0; }
+        .family-member-actions select { width: auto; min-width: 118px; padding: 6px 25px 6px 8px; font-size: 12px; }
+        .family-member-remove {
+          background: transparent; border: 1px solid #e4ddcd; color: #a83220;
+          padding: 4px 10px; font-size: 12px; border-radius: 7px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+        }
+        .family-member-remove:hover { background: #fff0ec; border-color: #e2a99a; }
+        .family-amount { display: grid; grid-template-columns: 1fr 100px; gap: 8px; }
+        .family-pending-expenses { display: grid; gap: 8px; margin-top: 14px; }
+        .family-pending-expenses article { display: grid; grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 220px) minmax(140px, 220px); align-items: center; gap: 10px; padding: 10px; border: 1px solid #e4ddcd; border-radius: 9px; background: #fff9e9; }
+        .family-pending-expenses article > div { display: grid; gap: 3px; min-width: 0; }
+        .family-pending-expenses span { color: #7a8590; font-size: 12px; }
+        .family-pending-totals { display: grid; gap: 4px; padding: 11px 12px; border: 1px solid #d8c078; border-radius: 9px; background: #fffdf4; }
+        .family-pending-totals strong { color: #173a54; }
+        .family-shared-accounts { grid-column: 1 / -1; }
+        .family-shared-accounts form { display: grid; gap: 9px; }
+        .family-account-access { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(150px, 220px); gap: 9px; align-items: center; padding: 8px 0; border-top: 1px solid #eee8dc; }
+        .family-account-access input { width: auto; }
+        .family-account-access select { width: 100%; }
+        .family-expenses article > div:last-child { text-align: right; }
+        @media (max-width: 720px) {
+          .family-columns { grid-template-columns: 1fr; }
+          .family-analytics-stats, .family-analytics-stats-four, .family-month-summary, .family-analytics-columns { grid-template-columns: 1fr; }
+          .family-analytics-heading { align-items: stretch; flex-direction: column; }
+          .family-analytics-heading input { width: 100%; }
+          .family-report-controls { justify-content: stretch; align-items: stretch; }
+          .family-report-actions { display: grid; grid-template-columns: 1fr 1fr; }
+          .family-report-actions button { width: 100%; }
+          .family-forecast-heading { flex-direction: column; }
+          .family-forecast-stats { grid-template-columns: 1fr; }
+          .family-recurring-item { grid-template-columns: 1fr; gap: 9px; }
+          .family-recurring-amount { text-align: left; }
+          .family-recurring-actions { justify-content: flex-start; }
+          .family-recurring-owner { max-width: none; text-align: left; }
+          .family-expenses article { align-items: flex-start; }
+          .family-heading { align-items: flex-start; }
+          .family-members > div { flex-wrap: wrap; }
+          .family-member-actions { flex-wrap: wrap; justify-content: flex-start; width: 100%; min-width: 0; }
+          .family-account-access { grid-template-columns: auto minmax(0, 1fr); }
+          .family-account-access select { grid-column: 2; }
+          .family-pending-expenses article { grid-template-columns: 1fr; align-items: stretch; }
+        }

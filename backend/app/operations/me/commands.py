@@ -1,0 +1,130 @@
+"""Me: commands. Callers supply resolved user and database session."""
+from fastapi import HTTPException
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from app.models.user import User
+from app.models.account import Account
+from app.models.account_balance import AccountBalance
+from app.models.transaction import Transaction
+from app.models.category import Category
+from app.models.account_group import AccountGroup
+from app.models.user_currency import UserCurrency
+from app.models.shopping import ShoppingList
+from app.models.family import Family, FamilyMember
+from app.schemas.user import UserUpdate, PasswordChange
+from app.services.auth import hash_password, normalize_email, verify_password
+from app.services.notifications import normalized_preferences
+from app.operations.me.common import _get_user, _serialize
+
+
+def update_me(data: UserUpdate, db: Session=None, user_id: int=None):
+    user = _get_user(db, user_id)
+    update_fields = data.model_dump(exclude_unset=True)
+    confirm_family_data_cleanup = update_fields.pop("confirm_family_data_cleanup", False)
+    requested_mode = update_fields.get("preferred_mode")
+    if requested_mode == "personal" and user.preferred_mode != "personal":
+        membership = db.query(FamilyMember).filter(
+            FamilyMember.user_id == user_id,
+            FamilyMember.status == "active",
+        ).first()
+        if membership:
+            if not confirm_family_data_cleanup:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Подтвердите выход из Family: общие данные этого пространства будут недоступны",
+                )
+            if membership.role == "owner":
+                family = db.query(Family).filter(Family.id == membership.family_id).first()
+                if family:
+                    # Общие списки, цели и взаиморасчёты каскадно удаляются;
+                    # личные операции сохраняются, их family_id станет NULL.
+                    db.delete(family)
+            else:
+                db.delete(membership)
+    if "main_currency" in update_fields and update_fields["main_currency"]:
+        update_fields["main_currency"] = update_fields["main_currency"].upper()
+    if "email" in update_fields and update_fields["email"]:
+        update_fields["email"] = normalize_email(str(update_fields["email"]))
+        # проверим уникальность
+        other = db.query(User).filter(
+            func.lower(func.trim(User.email)) == update_fields["email"],
+            User.id != user_id,
+        ).first()
+        if other:
+            raise HTTPException(status_code=400, detail="Email уже занят")
+    if "notification_preferences" in update_fields:
+        # Same sanitization as PUT /api/notifications/settings — drop unknown
+        # event keys and coerce to bool, regardless of which endpoint wrote it.
+        update_fields["notification_preferences"] = normalized_preferences(
+            update_fields["notification_preferences"]
+        )
+    for k, v in update_fields.items():
+        setattr(user, k, v)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Email уже занят")
+    db.refresh(user)
+    if "main_currency" in update_fields:
+        from app.services import exchange as exchange_svc
+        exchange_svc.invalidate_user_rates(user_id)
+    return _serialize(db, user)
+
+
+def change_password(data: PasswordChange, db: Session=None, user_id: int=None):
+    user = _get_user(db, user_id)
+    if not verify_password(data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Текущий пароль неверен")
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+
+
+def delete_all_transactions(db: Session=None, user_id: int=None):
+    """Удаляет ВСЕ транзакции пользователя. Балансы счетов обнуляются."""
+    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
+    # Сбрасываем балансы всех счетов в 0
+    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
+    if acc_ids:
+        db.query(AccountBalance).filter(
+            AccountBalance.account_id.in_(acc_ids)
+        ).update({AccountBalance.balance: 0}, synchronize_session=False)
+    db.commit()
+
+
+def reset_account(db: Session=None, user_id: int=None):
+    """Удаляет ВСЕ данные пользователя кроме самого аккаунта.
+
+    Удаляются: транзакции, балансы, счета, группы счетов, категории, валюты.
+    """
+    # Порядок важен из-за FK
+    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
+    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
+    if acc_ids:
+        db.query(AccountBalance).filter(
+            AccountBalance.account_id.in_(acc_ids)
+        ).delete(synchronize_session=False)
+    db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
+    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
+    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
+    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
+    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
+    db.commit()
+
+
+def delete_account(db: Session=None, user_id: int=None):
+    """Полностью удаляет пользователя и все его данные."""
+    acc_ids = [a.id for a in db.query(Account).filter(Account.user_id == user_id).all()]
+    db.query(Transaction).filter(Transaction.user_id == user_id).delete(synchronize_session=False)
+    if acc_ids:
+        db.query(AccountBalance).filter(
+            AccountBalance.account_id.in_(acc_ids)
+        ).delete(synchronize_session=False)
+    db.query(Account).filter(Account.user_id == user_id).delete(synchronize_session=False)
+    db.query(AccountGroup).filter(AccountGroup.user_id == user_id).delete(synchronize_session=False)
+    db.query(Category).filter(Category.user_id == user_id).delete(synchronize_session=False)
+    db.query(UserCurrency).filter(UserCurrency.user_id == user_id).delete(synchronize_session=False)
+    db.query(ShoppingList).filter(ShoppingList.user_id == user_id).delete(synchronize_session=False)
+    db.query(User).filter(User.id == user_id).delete(synchronize_session=False)
+    db.commit()

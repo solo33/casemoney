@@ -26,4 +26,12 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    files: ['src/components/**/*.{js,jsx}', 'src/hooks/**/*.{js,jsx}', 'src/utils/**/*.{js,jsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{ group: ['**/pages/**'], message: 'Shared UI and state must not depend on route pages. Move reusable code into components, hooks or utils.' }],
+      }],
+    },
+  },
 ])

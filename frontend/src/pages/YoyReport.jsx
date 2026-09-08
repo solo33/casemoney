@@ -1,63 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import api from "../api/client";
-import { useUser } from "../contexts/UserContext";
-import { currencySymbol, formatMoney } from "../utils/money";
+
 import AnalysisNav from "../components/AnalysisNav";
+import { formatMoney } from "../utils/money";
+import { useYoyReportController } from "../hooks/useYoyReportController";
+import { TypeBtn, FilterChips } from "../components/yoyReport/YoyReportParts";
+import { thStyle } from "../utils/yoyReportView";
 
-// Сравнение год к году: строки — месяцы, колонки — годы.
-// Фильтры: тип (расходы/доходы), счета, категории (мультивыбор).
 export default function YoyReport() {
-  const { mainCurrency } = useUser();
-  const [type, setType] = useState("expense");
-  const [accounts, setAccounts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selAccounts, setSelAccounts] = useState(new Set());   // пусто = все
-  const [selCategories, setSelCategories] = useState(new Set());
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [hoverCol, setHoverCol] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const onCellOver = (e) => {
-    const cell = e.target.closest("td, th");
-    if (cell) setHoverCol(cell.cellIndex + 1);
-  };
-
-  useEffect(() => {
-    Promise.all([api.get("/api/accounts/"), api.get("/api/categories/")])
-      .then(([a, c]) => { setAccounts(a.data); setCategories(c.data); })
-      .catch(() => {});
-  }, []);
-
-  const fetchData = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    const params = { type };
-    if (selAccounts.size) params.account_ids = [...selAccounts].join(",");
-    if (selCategories.size) params.category_ids = [...selCategories].join(",");
-    api.get("/api/reports/yoy", { params })
-      .then(r => setData(r.data))
-      .catch(() => setError("Ошибка загрузки"))
-      .finally(() => setLoading(false));
-  }, [type, selAccounts, selCategories]);
-
-  useEffect(() => { fetchData(); }, [fetchData, mainCurrency]);
-
-  const sym = currencySymbol(data?.main_currency || mainCurrency);
-  const rootCategories = useMemo(
-    () => categories.filter(c => !c.parent_id && c.type === type),
-    [categories, type],
-  );
-
-  const toggle = (set, setter, id) => {
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setter(next);
-  };
-
-  const accentColor = type === "income" ? "#0f6a40" : "#a93421";
-
+  const { mainCurrency, type, setType, accounts, selAccounts, setSelAccounts, selCategories, setSelCategories, data, loading, error, hoverCol, setHoverCol, filtersOpen, setFiltersOpen, onCellOver, sym, rootCategories, toggle, accentColor } = useYoyReportController();
   return (
     <div className="page" style={{ maxWidth: 1400 }}>
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
@@ -111,6 +60,10 @@ export default function YoyReport() {
         ) : (
           <>
           <div className="yoy-mobile-results">
+            <section className="yoy-mobile-month">
+              <h3>Итого за год</h3>
+              {data.years.map(year => <div key={year}><span>{year}</span><strong>{formatMoney(data.totals[year] ?? 0, { maxFraction: 0 })} {sym}</strong></div>)}
+            </section>
             {data.rows.map(row => (
               <section key={row.month} className="yoy-mobile-month">
                 <h3>{row.label}</h3>
@@ -181,66 +134,5 @@ export default function YoyReport() {
         )
       )}
     </div>
-  );
-}
-
-const thStyle = {
-  padding: "8px 10px", textAlign: "left",
-  fontSize: 11, fontWeight: 600, color: "#fff",
-  textTransform: "uppercase", letterSpacing: 0.4,
-  whiteSpace: "nowrap",
-};
-
-function TypeBtn({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "5px 14px", borderRadius: 999,
-        border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
-        background: active ? "#173a54" : "transparent",
-        color: active ? "#fff" : "#515c68",
-        fontSize: 13, fontWeight: active ? 600 : 500, cursor: "pointer",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function FilterChips({ label, items, selected, onToggle, onClear }) {
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 12, color: "#7a8590", fontWeight: 600, paddingTop: 4, minWidth: 78 }}>
-        {label}:
-      </span>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1 }}>
-        <Chip active={selected.size === 0} onClick={onClear}>Все</Chip>
-        {items.map(it => (
-          <Chip key={it.id} active={selected.has(it.id)} onClick={() => onToggle(it.id)}>
-            {it.name}
-          </Chip>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Chip({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "3px 10px", borderRadius: 999, fontSize: 12,
-        border: `1px solid ${active ? "#9c7b3c" : "#e4ddcd"}`,
-        background: active ? "#9c7b3c" : "transparent",
-        color: active ? "#fff" : "#515c68",
-        cursor: "pointer",
-      }}
-    >
-      {children}
-    </button>
   );
 }

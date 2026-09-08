@@ -45,8 +45,8 @@ def financial_period_totals(
     """Aggregate actual income/expenses in ``currency`` using saved rates.
 
     Financing operations and transfers are deliberately excluded: they move
-    money but are not earned income or consumption.  A legacy operation with
-    no usable rate is skipped rather than making an entire dashboard fail.
+    money but are not earned income or consumption. Missing rates propagate
+    explicitly: an incomplete financial total must never look like zero.
     """
     query = db.query(Transaction).filter(
         Transaction.user_id == user_id,
@@ -69,7 +69,7 @@ def financial_period_totals(
         try:
             amount = exchange_svc.convert_transaction_for_user(db, user_id, transaction, currency)
         except exchange_svc.ExchangeError:
-            continue
+            raise
         if transaction.type == TransactionType.income:
             result.income += amount
         else:

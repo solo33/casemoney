@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import api from "../api/client";
-import { formatMoney } from "../utils/money";
 
-const blankItem = { name: "", quantity: "1", unit: "", planned_price: "", currency: "RUB", category_id: "", note: "" };
+import { useState, useCallback, useEffect, useMemo } from "react";
+
+import api from "../api/client";
+
+import { blankItem } from "../utils/shoppingView";
+import { ShoppingRow } from "../components/shopping/ShoppingParts";
 
 export default function Shopping() {
   const [lists, setLists] = useState([]);
@@ -145,9 +147,4 @@ export default function Shopping() {
     {bought.length > 0 && <section className="shopping-items-card shopping-bought"><h2>Куплено ({bought.length})</h2>{bought.map(item => <ShoppingRow key={item.id} item={item} bought onReopen={() => reopen(item)} onDelete={() => removeItem(item)} onExpense={() => openExpense(item)} />)}</section>}
     {expenseFor && <div className="modal-backdrop"><form className="shopping-expense-modal" onSubmit={saveExpense}><div className="modal-heading"><h2>Добавить расход</h2><button type="button" className="btn-ghost" onClick={() => setExpenseFor(null)}>×</button></div><p>{expenseFor.name}</p><label>Сумма<input autoFocus inputMode="decimal" value={expense.amount} onChange={e => setExpense(current => ({ ...current, amount: e.target.value }))} required /></label><label>Счёт<select value={expense.account_id} onChange={e => setExpense(current => ({ ...current, account_id: e.target.value }))} required><option value="">Выберите счёт</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label><label>Категория<select value={expense.category_id} onChange={e => setExpense(current => ({ ...current, category_id: e.target.value }))}><option value="">Без категории</option>{categories.map(category => <option key={category.id} value={category.id}>{category.parent_id ? "↳ " : ""}{category.name}</option>)}</select></label><label>Дата<input type="date" value={expense.date} onChange={e => setExpense(current => ({ ...current, date: e.target.value }))} /></label><button type="submit">Добавить расход и отметить купленным</button></form></div>}
   </div>;
-}
-
-function ShoppingRow({ item, bought, onBought, onReopen, onDelete, onExpense }) {
-  const price = item.actual_price ?? item.planned_price;
-  return <article className={`shopping-item ${bought ? "is-bought" : ""}`}><button type="button" className="shopping-check" onClick={bought ? onReopen : onBought} aria-label={bought ? "Вернуть в список" : "Отметить купленным"}>{bought ? "✓" : ""}</button><div className="shopping-item-name"><strong>{item.name}</strong><span>{item.quantity}{item.unit ? ` ${item.unit}` : ""}{price != null ? ` · ${formatMoney(price)} ${item.currency}` : ""}</span></div><div className="shopping-item-actions">{!item.transaction_id && <button type="button" className="btn-secondary" onClick={onExpense}>Учесть расход</button>}<button type="button" className="btn-icon-danger" onClick={onDelete} aria-label="Удалить">×</button></div></article>;
 }

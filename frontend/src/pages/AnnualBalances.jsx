@@ -1,70 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import api from "../api/client";
-import { TX_ADDED_EVENT } from "../components/QuickAddFab";
-import { useUser } from "../contexts/UserContext";
-import { currencySymbol, formatMoney } from "../utils/money";
+
 import AnalysisNav from "../components/AnalysisNav";
-
-const MONTHS = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
-
-function Cell({ value, bold }) {
-  const zero = Math.abs(value) < 0.5;
-  return (
-    <td style={{
-      padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap",
-      fontVariantNumeric: "tabular-nums",
-      fontWeight: bold ? 600 : 400,
-      color: zero ? "#9aa5af" : (value < 0 ? "#a93421" : "#1b2531"),
-      fontSize: 12.5,
-    }}>
-      {zero ? "—" : formatMoney(value, { maxFraction: 0 })}
-    </td>
-  );
-}
+import { useAnnualBalancesController } from "../hooks/useAnnualBalancesController";
+import { MobileBalances, GroupBlock, Cell } from "../components/annualBalances/AnnualBalancesParts";
+import { MONTHS } from "../utils/annualBalancesView";
 
 export default function AnnualBalances() {
-  const { mainCurrency } = useUser();
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [hoverCol, setHoverCol] = useState(null);
-  const [mobileMonth, setMobileMonth] = useState(new Date().getMonth());
-
-  // Делегирование: подсветка колонки по nth-child наведённой ячейки
-  const onCellOver = (e) => {
-    const cell = e.target.closest("td, th");
-    if (cell) setHoverCol(cell.cellIndex + 1);
-  };
-
-  const fetchData = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    api.get(`/api/reports/annual-balances?year=${year}`)
-      .then(r => setData(r.data))
-      .catch(() => setError("Ошибка загрузки"))
-      .finally(() => setLoading(false));
-  }, [year]);
-
-  useEffect(() => {
-    fetchData();
-    window.addEventListener(TX_ADDED_EVENT, fetchData);
-    return () => window.removeEventListener(TX_ADDED_EVENT, fetchData);
-  }, [fetchData]);
-  useEffect(() => { fetchData(); }, [mainCurrency, fetchData]);
-
-  const sym = currencySymbol(data?.main_currency || mainCurrency);
-
-  // Показываем только месяцы, где есть ненулевой остаток хотя бы по одному счёту
-  const visibleMonths = useMemo(() => {
-    if (!data) return [...Array(12).keys()];
-    const idx = [];
-    for (let i = 0; i < 12; i++) {
-      if (Math.abs(data.total_monthly[i]) > 0.5) idx.push(i);
-    }
-    return idx.length ? idx : [...Array(12).keys()];
-  }, [data]);
-
+  const { mainCurrency, year, setYear, data, loading, error, hoverCol, setHoverCol, mobileMonth, setMobileMonth, onCellOver, sym, visibleMonths } = useAnnualBalancesController();
   return (
     <div className="page" style={{ maxWidth: 1680 }}>
       <h1 style={{ margin: "0 0 12px" }}>Анализ</h1>
@@ -136,58 +77,5 @@ export default function AnnualBalances() {
         )
       )}
     </div>
-  );
-}
-
-function MobileBalances({ data, month, onMonthChange, sym }) {
-  return (
-    <div className="annual-mobile-view">
-      <label className="mobile-period-select">Месяц
-        <select value={month} onChange={e => onMonthChange(Number(e.target.value))}>
-          {MONTHS.map((label, index) => <option key={label} value={index}>{label}</option>)}
-        </select>
-      </label>
-      <div className="mobile-balance-total">
-        <small>Общий баланс на конец месяца</small>
-        <strong>{formatMoney(data.total_monthly[month] || 0, { maxFraction: 0 })} {sym}</strong>
-      </div>
-      {data.groups.map(group => (
-        <section key={group.group_id ?? "ungrouped"} className="mobile-report-section">
-          <h3><span>{group.group_name}</span><strong>{formatMoney(group.monthly[month] || 0, { maxFraction: 0 })} {sym}</strong></h3>
-          {group.accounts.map(account => (
-            <div key={account.account_id} className="mobile-report-row static">
-              <span>{account.icon ? `${account.icon} ` : ""}{account.name}</span>
-              <strong>{formatMoney(account.monthly[month] || 0, { maxFraction: 0 })} {sym}</strong>
-            </div>
-          ))}
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function GroupBlock({ group, months }) {
-  const cols = months || group.monthly.map((_, i) => i);
-  return (
-    <>
-      <tr style={{ background: "#f6f2e9", borderTop: "1px solid #e4ddcd" }}>
-        <td style={{ padding: "7px 10px", fontWeight: 700, color: "#1b2531", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#f6f2e9" }}>
-          {group.group_name}
-        </td>
-        {cols.map(i => (
-          <Cell key={i} value={group.monthly[i]} bold />
-        ))}
-      </tr>
-      {group.accounts.map(a => (
-        <tr key={a.account_id} style={{ borderTop: "1px solid #ece6d8" }}>
-          <td style={{ padding: "6px 10px 6px 22px", color: "#515c68", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fffdf7" }}>
-            {a.icon ? `${a.icon} ` : ""}{a.name}
-          </td>
-          {cols.map(i => (
-            <Cell key={i} value={a.monthly[i]} />
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }

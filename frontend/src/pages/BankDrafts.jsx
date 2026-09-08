@@ -7,13 +7,7 @@ import { TX_ADDED_EVENT } from "../components/QuickAddFab";
 import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
 import { submitOrQueueTransaction } from "../services/offlineMutations";
 import { currencySymbol, sortCurrenciesRubFirst } from "../utils/money";
-import {
-  BANK_DRAFTS_CHANGED_EVENT,
-  clearBankNotificationDrafts,
-  isBankNotificationImportAvailable,
-  listBankNotificationDrafts,
-  removeBankNotificationDraft,
-} from "../services/bankNotificationImport";
+import { BANK_DRAFTS_CHANGED_EVENT, clearBankNotificationDrafts, isBankNotificationImportAvailable, listBankNotificationDrafts, removeBankNotificationDraft } from "../services/bankNotificationImport";
 
 function dateFromDraft(value) {
   return value ? value.slice(0, 10) : new Date().toISOString().slice(0, 10);

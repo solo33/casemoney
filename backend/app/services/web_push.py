@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.push_subscription import PushSubscription
 from app.models.user import User
+from app.schemas.push_subscription import validate_push_endpoint
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ def send_web_pushes(db: Session, user: User, *, title: str, link: str | None = N
     sent = 0
     for subscription in db.query(PushSubscription).filter(PushSubscription.user_id == user.id).all():
         try:
+            validate_push_endpoint(subscription.endpoint)
             webpush(
                 subscription_info={
                     "endpoint": subscription.endpoint,

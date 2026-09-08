@@ -1,4 +1,5 @@
 SUPPORT_EMAIL = "support@casemoney.ru"
+VERIFICATION_GRACE_DAYS = 7
 LEGAL_EMAIL = "info@casemoney.ru"
 NO_REPLY_EMAIL = "no-reply@casemoney.ru"
 

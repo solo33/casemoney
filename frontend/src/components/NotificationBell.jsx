@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../api/client";
 
-
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState([]);

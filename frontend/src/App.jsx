@@ -69,7 +69,6 @@ function ProtectedRoute({ children }) {
       <QuickAddFab />
       <MobilePwaInstallPrompt />
       <OfflineSyncStatus />
-      <PwaUpdatePrompt />
     </UserProvider>
   )
 }
@@ -355,6 +354,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <CookieBanner />
+      <PwaUpdatePrompt />
       <GlobalNetworkProgress />
     </BrowserRouter>
   )

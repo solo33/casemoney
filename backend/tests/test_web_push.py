@@ -4,7 +4,7 @@ from app.services.notifications import notify_user
 
 
 PUSH_PAYLOAD = {
-    "endpoint": "https://push.example.test/subscription/abc123",
+    "endpoint": "https://fcm.googleapis.com/subscription/abc123",
     "p256dh": "a" * 40,
     "auth": "b" * 20,
     "user_agent": "CaseMoney test browser",

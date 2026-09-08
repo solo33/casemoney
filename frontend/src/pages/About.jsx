@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+
+import { useState, useEffect } from "react";
+
 import { APP_FULL_VERSION } from "../config/version";
-import { SUPPORT_EMAIL } from "../config/contacts";
 import PublicPage, { card, paragraph } from "../components/PublicPage";
+
+import { SUPPORT_EMAIL } from "../config/contacts";
+import { Link } from "react-router-dom";
+import { InfoRow } from "../components/about/AboutParts";
+import { statusStyle, updateActionStyle, documentLinkStyle } from "../utils/aboutView";
 
 export default function About() {
   const [updateStatus, setUpdateStatus] = useState("idle");
@@ -97,32 +102,3 @@ export default function About() {
     </PublicPage>
   );
 }
-
-function InfoRow({ label, value, mono = false }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 20, padding: "11px 0", borderBottom: "1px solid #ece6d8" }}>
-      <span style={{ color: "#7a8590" }}>{label}</span>
-      <span style={{ color: "#173a54", fontWeight: 600, fontFamily: mono ? "var(--font-mono)" : undefined }}>{value}</span>
-    </div>
-  );
-}
-
-const statusStyle = {
-  margin: "10px 0 0",
-  color: "#287a52",
-  fontSize: 13,
-};
-
-const updateActionStyle = {
-  display: "grid",
-  justifyItems: "start",
-  gap: 8,
-  marginTop: 10,
-};
-
-const documentLinkStyle = {
-  color: "#9c6f1d",
-  fontWeight: 600,
-  textDecoration: "underline",
-  textUnderlineOffset: 2,
-};

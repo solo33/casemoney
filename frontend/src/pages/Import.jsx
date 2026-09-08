@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 
-
 export default function Import() {
   return (
     <div className="page" style={{ maxWidth: 920 }}>

@@ -1,4 +1,4 @@
-import { DEMO_SESSION_FLAG } from "../pages/Login";
+import { DEMO_SESSION_FLAG } from "../utils/sessionFlags";
 
 export default function DemoSessionBanner() {
   if (localStorage.getItem(DEMO_SESSION_FLAG) !== "1") return null;

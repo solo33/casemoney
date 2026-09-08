@@ -4,13 +4,7 @@ import { TX_ADDED_EVENT } from "./QuickAddFab";
 import AccountOptions, { entryAccountGroups } from "./AccountOptions";
 import CategoryPicker from "./CategoryPicker";
 import { COMMON_CURRENCIES } from "../utils/money";
-import {
-  accountCurrencies as currenciesForAccount,
-  isSameTransferCurrency,
-  preferredAccountCurrency,
-  swapTransferFields,
-  transferDisplayRate,
-} from "../utils/transactionForm";
+import { accountCurrencies as currenciesForAccount, isSameTransferCurrency, preferredAccountCurrency, swapTransferFields, transferDisplayRate } from "../utils/transactionForm";
 import { clearIdempotencyKey, idempotencyKeyFor } from "../utils/idempotency";
 import useTransferQuote from "../hooks/useTransferQuote";
 import { submitOrQueueTransaction } from "../services/offlineMutations";

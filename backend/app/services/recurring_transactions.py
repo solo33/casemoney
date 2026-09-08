@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.models.recurring_transaction import RecurringTransaction, RecurringTransactionRun
 from app.models.transaction import Transaction, TransactionType
-from app.services import accounts as accounts_svc
+from app.services.ledger import apply_transaction_effect, write_transaction_history
+from app.services.family_accounting import sync_family_expense_accounting
 from app.models.user import User
 from app.services.notifications import notify_user
+from app.services.exchange import snapshot_transaction_rates
 
 
 def next_occurrence(value: date, frequency: str, custom_interval_days: int | None = None) -> date:
@@ -54,11 +56,10 @@ def _post_transaction(db: Session, schedule: RecurringTransaction, due_date: dat
     )
     db.add(transaction)
     db.flush()
-    balance = accounts_svc.get_or_create_balance(db, schedule.account_id, schedule.currency)
-    if schedule.type == TransactionType.income:
-        balance.balance += schedule.amount
-    else:
-        balance.balance -= schedule.amount
+    snapshot_transaction_rates(db, schedule.user_id, transaction)
+    apply_transaction_effect(db, transaction)
+    sync_family_expense_accounting(db, transaction)
+    write_transaction_history(db, schedule.user_id, transaction, "created")
     return transaction
 
 
@@ -88,7 +89,7 @@ def process_recurring_transactions(db: Session, today: date | None = None) -> in
     count = 0
     schedules = db.query(RecurringTransaction).filter(
         RecurringTransaction.is_active.is_(True),
-    ).all()
+    ).order_by(RecurringTransaction.id).with_for_update().all()
     for schedule in schedules:
         if schedule.end_date and schedule.next_date > schedule.end_date:
             schedule.is_active = False
@@ -140,10 +141,13 @@ def process_recurring_transactions(db: Session, today: date | None = None) -> in
                 )
             schedule.last_generated_for = due_date
             count += 1
-        while schedule.next_date <= today:
-            schedule.next_date = next_occurrence(schedule.next_date, schedule.frequency, schedule.custom_interval_days)
+        schedule.next_date = next_occurrence(schedule.next_date, schedule.frequency, schedule.custom_interval_days)
         if schedule.end_date and schedule.next_date > schedule.end_date:
             schedule.is_active = False
+        elif schedule.next_date <= today and count < 500:
+            # Revisit this schedule once per missed date, rather than silently
+            # advancing past unprocessed occurrences. Bound each worker pass.
+            schedules.append(schedule)
     if schedules:
         db.commit()
     return count

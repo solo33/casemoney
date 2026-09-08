@@ -25,7 +25,9 @@ backend/
     main.py                    # точка входа: app.main:app
     database.py                # engine/SessionLocal; грузит backend/.env по абсолютному пути
     constants.py, seeds.py     # seed_demo_user()
-    api/  models/  schemas/  services/
+    api/                       # HTTP-маршруты, Depends, ограничения запросов
+    operations/                # прикладные операции по подсистемам: queries/commands
+    models/  schemas/  services/
   requirements.txt, requirements-dev.txt
   .env.example                 # шаблон; реальный backend/.env — в .gitignore
   tests/                       # pytest (pytest.ini, tests/conftest.py)
@@ -77,6 +79,14 @@ npm run dev                     # http://localhost:5173
 Jira: sololoom.atlassian.net, проект **FIN**, cloudId `da617a3e-e0f3-420b-a865-737a96ed182b`.
 
 ## Как работать
+- Архитектура после рефакторинга: `api → operations → services/models`.
+  Операции получают уже разрешённые `db` и пользователя; `Depends/Query/Header`
+  остаются в API. Сервисы и схемы не импортируют `app.api`.
+- Крупные React-страницы собирают компоненты из `components/<раздел>/`;
+  состояние и обработчики находятся в `hooks/use<Раздел>Controller.js`.
+  Общие компоненты и утилиты не должны импортировать страницы.
+- Тест `tests/test_architecture.py` проверяет границы слоёв и прежний OpenAPI-контракт.
+  При намеренном изменении API обновлять `tests/fixtures/openapi_contract.json`.
 - Объясняй **что** и **почему**, а не просто выдавай код.
 - Точность по путям и именам критична — сверяйся с реальными файлами, не угадывай.
 - Опорные факты: точка входа `app.main:app`, сид `seeds.py → seed_demo_user`,

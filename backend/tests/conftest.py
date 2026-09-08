@@ -38,10 +38,9 @@ import app.models.notification    # noqa: F401
 import app.models.push_subscription  # noqa: F401
 import app.models.credit          # noqa: F401
 
-test_engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+_integration_url = os.getenv("TEST_DATABASE_URL")
+test_engine = create_engine(_integration_url) if _integration_url else create_engine(
+    "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(bind=test_engine, autoflush=False, autocommit=False)
 
@@ -65,15 +64,24 @@ def _override_get_db():
 @pytest.fixture(autouse=True)
 def _fresh_db(monkeypatch):
     """Чистая схема на каждый тест."""
+    from app.services import exchange
+    exchange.invalidate_user_rates()
+    # Application tests must not depend on live providers or share cached
+    # rates across databases whose user IDs restart at 1. Provider-error tests
+    # override these deterministic fetchers explicitly.
+    monkeypatch.setattr(exchange, "fetch_cbr_to_rub", lambda: {"RUB": 1.0, "USD": 90.0, "EUR": 100.0, "UAH": 2.2})
+    monkeypatch.setattr(exchange, "fetch_coingecko_to_rub", lambda tickers: {code: 90.0 for code in tickers})
     Base.metadata.create_all(bind=test_engine)
     main_module.app.dependency_overrides[get_db] = _override_get_db
-    monkeypatch.setattr("app.api.auth.send_activation_email", lambda *args: True)
+    monkeypatch.setattr("app.operations.auth.common.send_activation_email", lambda *args: True)
+    monkeypatch.setattr("app.operations.auth.commands.send_activation_email", lambda *args: True)
     monkeypatch.setattr(
-        "app.api.auth.send_registration_notification", lambda *args: True
+        "app.operations.auth.common.send_registration_notification", lambda *args: True
     )
-    monkeypatch.setattr("app.api.family.send_email", lambda *args: True)
-    monkeypatch.setattr("app.api.admin.send_email", lambda *args, **kwargs: True)
-    monkeypatch.setattr("app.api.admin.send_web_pushes", lambda *args, **kwargs: 0)
+    monkeypatch.setattr("app.operations.family.analytics.send_email", lambda *args: True)
+    monkeypatch.setattr("app.operations.family.members.send_email", lambda *args: True)
+    monkeypatch.setattr("app.operations.admin.commands.send_email", lambda *args, **kwargs: True)
+    monkeypatch.setattr("app.operations.admin.commands.send_web_pushes", lambda *args, **kwargs: 0)
     # Семейные действия создают in-app уведомления, а email-канал в тестах
     # не должен обращаться к настоящему почтовому провайдеру.
     monkeypatch.setattr(

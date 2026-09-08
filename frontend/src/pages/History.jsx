@@ -1,36 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+
+import { useState, useCallback, useEffect } from "react";
+
 import api from "../api/client";
+
 import { TX_ADDED_EVENT } from "../components/QuickAddFab";
-import { formatMoney } from "../utils/money";
-
-const ACTION_COLOR = {
-  created: "#167a4a",   // записано
-  edited: "#b45309",    // отредактировано
-  deleted: "#c0432b",   // удалено
-};
-
-// Стрелка направления: доход — приход (←), расход — уход (→), перевод (⇄)
-const TYPE_ARROW = { income: "←", expense: "→", transfer: "⇄" };
-
-const RU_MONTHS_SHORT = ["янв","фев","мар","апр","май","июн","июл","авг","сен","окт","ноя","дек"];
-
-function changedAtLabel(iso) {
-  const d = new Date(iso);
-  const t = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${d.getDate()} ${RU_MONTHS_SHORT[d.getMonth()]} ${t}`;
-}
-function opDateLabel(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-const ACTION_FILTERS = [
-  { key: "", label: "Все" },
-  { key: "created", label: "Записано" },
-  { key: "edited", label: "Отредактировано" },
-  { key: "deleted", label: "Удалено" },
-];
+import { ACTION_COLOR, ACTION_FILTERS } from "../utils/historyView";
+import { Row } from "../components/history/HistoryParts";
 
 export default function History() {
   const [items, setItems] = useState([]);
@@ -129,48 +104,6 @@ export default function History() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function Row({ h, first }) {
-  const color = ACTION_COLOR[h.action] || "#1b2531";
-  const deleted = h.action === "deleted";
-  const arrow = TYPE_ARROW[h.type] || "→";
-
-  // Сумма: для отредактированных показываем «было → стало», если сумма менялась
-  const amountNode = (h.action === "edited" && h.prev_amount != null && Math.abs(h.prev_amount - h.amount) > 0.005)
-    ? <>{formatMoney(h.prev_amount)} {h.prev_currency || h.currency} → {formatMoney(h.amount)} {h.currency}</>
-    : <>{formatMoney(h.amount)} {h.currency}</>;
-
-  return (
-    <div className="history-row" style={{
-      display: "flex", alignItems: "center", gap: 12,
-      padding: "9px 16px",
-      borderTop: first ? "none" : "1px solid #ece6d8",
-      fontSize: 13.5,
-    }}>
-      <span className="history-changed" style={{ color: "#7a8590", whiteSpace: "nowrap", minWidth: 110 }}>
-        {changedAtLabel(h.changed_at)}
-      </span>
-      <span className="history-date" style={{ color: "#a6afb8", whiteSpace: "nowrap", minWidth: 86 }}>
-        {opDateLabel(h.op_date)}
-      </span>
-      <span className="history-operation" style={{ flex: 1, minWidth: 0, color: "#1b2531" }}>
-        <span style={{ color: "#173a54" }}>{h.account_name || "—"}</span>
-        <span style={{ color: "#a6afb8", margin: "0 6px" }}>{arrow}</span>
-        <span>{h.category_name || (h.type === "transfer" ? "Перевод" : "Без категории")}</span>
-        {h.description && (
-          <span style={{ color: "#a6afb8", marginLeft: 8, fontSize: 12.5 }}>{h.description}</span>
-        )}
-      </span>
-      <span className="history-amount" style={{
-        whiteSpace: "nowrap", fontWeight: 600, color,
-        textDecoration: deleted ? "line-through" : "none",
-        fontVariantNumeric: "tabular-nums",
-      }}>
-        {amountNode}
-      </span>
     </div>
   );
 }

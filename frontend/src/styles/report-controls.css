@@ -1,0 +1,11 @@
+.period-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.period-controls__modes { display: flex; gap: 6px; }
+.period-controls__modes button { background: transparent; color: var(--text-2); border: 1px solid var(--line); border-radius: 20px; padding: 8px 14px; }
+.period-controls__modes button[aria-pressed="true"] { background: var(--navy); color: white; border-color: var(--navy); }
+.period-controls__date { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; align-items: center; }
+.period-controls__date input { width: 100%; min-width: 0; }
+@media (max-width: 767px) {
+  .period-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .period-controls__modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .period-controls__today { justify-self: end; }
+}

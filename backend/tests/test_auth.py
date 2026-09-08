@@ -15,7 +15,7 @@ def _get_user(email: str) -> User | None:
 
 
 def test_registration_succeeds_when_email_delivery_fails(client, monkeypatch):
-    monkeypatch.setattr("app.api.auth.send_activation_email", lambda *args: False)
+    monkeypatch.setattr("app.operations.auth.commands.send_activation_email", lambda *args: False)
 
     response = client.post("/api/auth/register", json={
         "email": "delivery-failure@test.com",
@@ -51,7 +51,7 @@ def test_registration_creates_unverified_user_with_seven_day_access(client):
 def test_registration_notifies_owner_in_background(client, monkeypatch):
     notifications = []
     monkeypatch.setattr(
-        "app.api.auth.send_registration_notification",
+        "app.operations.auth.common.send_registration_notification",
         lambda *args: notifications.append(args) or True,
     )
 

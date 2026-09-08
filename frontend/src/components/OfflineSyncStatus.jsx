@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BrandProgress } from "./BrandProgress";
-import {
-  listOfflineMutations,
-  OFFLINE_QUEUE_EVENT,
-  removeOfflineMutation,
-  retryOfflineMutation,
-  syncOfflineMutations,
-} from "../services/offlineMutations";
+import { listOfflineMutations, OFFLINE_QUEUE_EVENT, removeOfflineMutation, retryOfflineMutation, syncOfflineMutations } from "../services/offlineMutations";
 import { TX_ADDED_EVENT } from "./QuickAddFab";
 import { markSyncSuccessful, SYNC_REQUEST_EVENT } from "../services/syncStatus";
 

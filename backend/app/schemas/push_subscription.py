@@ -1,4 +1,15 @@
 from pydantic import BaseModel, Field, field_validator
+from urllib.parse import urlsplit
+
+
+def validate_push_endpoint(value: str) -> str:
+    value = value.strip()
+    parsed = urlsplit(value)
+    host = (parsed.hostname or "").lower()
+    providers = ("fcm.googleapis.com", "updates.push.services.mozilla.com", "notify.windows.com", "push.apple.com")
+    if parsed.scheme != "https" or parsed.username or parsed.password or parsed.port not in (None, 443) or not any(host == domain or host.endswith("." + domain) for domain in providers):
+        raise ValueError("Неподдерживаемый адрес службы push-уведомлений")
+    return value
 
 
 class PushSubscriptionCreate(BaseModel):
@@ -10,10 +21,7 @@ class PushSubscriptionCreate(BaseModel):
     @field_validator("endpoint")
     @classmethod
     def endpoint_must_be_https(cls, value: str) -> str:
-        value = value.strip()
-        if not value.startswith("https://"):
-            raise ValueError("Адрес push-подписки должен использовать HTTPS")
-        return value
+        return validate_push_endpoint(value)
 
 
 class PushSubscriptionDelete(BaseModel):

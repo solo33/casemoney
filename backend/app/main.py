@@ -15,6 +15,7 @@ from slowapi.middleware import SlowAPIMiddleware
 # Импорты моделей нужны для регистрации в Base.metadata (используется alembic).
 # Схему БД меняем ТОЛЬКО через alembic, create_all больше не вызываем.
 from app.models.user import User  # noqa: F401
+from app.models.import_session import ImportSession  # noqa: F401
 from app.models.ai_usage import AiUsage  # noqa: F401
 from app.models.category import Category  # noqa: F401
 from app.models.category_rule import CategoryRule  # noqa: F401
@@ -83,6 +84,7 @@ from app.services.credit_reminders import process_credit_reminders
 from app.services.billing import process_subscription_renewals
 from app.services.demo_cleanup import cleanup_expired_demo_users
 from app.services.recurring_transactions import process_recurring_transactions
+from app.services.exchange import ExchangeError
 
 log = logging.getLogger("casemoney.credit_reminders")
 
@@ -97,6 +99,12 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+
+@app.exception_handler(ExchangeError)
+async def unavailable_exchange_rate(request: Request, exc: ExchangeError):
+    return JSONResponse(status_code=503, content={"detail": "Не удалось получить курс валюты. Итог не рассчитан, чтобы не показывать неверную сумму. Повторите позже или задайте курс в настройках валют."})
+
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 

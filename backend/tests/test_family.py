@@ -265,7 +265,7 @@ def test_family_expense_is_shared_without_exposing_personal_transactions(client)
     accounted = client.post(
         f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
         headers=owner,
-        json={"owner_category_id": owner_category_id},
+        json={"owner_category_id": owner_category_id, "owner_account_id": make_account(client, owner, balance=100000)["id"]},
     )
     assert accounted.status_code == 200, accounted.text
 
@@ -403,7 +403,7 @@ def test_settlement_reduces_outstanding_without_creating_expense(client):
     accepted_expense = client.post(
         f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
         headers=owner,
-        json={"owner_category_id": owner_category_id},
+        json={"owner_category_id": owner_category_id, "owner_account_id": make_account(client, owner, balance=100000)["id"]},
     )
     assert accepted_expense.status_code == 200, accepted_expense.text
 
@@ -485,7 +485,7 @@ def test_family_analytics_includes_comparison_settlements_and_large_expenses(cli
         accepted_expense = client.post(
             f"/api/family/expense-accounting/{item['id']}/accept",
             headers=owner,
-            json={"owner_category_id": owner_category_id},
+            json={"owner_category_id": owner_category_id, "owner_account_id": make_account(client, owner, balance=100000)["id"]},
         )
         assert accepted_expense.status_code == 200, accepted_expense.text
     settlement = client.post("/api/family/settlements", headers=owner, json={
@@ -632,7 +632,7 @@ def test_family_monthly_report_contains_goals_and_can_be_exported(client, monkey
         sent.update({"to": to, "subject": subject, "text": text, "html": html})
         return True
 
-    monkeypatch.setattr("app.api.family.send_email", fake_send_email)
+    monkeypatch.setattr("app.operations.family.analytics.send_email", fake_send_email)
     emailed = client.post("/api/family/analytics/email", headers=owner, json={"year": now.year, "month": now.month})
     assert emailed.status_code == 200, emailed.text
     assert emailed.json()["email"] == "monthly-report-owner@test.com"
@@ -641,7 +641,10 @@ def test_family_monthly_report_contains_goals_and_can_be_exported(client, monkey
     assert "Резерв семьи" in sent["html"]
 
 
-def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(client):
+def test_family_recurring_suggestions_can_create_or_dismiss_shared_schedule(client, monkeypatch):
+    from app.services.family_recurring import find_family_recurring_suggestions
+    monkeypatch.setattr("app.operations.family.recurring.find_family_recurring_suggestions", lambda *args, **kwargs:
+        find_family_recurring_suggestions(*args, **kwargs, today=date(2026, 8, 24)))
     owner = register_and_login(client, "recurring-owner@test.com")
     enable_family_plan("recurring-owner@test.com")
     client.post("/api/family/", headers=owner, json={"name": "Регулярные"})
@@ -838,7 +841,7 @@ def test_family_action_notifications_honor_each_member_preferences(client, monke
     accepted_expense = client.post(
         f"/api/family/expense-accounting/{pending['items'][0]['id']}/accept",
         headers=owner,
-        json={"owner_category_id": owner_category_id},
+        json={"owner_category_id": owner_category_id, "owner_account_id": make_account(client, owner, balance=100000)["id"]},
     )
     assert accepted_expense.status_code == 200, accepted_expense.text
     member_id = next(

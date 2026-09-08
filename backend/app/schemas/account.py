@@ -7,7 +7,7 @@ from typing import Optional, List
 class AccountBalanceResponse(BaseModel):
     currency: str
     balance: float
-    balance_in_main: float  # эквивалент в main_currency пользователя
+    balance_in_main: Optional[float]  # None, если курс недоступен
 
     class Config:
         from_attributes = True
@@ -70,7 +70,7 @@ class AccountResponse(AccountBase):
     id: int
     user_id: int
     balances: List[AccountBalanceResponse] = []
-    total_in_main: float = 0.0  # сумма всех балансов в main_currency пользователя
+    total_in_main: Optional[float] = None
     family_id: Optional[int] = None
     is_shared: bool = False
     access_level: Optional[str] = None
@@ -90,4 +90,4 @@ class GroupSummary(BaseModel):
 class AccountGroupBucket(BaseModel):
     group: GroupSummary
     accounts: List[AccountResponse]
-    total_in_main: float  # сумма total_in_main всех счетов в группе
+    total_in_main: Optional[float]

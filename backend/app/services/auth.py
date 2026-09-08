@@ -4,6 +4,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 import os
+import hashlib
+import hmac
 
 # Явный путь к backend/.env — чтобы load работал независимо от CWD,
 # из которого запущен uvicorn (часто запускают из корня репо).
@@ -20,6 +22,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 def normalize_email(value: str) -> str:
     """Return the canonical representation used for storage and lookup."""
     return value.strip().lower()
+
+
+def credential_version(password_hash: str) -> str:
+    """Opaque token stamp, invalidated whenever the stored password changes."""
+    return hmac.new(SECRET_KEY.encode(), password_hash.encode(), hashlib.sha256).hexdigest()
 
 # Защита от запуска без секрета / с тестовыми значениями
 _BANNED_SECRETS = {"supersecretkey123", "secret", "changeme", "test", "changeme_long_random_string"}
@@ -105,22 +112,24 @@ def verify_activation_token(token: str) -> int | None:
 RESET_TOKEN_TTL_HOURS = 1
 
 
-def create_reset_token(user_id: int) -> str:
+def create_reset_token(user_id: int, password_hash: str) -> str:
     """Подписанный JWT для сброса пароля. TTL 1ч."""
     exp = datetime.utcnow() + timedelta(hours=RESET_TOKEN_TTL_HOURS)
     return jwt.encode(
-        {"sub": str(user_id), "purpose": "reset", "exp": exp},
+        {"sub": str(user_id), "purpose": "reset", "exp": exp, "cv": credential_version(password_hash)},
         SECRET_KEY, algorithm=ALGORITHM,
     )
 
 
-def verify_reset_token(token: str) -> int | None:
+def verify_reset_token(token: str, password_hash: str | None = None) -> int | None:
     """Возвращает user_id если токен валидный и для сброса пароля, иначе None."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
     if payload.get("purpose") != "reset":
+        return None
+    if password_hash is not None and not hmac.compare_digest(str(payload.get("cv", "")), credential_version(password_hash)):
         return None
     sub = payload.get("sub")
     return int(sub) if sub else None

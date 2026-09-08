@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
-import api from "../api/client";
-import SettingsTabs from "../components/SettingsTabs";
+
+import { useState, useCallback, useEffect } from "react";
 import { useUser } from "../contexts/UserContext";
 
+import api from "../api/client";
 
-const statusNames = { succeeded: "Успешно", active: "Активна", canceled: "Отменена", past_due: "Завершена" };
-const formatDate = value => value ? new Date(value).toLocaleDateString("ru-RU") : "—";
+import SettingsTabs from "../components/SettingsTabs";
+import { PeriodCard } from "../components/billing/BillingParts";
+import { formatDate, statusNames, styles } from "../utils/billingView";
 
 export default function Billing() {
   const [data, setData] = useState(null);
@@ -79,11 +80,3 @@ export default function Billing() {
     <style>{styles}</style>
   </main>;
 }
-
-function PeriodCard({ active, title, price, text, onClick }) {
-  return <button type="button" className={`period-card ${active ? "active" : ""}`} onClick={onClick}><span>{title}</span><strong>{price}</strong><small>{text}</small></button>;
-}
-
-const styles = `
-.billing-page{max-width:1050px}.billing-alert,.billing-locked{padding:14px;border-radius:10px;margin:12px 0}.billing-error{background:#fff0ed;color:#b43320}.billing-success{background:#ecf8ee;color:#166534}.billing-locked,.family-welcome,.billing-card{background:#fffdf7;border:1px solid #e4ddcd;border-radius:12px;padding:22px}.billing-locked h2,.family-welcome h2,.billing-card h2{margin-top:0}.family-welcome{box-shadow:inset 0 4px #c89b3c}.billing-badge{font-size:12px;font-weight:700;color:#9a6a13;text-transform:uppercase}.period-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.period-card{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:16px;background:#fff;border:1px solid #ddd4c2;color:#173a54}.period-card.active{border-color:#173a54;box-shadow:0 0 0 2px #173a5422}.period-card span{font-size:18px;font-weight:700}.period-card strong{font-size:22px}.period-card small{color:#75808b}.checkout-box{margin-top:16px;padding:18px;border-radius:10px;background:#f8f3e8;border:1px solid #e1d5bd}.checkout-box h3{margin-top:0}.trial-warning{background:#fff7df;border-color:#e6c978}.checkout-box label{display:flex;gap:8px;align-items:flex-start}.checkout-box>button{margin-top:16px}.test-mode{display:inline-block;padding:5px 9px;margin-bottom:12px;border-radius:6px;background:#173a54;color:white;font-size:11px;font-weight:700}.fake-card{max-width:390px;padding:18px;border-radius:14px;background:linear-gradient(135deg,#173a54,#285f80);color:white;margin-bottom:14px}.fake-card label{display:grid;gap:5px}.fake-card>div{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.fake-card input{background:#ffffffee}.payment-confirm{font-size:13px}.billing-card{margin-top:16px}.billing-card dl{margin-bottom:0}.billing-card dl div,.billing-history div{display:grid;grid-template-columns:180px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid #eee6d5}.billing-card dt{color:#738091}.billing-card dd{margin:0;font-weight:600}.billing-history em{font-style:normal;color:#738091}@media(max-width:700px){.period-grid{grid-template-columns:1fr}.billing-card dl div,.billing-history div{grid-template-columns:1fr;gap:3px}}
-`;

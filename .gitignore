@@ -34,7 +34,7 @@ frontend/.claude/
 assets/
 
 # Скрипты и отчёты других проектов
-reports/
+/reports/
 
 # Excel lock-файлы
 ~$*.xlsx

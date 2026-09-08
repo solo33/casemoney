@@ -1,13 +1,11 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { register, verifyCode, getPublicConfig } from "../api/auth";
-import { DEMO_SESSION_FLAG, REAL_LOGIN_FLAG } from "./Login";
 
-function markRealLogin(token) {
-  localStorage.setItem("token", token);
-  localStorage.removeItem(DEMO_SESSION_FLAG);
-  localStorage.setItem(REAL_LOGIN_FLAG, "1");
-}
+import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+
+import { getPublicConfig, register, verifyCode } from "../api/auth";
+
+import { markRealLogin, lbl, lblText } from "../utils/registerView";
+import { ModeOption } from "../components/register/RegisterParts";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -268,18 +266,3 @@ export default function Register() {
     </div>
   );
 }
-
-function ModeOption({ active, title, text, onClick }) {
-  return <button type="button" onClick={onClick} style={{
-    textAlign: "left", padding: 12, borderRadius: 9, cursor: "pointer",
-    border: `1px solid ${active ? "#173a54" : "#e4ddcd"}`,
-    background: active ? "#eef4f7" : "#fffdf7", color: "#1b2531",
-  }}><strong style={{ display: "block", marginBottom: 4 }}>{title}</strong><span style={{ fontSize: 12, color: "#687582" }}>{text}</span></button>;
-}
-
-const lbl = { display: "block", marginBottom: 14 };
-const lblText = {
-  display: "block",
-  fontSize: 12, color: "#7a8590",
-  marginBottom: 4, fontWeight: 500,
-};

@@ -1,0 +1,1 @@
+"""Shopping application operations."""

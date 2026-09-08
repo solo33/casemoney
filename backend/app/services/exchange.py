@@ -386,11 +386,11 @@ def convert_transaction_for_user(
         try:
             return convert_for_user(db, user_id, valued, valuation, target)
         except ExchangeError:
-            return 0.0
+            raise
     try:
         return convert_for_user(db, user_id, float(amount), currency, target)
     except ExchangeError:
-        return 0.0
+        raise
 
 
 def prime_user_rates(
