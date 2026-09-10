@@ -1,9 +1,11 @@
 """import_csv: types."""
 from __future__ import annotations
+from decimal import Decimal
 
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional
+from app.money import decimal
 
 
 @dataclass
@@ -14,8 +16,8 @@ class ParsedRow:
     category_path: Optional[str]          # как в CSV: "Покупки\\Подарки" или ""
     category_parent: Optional[str]
     category_child: Optional[str]
-    amount: float                         # подписанная сумма (исходная)
-    abs_amount: float
+    amount: Decimal                         # подписанная сумма (исходная)
+    abs_amount: Decimal
     currency: str
     description: Optional[str]
     transfer_to: Optional[str]            # имя счёта-противоположной стороны
@@ -25,7 +27,13 @@ class ParsedRow:
     # счёте) — валюта/сумма зачисления, если она отличается от исходной
     # (конвертация валют внутри перевода). None = зачисление в той же валюте.
     to_currency: Optional[str] = None
-    to_amount: Optional[float] = None
+    to_amount: Optional[Decimal] = None
+
+    def __post_init__(self):
+        self.amount = decimal(self.amount)
+        self.abs_amount = decimal(self.abs_amount)
+        if self.to_amount is not None:
+            self.to_amount = decimal(self.to_amount)
 
 
 @dataclass

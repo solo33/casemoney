@@ -1,4 +1,5 @@
 """Shared balance effects and audit snapshots. Caller owns the DB transaction."""
+from decimal import Decimal
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.account import Account
@@ -56,7 +57,7 @@ def _account_name(db: Session, account_id: int) -> str:
 
 
 def write_transaction_history(db: Session, user_id: int, tx: Transaction, action: str,
-                   prev_amount: Optional[float] = None, prev_currency: Optional[str] = None) -> None:
+                   prev_amount: Optional[Decimal] = None, prev_currency: Optional[str] = None) -> None:
     """Записать событие в журнал изменений (денормализованный снимок)."""
     # Для перевода вместо категории показываем счёт-получатель
     if tx.type == TransactionType.transfer and tx.to_account_id:

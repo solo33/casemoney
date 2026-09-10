@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Float, DateTime
+from app.money import Money
+from sqlalchemy import Column, String, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -9,6 +10,6 @@ class ExchangeRate(Base):
 
     from_currency = Column(String(10), primary_key=True)
     to_currency = Column(String(10), primary_key=True)
-    rate = Column(Float, nullable=False)
+    rate = Column(Money, nullable=False)
     source = Column(String(20), nullable=False)  # 'cbr' | 'coingecko' | 'derived'
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

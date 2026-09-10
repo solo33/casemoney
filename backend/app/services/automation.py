@@ -4,6 +4,7 @@ Rules only fill an empty category.  They never rewrite an explicitly chosen
 category, so the user remains in full control of historic data.
 """
 from __future__ import annotations
+from app.money import decimal
 
 from collections import defaultdict
 from datetime import timedelta
@@ -74,7 +75,7 @@ def suggest_category_from_history(
                 "category_name": category.name,
                 "category_type": category.type,
                 "source": "rule",
-                "confidence": 1.0,
+                "confidence": 1,
                 "matching_operations": 1,
             }
 
@@ -148,7 +149,7 @@ def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]
             transaction.type.value,
             transaction.account_id,
             transaction.currency,
-            round(float(transaction.amount), 2),
+            round(decimal(transaction.amount), 2),
             transaction.category_id,
             note,
         )

@@ -1,5 +1,7 @@
 """import_csv: parsing."""
 from __future__ import annotations
+from decimal import Decimal
+from app.money import decimal
 
 import csv
 import io
@@ -20,19 +22,19 @@ def _stringify(value) -> str:
     return str(value).strip()
 
 
-def _parse_amount(value) -> float:
+def _parse_amount(value) -> Decimal:
     """Преобразует '-600,00' → -600.0"""
     if value is None:
-        return 0.0
+        return 0
     if isinstance(value, (int, float)):
-        return float(value)
+        return decimal(value)
     s = str(value).strip().replace(" ", "").replace(" ", "").replace(",", ".")
     if not s:
-        return 0.0
+        return 0
     try:
-        return float(s)
+        return decimal(s)
     except ValueError:
-        return 0.0
+        return 0
 
 
 def _parse_date(value) -> Optional[str]:

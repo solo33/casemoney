@@ -1,4 +1,5 @@
 """Family: analytics. Callers supply resolved user and database session."""
+from app.money import decimal
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -125,7 +126,7 @@ def family_report(year: Optional[int]=None, month: Optional[int]=None, db: Sessi
                 "amount": round(amount, 2),
             }
             for (recipient_id, currency), amount in sorted(outstanding.items())
-            if abs(amount) >= 0.005
+            if abs(amount) >= decimal('0.005')
         ],
     }
 
@@ -154,7 +155,7 @@ def _shared_goal_progress(db, family_id, start, end, main_currency, skipped_curr
         if goal.account_id:
             account = db.query(Account).filter(Account.id == goal.account_id).first()
             if account:
-                current_in_goal_currency = 0.0
+                current_in_goal_currency = 0
                 for balance in account.balances:
                     converted = _convert_or_skip(
                         db, goal.user_id, balance.balance, balance.currency,
@@ -166,7 +167,7 @@ def _shared_goal_progress(db, family_id, start, end, main_currency, skipped_curr
             GoalContribution.goal_id == goal.id,
         ).all()
         current_in_goal_currency += sum(item.amount for item in all_contributions)
-        monthly_contributions = 0.0
+        monthly_contributions = 0
         for item in all_contributions:
             contribution_date = item.created_at
             if not contribution_date:
@@ -196,8 +197,8 @@ def _shared_goal_progress(db, family_id, start, end, main_currency, skipped_curr
             "name": goal.name,
             "target_amount": round(target, 2),
             "current_amount": round(current, 2),
-            "monthly_contribution": round(monthly or 0.0, 2),
-            "progress_percent": round(max(0.0, min(100.0, current / target * 100)) if target else 0.0, 1),
+            "monthly_contribution": round(monthly or 0, 2),
+            "progress_percent": round(max(0, min(100, current / target * 100)) if target else 0, 1),
         })
 
     return goal_rows
@@ -210,7 +211,7 @@ def _period_settlements(db, family_id, user_id, start, end, main_currency, users
         FamilySettlement.date < end,
     ).order_by(FamilySettlement.date.desc(), FamilySettlement.id.desc()).all()
     settlement_rows = []
-    settlements_total = 0.0
+    settlements_total = 0
     for item in settlements:
         amount = _convert_or_skip(db, user_id, item.amount, item.currency, main_currency, skipped_currencies)
         if amount is None:
@@ -284,11 +285,11 @@ class PeriodTotals:
 
 
 def _aggregate_period_transactions(db, main_currency, transactions, previous_transactions, accepted_by_tx_id, accounting_by_tx_id, category_names, users):
-    actual_expenses = 0.0
-    actual_income = 0.0
-    planned_expenses = 0.0
-    planned_income = 0.0
-    unaccounted_expenses = 0.0
+    actual_expenses = 0
+    actual_income = 0
+    planned_expenses = 0
+    planned_income = 0
+    unaccounted_expenses = 0
     unaccounted_expense_count = 0
     per_member: dict[int, float] = {}
     per_category: dict[str, float] = {}
@@ -308,7 +309,7 @@ def _aggregate_period_transactions(db, main_currency, transactions, previous_tra
                 accounting = accepted_by_tx_id.get(item.id)
                 category_id = accounting.owner_category_id if accounting else item.category_id
                 name = category_names.get(category_id, "Без категории")
-                planned_per_category[name] = planned_per_category.get(name, 0.0) + amount
+                planned_per_category[name] = planned_per_category.get(name, 0) + amount
             elif item.type == TransactionType.income:
                 planned_income += amount
             continue
@@ -318,7 +319,7 @@ def _aggregate_period_transactions(db, main_currency, transactions, previous_tra
         if item.type != TransactionType.expense:
             continue
         actual_expenses += amount
-        per_member[item.user_id] = per_member.get(item.user_id, 0.0) + amount
+        per_member[item.user_id] = per_member.get(item.user_id, 0) + amount
         accounting = accounting_by_tx_id.get(item.id)
         is_accounted = bool(accounting and accounting.status == "accepted")
         # Pending purchases already participate in the household total and
@@ -328,7 +329,7 @@ def _aggregate_period_transactions(db, main_currency, transactions, previous_tra
         if is_accounted:
             category_id = accounting.owner_category_id
             name = category_names.get(category_id, "Без категории")
-            per_category[name] = per_category.get(name, 0.0) + amount
+            per_category[name] = per_category.get(name, 0) + amount
         else:
             category_id = item.category_id
             name = category_names.get(category_id, "Без категории")
@@ -343,8 +344,8 @@ def _aggregate_period_transactions(db, main_currency, transactions, previous_tra
             "amount": round(amount, 2),
         })
 
-    previous_expenses = 0.0
-    previous_income = 0.0
+    previous_expenses = 0
+    previous_income = 0
     for item in previous_transactions:
         if item.is_planned or item.type not in {TransactionType.expense, TransactionType.income}:
             continue
@@ -389,7 +390,7 @@ class PeriodForecast:
 
 
 def _period_forecast(db, user_id, year, month, start, end, main_currency, category_names, transactions, totals, now):
-    budget_plan = 0.0
+    budget_plan = 0
     budgets = db.query(Budget).filter(
         Budget.user_id == user_id,
         Budget.scope == "family",
@@ -405,7 +406,7 @@ def _period_forecast(db, user_id, year, month, start, end, main_currency, catego
     total_days = monthrange(year, month)[1]
     days_elapsed = now.day if is_current_period else total_days if now > end else 0
     days_remaining = total_days - days_elapsed if is_current_period else 0
-    average_daily_expenses = totals.actual_expenses / days_elapsed if days_elapsed else 0.0
+    average_daily_expenses = totals.actual_expenses / days_elapsed if days_elapsed else 0
     predicted_expenses = totals.actual_expenses + totals.planned_expenses + average_daily_expenses * days_remaining
     predicted_income = totals.actual_income + totals.planned_income
 
@@ -417,10 +418,10 @@ def _period_forecast(db, user_id, year, month, start, end, main_currency, catego
         limit = _convert_or_skip(db, user_id, item.amount, item.currency, main_currency, totals.skipped_currencies)
         if limit is None:
             continue
-        category_actual = totals.per_category.get(category_name, 0.0)
-        category_planned = totals.planned_per_category.get(category_name, 0.0)
+        category_actual = totals.per_category.get(category_name, 0)
+        category_planned = totals.planned_per_category.get(category_name, 0)
         category_forecast = category_actual + category_planned + (
-            category_actual / days_elapsed * days_remaining if days_elapsed else 0.0
+            category_actual / days_elapsed * days_remaining if days_elapsed else 0
         )
         if is_current_period and category_forecast > limit:
             budget_risks.append({
@@ -554,7 +555,7 @@ def _family_analytics_data(year: int, month: int, db: Session=None, user_id: int
         {
             "user_id": member.user_id,
             "name": _user_label(users.get(member.user_id), member.email),
-            "actual": round(totals.per_member.get(member.user_id, 0.0), 2),
+            "actual": round(totals.per_member.get(member.user_id, 0), 2),
         }
         for member in members
     ]

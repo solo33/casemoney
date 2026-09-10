@@ -77,4 +77,5 @@ jobs:
       - run: alembic upgrade head
       - run: alembic downgrade fe0a1b2c3d4e
       - run: alembic upgrade head
+      - run: python scripts/verify_family_accounting_migration.py
       - run: pytest

@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
@@ -18,12 +19,12 @@ class HistoryItem(BaseModel):
     changed_at: datetime
     op_date: Optional[datetime]
     type: str
-    amount: float
+    amount: MoneyValue
     currency: str
     account_name: Optional[str]
     category_name: Optional[str]
     description: Optional[str]
-    prev_amount: Optional[float]
+    prev_amount: Optional[MoneyValue]
     prev_currency: Optional[str]
 
     class Config:

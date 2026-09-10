@@ -1,4 +1,5 @@
 """Finance_ai: commands. Callers supply resolved user and database session."""
+from app.money import decimal
 import json
 import os
 from datetime import datetime, timezone
@@ -50,7 +51,7 @@ async def finance_ai_insight(data: FinanceAiRequest, db: Session=None, user_id: 
             response = await client.post(
                 "https://api.deepseek.com/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": os.getenv("DEEPSEEK_FINANCE_MODEL", "deepseek-chat"), "temperature": 0.2, "max_tokens": 420, "messages": _prompt(data.scenario, currency, snapshot)},
+                json={"model": os.getenv("DEEPSEEK_FINANCE_MODEL", "deepseek-chat"), "temperature": decimal('0.2'), "max_tokens": 420, "messages": _prompt(data.scenario, currency, snapshot)},
             )
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"].strip()

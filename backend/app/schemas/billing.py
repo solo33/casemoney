@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import datetime
 from typing import Literal, Optional
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 class PlanResponse(BaseModel):
     code: Literal["personal", "family"]
     name: str
-    price: Optional[float] = None
+    price: Optional[MoneyValue] = None
     currency: str = "RUB"
     period: Optional[str] = None
     current: bool = False
@@ -16,7 +17,7 @@ class PlanResponse(BaseModel):
 class BillingPaymentResponse(BaseModel):
     id: int
     kind: str
-    amount: float
+    amount: MoneyValue
     currency: str
     status: str
     paid_at: Optional[datetime]
@@ -43,7 +44,7 @@ class BillingOverview(BaseModel):
     plan: str
     plan_source: str
     plan_expires_at: Optional[datetime]
-    family_price: float
+    family_price: MoneyValue
     currency: str = "RUB"
     subscription: Optional[SubscriptionResponse]
     payments: list[BillingPaymentResponse]
@@ -51,8 +52,8 @@ class BillingOverview(BaseModel):
     billing_enabled: bool
     test_mode: bool = True
     trial_days: int = 7
-    test_month_price: float
-    test_year_price: float
+    test_month_price: MoneyValue
+    test_year_price: MoneyValue
 
 
 class CheckoutResponse(BaseModel):

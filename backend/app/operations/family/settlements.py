@@ -1,4 +1,5 @@
 """Family: settlements. Callers supply resolved user and database session."""
+from app.money import decimal
 from datetime import datetime, timezone
 from app.application import ApplicationError
 from sqlalchemy import func
@@ -34,9 +35,9 @@ def create_settlement(data: SettlementCreate, db: Session=None, user_id: int=Non
         FamilyExpenseAccounting.source_user_id == data.to_user_id,
     ).all()
     accepted_ids = [item.source_transaction_id for item in accepted_rows]
-    owed = 0.0
+    owed = 0
     if accepted_ids:
-        owed = float(
+        owed = decimal(
             db.query(func.coalesce(func.sum(Transaction.reimbursement_amount), 0))
             .filter(
                 Transaction.id.in_(accepted_ids),
@@ -50,7 +51,7 @@ def create_settlement(data: SettlementCreate, db: Session=None, user_id: int=Non
         FamilySettlement.to_user_id == data.to_user_id,
         FamilySettlement.currency == currency,
     ).scalar() or 0
-    if data.amount > float(owed) - float(reimbursed) + 0.005:
+    if data.amount > decimal(owed) - decimal(reimbursed) + decimal('0.005'):
         raise ApplicationError(status_code=400, detail="Сумма больше подтверждённого долга к возмещению")
     settlement = FamilySettlement(
         family_id=membership.family_id,

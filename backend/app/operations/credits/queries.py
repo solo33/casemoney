@@ -1,4 +1,5 @@
 """Credits: queries. Callers supply resolved user and database session."""
+from app.money import decimal
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.credit import CreditObligation
@@ -42,7 +43,7 @@ def mortgage_schedule(credit_id: int, db: Session=None, user_id: int=None):
     return MortgageScheduleResponse(
         credit_id=credit.id,
         currency=credit.currency,
-        monthly_payment=float(credit.monthly_payment or 0),
+        monthly_payment=decimal(credit.monthly_payment or 0),
         early_repayment_mode=credit.early_repayment_mode,
         items=_mortgage_schedule(credit),
     )

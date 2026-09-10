@@ -51,7 +51,7 @@ def budget_suggestions(period: str='month', anchor: date | None=None, db: Sessio
         category_id = row.category_id
         if category_id in already_budgeted:
             continue
-        bucket = by_category.setdefault(category_id, {"total": 0.0, "months": set()})
+        bucket = by_category.setdefault(category_id, {"total": 0, "months": set()})
         bucket["total"] += convert_transaction_for_user(db, user_id, row, main_currency)
         bucket["months"].add((row.date.year, row.date.month))
     categories = {c.id: c for c in db.query(Category).filter(Category.id.in_(by_category.keys())).all()}

@@ -6,6 +6,8 @@ const tx = { id: 1, amount: 123456.78, currency: 'RUB', type: 'expense', account
 const user = { id: 1, username: 'Андрей', email: 'mobile@example.test', main_currency: 'RUB', preferred_mode: 'family', family_access: true, plan: 'family', is_admin: true, email_verified: true, onboarding_completed: true, dashboard_widgets: {} };
 const family = { id: 1, name: 'Наша семья', current_user_id: 1, current_user_role: 'owner', members: [{ id: 1, user_id: 1, name: 'Андрей', email: user.email, role: 'owner', status: 'active' }, { id: 2, user_id: 2, name: 'Светлана', email: 'member@example.test', role: 'editor', status: 'active' }] };
 export async function mockApi(page) {
+  // Analytics is unrelated to layout and can keep networkidle pending offline.
+  await page.route('https://mc.yandex.ru/**', route => route.abort());
   await page.addInitScript(() => { localStorage.setItem('token', 'layout-test'); localStorage.setItem('cm_onb_done', '1'); localStorage.setItem('cm_cookie_consent', 'accepted'); });
   await page.route(/^https?:\/\/[^/]+\/api\//, async route => {
     const p = new URL(route.request().url()).pathname.replace(/\/$/, '');

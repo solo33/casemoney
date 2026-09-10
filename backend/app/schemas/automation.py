@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -34,14 +35,14 @@ class CategorySuggestion(BaseModel):
     category_name: str
     category_type: str
     source: str  # rule | history
-    confidence: float = Field(ge=0, le=1)
+    confidence: MoneyValue = Field(ge=0, le=1)
     matching_operations: int = Field(ge=1)
 
 
 class DuplicateTransactionItem(BaseModel):
     id: int
     date: str
-    amount: float
+    amount: MoneyValue
     currency: str
     description: Optional[str] = None
     account_name: str
@@ -61,7 +62,7 @@ class RegularPaymentSuggestion(BaseModel):
     account_name: str
     category_id: Optional[int] = None
     category_name: Optional[str] = None
-    amount: float
+    amount: MoneyValue
     currency: str
     cadence: str
     occurrences: int

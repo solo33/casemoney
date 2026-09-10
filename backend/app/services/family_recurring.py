@@ -6,6 +6,7 @@ weekly, monthly or yearly cadence.  It never looks at private operations.
 """
 
 from __future__ import annotations
+from app.money import decimal
 
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
@@ -108,7 +109,7 @@ def find_family_recurring_suggestions(
         average = sum(amounts) / len(amounts)
         # A fixed household payment may grow a little, but a wildly varying
         # set of purchases must not be mistaken for a subscription.
-        if average <= 0 or (max(amounts) - min(amounts)) / average > 0.40:
+        if average <= 0 or (max(amounts) - min(amounts)) / average > decimal('0.4'):
             continue
 
         fingerprint = _fingerprint(family_id, description, currency, frequency)

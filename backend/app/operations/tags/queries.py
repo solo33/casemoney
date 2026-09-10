@@ -1,4 +1,5 @@
 """Tags: queries. Callers supply resolved user and database session."""
+from app.money import decimal
 from app.application import ApplicationError
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ def tag_report(tag_id: int, db: Session=None, user_id: int=None):
     return {
         "tag": {"id": tag.id, "name": tag.name, "color": tag.color},
         "totals": [
-            {"type": row.type.value, "currency": row.currency, "amount": round(float(row.amount or 0), 2)}
+            {"type": row.type.value, "currency": row.currency, "amount": round(decimal(row.amount or 0), 2)}
             for row in rows
         ],
     }

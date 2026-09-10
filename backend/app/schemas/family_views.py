@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import datetime
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
@@ -30,7 +31,7 @@ class SettlementCreate(BaseModel):
     to_user_id: int
     from_account_id: Optional[int] = None
     to_account_id: Optional[int] = None
-    amount: float = Field(gt=0)
+    amount: MoneyValue = Field(gt=0)
     currency: str = Field(min_length=2, max_length=10)
     date: Optional[datetime] = None
     description: Optional[str] = Field(None, max_length=500)

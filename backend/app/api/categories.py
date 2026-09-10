@@ -4,7 +4,7 @@ from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse, CategoryTreeNode, CategoryReorder
 from app.operations.categories import queries, commands
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 
 @router.get("/", response_model=List[CategoryResponse])
 def get_categories(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Плоский список всех категорий — для select-форм и быстрых выборок.'
@@ -22,7 +22,7 @@ def get_categories(
 
 @router.get("/tree", response_model=List[CategoryTreeNode])
 def get_categories_tree(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Вложенное дерево категорий. Корневые на верхнем уровне, в children — подкатегории.'
@@ -32,7 +32,7 @@ def get_categories_tree(
 @router.post("/", response_model=CategoryResponse, status_code=201)
 def create_category(
     data: CategoryCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.create_category(data=data, db=db, user_id=user_id))
@@ -42,7 +42,7 @@ def create_category(
 def update_category(
     category_id: int,
     data: CategoryUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.update_category(category_id=category_id, data=data, db=db, user_id=user_id))
@@ -51,7 +51,7 @@ def update_category(
 @router.post("/reorder", status_code=204)
 def reorder_categories(
     data: CategoryReorder,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Сохраняет порядок категорий среди соседей одного уровня и типа.'
@@ -61,7 +61,7 @@ def reorder_categories(
 @router.delete("/{category_id}", status_code=204)
 def delete_category(
     category_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаление каскадно удалит все дочерние (ON DELETE CASCADE на parent_id).'

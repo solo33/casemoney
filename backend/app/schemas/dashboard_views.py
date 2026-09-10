@@ -1,12 +1,13 @@
+from app.money import MoneyValue
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AccountSummary(BaseModel):
     id: int
     name: str
-    total_in_main: float  # сумма всех балансов счёта в main_currency
+    total_in_main: MoneyValue  # сумма всех балансов счёта в main_currency
     type: str
     color: Optional[str]
     icon: Optional[str]
@@ -17,18 +18,18 @@ class CategoryStat(BaseModel):
     category_name: str
     category_color: str
     category_icon: Optional[str]
-    total: float
+    total: MoneyValue
 
 
 class MonthStat(BaseModel):
     month: str   # "2025-01"
-    income: float   # в main_currency
-    expense: float
+    income: MoneyValue   # в main_currency
+    expense: MoneyValue
 
 
 class RecentTransaction(BaseModel):
     id: int
-    amount: float
+    amount: MoneyValue
     currency: str
     type: str
     description: Optional[str]
@@ -39,10 +40,10 @@ class RecentTransaction(BaseModel):
     category_name: Optional[str]
     category_icon: Optional[str]
     to_account_id: Optional[int] = None
-    to_amount: Optional[float] = None
+    to_amount: Optional[MoneyValue] = None
     to_currency: Optional[str] = None
     is_family_expense: bool = False
-    reimbursement_amount: float = 0
+    reimbursement_amount: MoneyValue = Field(default=0, json_schema_extra={"default": 0})
     updated_at: Optional[datetime] = None
 
 
@@ -50,9 +51,9 @@ class ForecastItem(BaseModel):
     id: str
     date: datetime
     type: str
-    amount: float
+    amount: MoneyValue
     currency: str
-    impact_in_main: float
+    impact_in_main: MoneyValue
     description: Optional[str]
     account_name: str
     category_name: Optional[str]
@@ -61,18 +62,18 @@ class ForecastItem(BaseModel):
 class ForecastSummary(BaseModel):
     days: int
     until_date: datetime
-    income: float
-    expense: float
-    net: float
-    projected_balance: float
+    income: MoneyValue
+    expense: MoneyValue
+    net: MoneyValue
+    projected_balance: MoneyValue
     events: List[ForecastItem]
 
 
 class DashboardResponse(BaseModel):
     main_currency: str
-    total_balance: float        # суммарно по всем счетам в main_currency
-    month_income: float         # в main_currency
-    month_expense: float        # в main_currency
+    total_balance: MoneyValue        # суммарно по всем счетам в main_currency
+    month_income: MoneyValue         # в main_currency
+    month_expense: MoneyValue        # в main_currency
     accounts: List[AccountSummary]
     top_categories: List[CategoryStat]
     monthly_stats: List[MonthStat]

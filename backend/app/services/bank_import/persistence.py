@@ -1,5 +1,6 @@
 """tbank_import: persistence."""
 from __future__ import annotations
+from app.money import decimal
 
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -151,7 +152,7 @@ def execute_tbank_import(
             balance = AccountBalance(
                 account_id=account_id,
                 currency=currency.upper(),
-                balance=0.0,
+                balance=0,
             )
             db.add(balance)
             db.flush()
@@ -206,13 +207,13 @@ def execute_tbank_import(
         ensure_currency(item.currency)
         source_balance = ensure_balance(source_account_id, item.currency)
         transaction_type = TransactionType(item.tx_type)
-        to_amount = float(item.to_amount) if item.to_amount is not None else None
+        to_amount = decimal(item.to_amount) if item.to_amount is not None else None
         to_currency = item.to_currency.upper() if item.to_currency else None
         if to_currency:
             ensure_currency(to_currency)
 
         transaction = Transaction(
-            amount=float(item.amount),
+            amount=decimal(item.amount),
             currency=item.currency.upper(),
             type=transaction_type,
             description=item.description or None,
@@ -229,16 +230,16 @@ def execute_tbank_import(
         db.add(transaction)
 
         if item.tx_type == "expense":
-            source_balance.balance -= float(item.amount)
+            source_balance.balance -= decimal(item.amount)
         elif item.tx_type == "income":
-            source_balance.balance += float(item.amount)
+            source_balance.balance += decimal(item.amount)
         else:
-            source_balance.balance -= float(item.amount)
+            source_balance.balance -= decimal(item.amount)
             target_balance = ensure_balance(
                 target_account_id,
                 to_currency or item.currency,
             )
-            target_balance.balance += to_amount if to_amount is not None else float(item.amount)
+            target_balance.balance += to_amount if to_amount is not None else decimal(item.amount)
 
         existing_request_ids.add(item.request_id)
         imported += 1

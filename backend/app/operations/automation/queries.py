@@ -1,4 +1,5 @@
 """Automation: queries. Callers supply resolved user and database session."""
+from app.money import decimal
 from datetime import datetime, timedelta, timezone
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
@@ -62,7 +63,7 @@ def possible_duplicates(db: Session=None, user_id: int=None):
         key = (
             transaction.account_id,
             transaction.type.value,
-            round(float(transaction.amount), 6),
+            round(decimal(transaction.amount), 6),
             transaction.currency,
             transaction.date.date().isoformat(),
             normalized_note,

@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import datetime
 from typing import List
 from pydantic import BaseModel
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 class RateItem(BaseModel):
     from_currency: str
     to_currency: str
-    rate: float
+    rate: MoneyValue
     source: str
     updated_at: datetime
 
@@ -21,6 +22,6 @@ class RatesResponse(BaseModel):
 class ConvertResponse(BaseModel):
     from_currency: str
     to_currency: str
-    amount: float
-    converted: float
-    rate: float
+    amount: MoneyValue
+    converted: MoneyValue
+    rate: MoneyValue

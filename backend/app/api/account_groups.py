@@ -4,7 +4,7 @@ from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.schemas.account_group import AccountGroupCreate, AccountGroupUpdate, AccountGroupResponse
 from app.operations.account_groups import queries, commands
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/account-groups", tags=["account-groups"])
 
 @router.get("/", response_model=List[AccountGroupResponse])
 def get_groups(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(queries.get_groups(db=db, user_id=user_id))
@@ -22,7 +22,7 @@ def get_groups(
 @router.post("/", response_model=AccountGroupResponse, status_code=201)
 def create_group(
     data: AccountGroupCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.create_group(data=data, db=db, user_id=user_id))
@@ -32,7 +32,7 @@ def create_group(
 def update_group(
     group_id: int,
     data: AccountGroupUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.update_group(group_id=group_id, data=data, db=db, user_id=user_id))
@@ -41,7 +41,7 @@ def update_group(
 @router.delete("/{group_id}", status_code=204)
 def delete_group(
     group_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаление группы. Связанные счета остаются (FK ON DELETE SET NULL).'

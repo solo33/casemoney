@@ -4,7 +4,7 @@ from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.schemas.user import UserResponse, UserUpdate, PasswordChange
 from app.operations.me import queries, commands
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/me", tags=["me"])
 
 @router.get("/", response_model=UserResponse)
 def get_me(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(queries.get_me(db=db, user_id=user_id))
@@ -24,7 +24,7 @@ def get_me(
 @router.put("/", response_model=UserResponse)
 def update_me(
     data: UserUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.update_me(data=data, db=db, user_id=user_id))
@@ -33,7 +33,7 @@ def update_me(
 @router.post("/password", status_code=204)
 def change_password(
     data: PasswordChange,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.change_password(data=data, db=db, user_id=user_id))
@@ -41,7 +41,7 @@ def change_password(
 
 @router.delete("/transactions", status_code=204)
 def delete_all_transactions(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаляет ВСЕ транзакции пользователя. Балансы счетов обнуляются.'
@@ -50,7 +50,7 @@ def delete_all_transactions(
 
 @router.post("/reset", status_code=204)
 def reset_account(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Удаляет ВСЕ данные пользователя кроме самого аккаунта.\n\n    Удаляются: транзакции, балансы, счета, группы счетов, категории, валюты.\n    '
@@ -59,7 +59,7 @@ def reset_account(
 
 @router.get("/limits")
 def get_limits(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Текущее использование + активный тариф.'
@@ -68,7 +68,7 @@ def get_limits(
 
 @router.delete("/", status_code=204)
 def delete_account(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Полностью удаляет пользователя и все его данные.'

@@ -4,7 +4,7 @@ from app.api.dependencies import current_user_id as get_current_user_id
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import List
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.schemas.account import AccountCreate, AccountUpdate, AccountResponse, AccountBalanceCreate, AccountBalanceUpdate, AccountBalanceAdjustmentCreate, AccountBalanceAdjustmentResponse, AccountBalanceResponse, AccountGroupBucket
 from app.operations.accounts import queries, commands, balances
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
 @router.get("/", response_model=List[AccountResponse])
 def get_accounts(
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Плоский список со всеми балансами и total_in_main.'
@@ -23,7 +23,7 @@ def get_accounts(
 @router.get("/grouped", response_model=List[AccountGroupBucket])
 def get_accounts_grouped(
     convert_balances: bool = True,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Сгруппированный список. total_in_main для группы = сумма total_in_main счетов.'
@@ -33,7 +33,7 @@ def get_accounts_grouped(
 @router.post("/", response_model=AccountResponse, status_code=201)
 def create_account(
     data: AccountCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.create_account(data=data, db=db, user_id=user_id))
@@ -42,7 +42,7 @@ def create_account(
 @router.post("/reorder", status_code=204)
 def reorder_accounts(
     payload: dict,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Задать порядок счетов. body: {"account_ids": [id, id, ...]} —\n    sort_order назначается по позиции в списке. Опционально {"group_id": X}\n    одновременно переносит все эти счета в указанную группу.'
@@ -53,7 +53,7 @@ def reorder_accounts(
 def update_account(
     account_id: int,
     data: AccountUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.update_account(account_id=account_id, data=data, db=db, user_id=user_id))
@@ -62,7 +62,7 @@ def update_account(
 @router.delete("/{account_id}", status_code=204)
 def delete_account(
     account_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(commands.delete_account(account_id=account_id, db=db, user_id=user_id))
@@ -71,7 +71,7 @@ def delete_account(
 @router.get("/{account_id}/balances", response_model=List[AccountBalanceResponse])
 def list_balances(
     account_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(queries.list_balances(account_id=account_id, db=db, user_id=user_id))
@@ -81,7 +81,7 @@ def list_balances(
 def add_balance(
     account_id: int,
     data: AccountBalanceCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(balances.add_balance(account_id=account_id, data=data, db=db, user_id=user_id))
@@ -92,7 +92,7 @@ def update_balance(
     account_id: int,
     currency: str,
     data: AccountBalanceUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(balances.update_balance(account_id=account_id, currency=currency, data=data, db=db, user_id=user_id))
@@ -107,7 +107,7 @@ def adjust_balance(
     account_id: int,
     currency: str,
     data: AccountBalanceAdjustmentCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Создаёт доход/расход на разницу между фактическим и указанным остатком.'
@@ -118,7 +118,7 @@ def adjust_balance(
 def delete_balance(
     account_id: int,
     currency: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return operation_response(balances.delete_balance(account_id=account_id, currency=currency, db=db, user_id=user_id))

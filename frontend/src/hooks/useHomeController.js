@@ -1,16 +1,12 @@
 import { useUser } from "../contexts/UserContext";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 
 import { normalizeDashboardWidgets as dashboardWidgetSettings } from "../utils/dashboardWidgets";
-import { getLastSuccessfulSync, SYNC_STATUS_EVENT, markSyncSuccessful } from "../services/syncStatus";
+import { getLastSuccessfulSync, SYNC_STATUS_EVENT } from "../services/syncStatus";
 
-
-
-
-import { cachedAccountsAndCategories, saveReferenceData } from "../services/offlineReferenceData";
+import { useHomeData } from "./useHomeData";
 import api from "../api/client";
-
 
 import { listPendingTransactions, removeOfflineMutation, LOCAL_TRANSACTION_EVENT } from "../services/offlineMutations";
 
@@ -22,36 +18,25 @@ import { isoToday, aggregateByCurrency, isToday, RU_MONTHS_FULL, currentMonthRan
 export function useHomeController() {
   const { mainCurrency, user, updateUser } = useUser();
   const navigate = useNavigate();
-  const [dashboard, setDashboard] = useState(null);
-  const [grouped, setGrouped] = useState([]);
-  const [accountOptions, setAccountOptions] = useState([]);
-  const [summary, setSummary] = useState(null);
-  const [monthlyTrend, setMonthlyTrend] = useState([]);
   const [breakdownType, setBreakdownType] = useState("expense"); // expense | income
   const [forecastDays, setForecastDays] = useState(30);
   const [balanceMode, setBalanceMode] = useState("actual"); // actual | planned
   const flowMonth = new Date().getMonth() + 1;
   const flowYear = new Date().getFullYear();
+  const { dashboard, grouped, accountOptions, summary, monthlyTrend, categories, initialLoading, balanceLoading, trendLoading, accountsLoading, error, setCategories, setError, fetchAll } = useHomeData({ breakdownType, flowMonth, flowYear, forecastDays });
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
-  const [categories, setCategories] = useState([]);
   const [editingTx, setEditingTx] = useState(null);
   const [adjustingBalance, setAdjustingBalance] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
-  const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
+  const [selectedDate, setSelectedDate] = useState(isoToday()); // РґР°С‚Р° С„РѕСЂРјС‹ = РґР°С‚Р° Р»РµРЅС‚С‹
+  const [dayTx, setDayTx] = useState([]);                       // Р·Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
   const widgetSettings = useMemo(() => dashboardWidgetSettings(user?.dashboard_widgets), [user?.dashboard_widgets]);
   const widgetSettingsSignature = useMemo(() => JSON.stringify(user?.dashboard_widgets || {}), [user?.dashboard_widgets]);
   const [collapsedWidgets, setCollapsedWidgets] = useState(() => Object.fromEntries(
     Object.entries(dashboardWidgetSettings()).map(([id, options]) => [id, options.collapsed]),
   ));
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [balanceLoading, setBalanceLoading] = useState(true);
-  const [trendLoading, setTrendLoading] = useState(true);
-  const [accountsLoading, setAccountsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [lastSyncedAt, setLastSyncedAt] = useState(() => getLastSuccessfulSync());
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-  const loadVersion = useRef(0);
 
   useEffect(() => {
     const onSync = event => setLastSyncedAt(event.detail?.lastSuccessfulSync || getLastSuccessfulSync());
@@ -90,125 +75,25 @@ export function useHomeController() {
 
   const isWidgetCollapsed = id => Boolean(collapsedWidgets[id]);
 
-  const fetchAll = useCallback(async () => {
-    const version = ++loadVersion.current;
-    const isCurrent = () => loadVersion.current === version;
-    setError(null);
-    setInitialLoading(true);
-    setBalanceLoading(true);
-    setTrendLoading(true);
-    setAccountsLoading(true);
-
-    const cached = cachedAccountsAndCategories();
-    if (cached) {
-      setAccountOptions(cached.accountGroups);
-      setCategories(cached.categories);
-    }
-    if (navigator.onLine === false) {
-      setInitialLoading(false);
-      setBalanceLoading(false);
-      setTrendLoading(false);
-      setAccountsLoading(false);
-      setError(cached ? null : "Для работы без сети сначала откройте приложение онлайн");
-      return;
-    }
-
-    const params = {
-      period: "month",
-      year: flowYear,
-      month: flowMonth,
-      breakdown_type: breakdownType,
-    };
-
-    // Этап 1: данные правой колонки и лёгкие опции счетов — без конвертации.
-    const firstStage = await Promise.allSettled([
-      api.get("/api/reports/summary", { params }),
-      api.get("/api/categories/"),
-      api.get("/api/accounts/grouped", { params: { convert_balances: false } }),
-    ]);
-    if (!isCurrent()) return;
-    if (firstStage[0].status === "fulfilled") setSummary(firstStage[0].value.data);
-    const nextCategories = firstStage[1].status === "fulfilled"
-      ? firstStage[1].value.data
-      : cached?.categories;
-    const nextAccountOptions = firstStage[2].status === "fulfilled"
-      ? firstStage[2].value.data
-      : cached?.accountGroups;
-    if (nextCategories) setCategories(nextCategories);
-    if (nextAccountOptions) setAccountOptions(nextAccountOptions);
-    if (firstStage[1].status === "fulfilled" || firstStage[2].status === "fulfilled") {
-      saveReferenceData({
-        categories: nextCategories || [],
-        accountGroups: nextAccountOptions || [],
-      });
-    }
-    if (firstStage.some(result => result.status === "rejected")) {
-      setError("Часть данных главной страницы пока недоступна");
-    }
-    setInitialLoading(false);
-
-    // Если весь первый пакет недоступен, последующие запросы также не запускаем.
-    // Это завершает индикаторы и оставляет доступными сохранённые счета/категории.
-    if (firstStage.every(result => result.status === "rejected")) {
-      setBalanceLoading(false);
-      setTrendLoading(false);
-      setAccountsLoading(false);
-      return;
-    }
-
-    // Этап 2: общий баланс и последние изменённые записи.
-    try {
-      const d = await api.get("/api/dashboard/", { params: { forecast_days: forecastDays } });
-      if (isCurrent()) {
-        setDashboard(d.data);
-        markSyncSuccessful();
-      }
-    } catch {
-      if (isCurrent()) setError("Не удалось обновить общий баланс");
-    } finally {
-      if (isCurrent()) setBalanceLoading(false);
-    }
-
-    // Этап 3: компактная статистика за последние месяцы.
-    try {
-      const t = await api.get("/api/reports/monthly-trend", { params: { months: 3 } });
-      if (isCurrent()) setMonthlyTrend(t.data.points || []);
-    } catch {
-      if (isCurrent()) setError("Не удалось обновить статистику по месяцам");
-    } finally {
-      if (isCurrent()) setTrendLoading(false);
-    }
-
-    // Этап 4: полный список счетов с пересчётом в основную валюту.
-    try {
-      const g = await api.get("/api/accounts/grouped");
-      if (isCurrent()) setGrouped(g.data);
-    } catch {
-      if (isCurrent()) setError("Не удалось обновить счета");
-    } finally {
-      if (isCurrent()) setAccountsLoading(false);
-    }
-  }, [breakdownType, flowMonth, flowYear, forecastDays]);
-
   const effectiveAccountGroups = grouped.length > 0 ? grouped : accountOptions;
   const flatAccounts = useMemo(
     () => effectiveAccountGroups.flatMap(b => b.accounts || []),
     [effectiveAccountGroups]
   );
 
-  // Обогащаем сырую транзакцию (из /api/transactions) именами счёта/категории
+  // РћР±РѕРіР°С‰Р°РµРј СЃС‹СЂСѓСЋ С‚СЂР°РЅР·Р°РєС†РёСЋ (РёР· /api/transactions) РёРјРµРЅР°РјРё СЃС‡С‘С‚Р°/РєР°С‚РµРіРѕСЂРёРё
   const enrichTx = useCallback((t) => {
     const acc = flatAccounts.find(a => a.id === t.account_id);
     const cat = t.category_id ? categories.find(c => c.id === t.category_id) : null;
     return {
       ...t,
-      account_name: acc?.name || "—",
+      account_name: acc?.name || "вЂ”",
       category_name: cat?.name || null,
       category_icon: cat?.icon || null,
     };
   }, [flatAccounts, categories]);
 
-  // Записи за выбранный день
+  // Р—Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ
   const fetchDay = useCallback(async (dateStr) => {
     const localItems = await listPendingTransactions(dateStr).catch(() => []);
     try {
@@ -222,7 +107,7 @@ export function useHomeController() {
   }, []);
 
   const handleDeleteTx = async (tx) => {
-    if (!confirm("Удалить запись?")) return;
+    if (!confirm("РЈРґР°Р»РёС‚СЊ Р·Р°РїРёСЃСЊ?")) return;
     try {
       if (tx.pending_sync && tx.offline_mutation_id) {
         await removeOfflineMutation(tx.offline_mutation_id);
@@ -233,7 +118,7 @@ export function useHomeController() {
       fetchAll();
       fetchDay(selectedDate);
     } catch (e) {
-      setError(e.response?.data?.detail || "Не удалось удалить");
+      setError(e.response?.data?.detail || "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ");
     }
   };
 
@@ -257,28 +142,28 @@ export function useHomeController() {
 
   useEffect(() => { fetchAll(); }, [mainCurrency, fetchAll]);
 
-  // Перезагрузка ленты дня при смене даты / валюты
+  // РџРµСЂРµР·Р°РіСЂСѓР·РєР° Р»РµРЅС‚С‹ РґРЅСЏ РїСЂРё СЃРјРµРЅРµ РґР°С‚С‹ / РІР°Р»СЋС‚С‹
   useEffect(() => { fetchDay(selectedDate); }, [selectedDate, mainCurrency, fetchDay]);
 
   const sym = currencySymbol(mainCurrency);
 
-  // breakdown сумм по валютам по всем счетам (только учитываемые в балансе)
+  // breakdown СЃСѓРјРј РїРѕ РІР°Р»СЋС‚Р°Рј РїРѕ РІСЃРµРј СЃС‡РµС‚Р°Рј (С‚РѕР»СЊРєРѕ СѓС‡РёС‚С‹РІР°РµРјС‹Рµ РІ Р±Р°Р»Р°РЅСЃРµ)
   const byCurrency = useMemo(() => aggregateByCurrency(grouped), [grouped]);
   const dashboardBalancesHidden = Boolean(user?.hide_dashboard_balances);
   const toggleDashboardBalances = () => updateUser({ hide_dashboard_balances: !dashboardBalancesHidden });
 
-  // Гистограмма движения денег: 3 месяца, свежие сверху (текущий — «Этот месяц»)
+  // Р“РёСЃС‚РѕРіСЂР°РјРјР° РґРІРёР¶РµРЅРёСЏ РґРµРЅРµРі: 3 РјРµСЃСЏС†Р°, СЃРІРµР¶РёРµ СЃРІРµСЂС…Сѓ (С‚РµРєСѓС‰РёР№ вЂ” В«Р­С‚РѕС‚ РјРµСЃСЏС†В»)
   const trendDesc = useMemo(() => [...monthlyTrend].reverse(), [monthlyTrend]);
 
-  // записи за выбранный день (для правой колонки), обогащённые именами
+  // Р·Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ (РґР»СЏ РїСЂР°РІРѕР№ РєРѕР»РѕРЅРєРё), РѕР±РѕРіР°С‰С‘РЅРЅС‹Рµ РёРјРµРЅР°РјРё
   const todayTx = useMemo(() => dayTx.map(enrichTx), [dayTx, enrichTx]);
 
-  // Заголовок таба = выбранная дата
+  // Р—Р°РіРѕР»РѕРІРѕРє С‚Р°Р±Р° = РІС‹Р±СЂР°РЅРЅР°СЏ РґР°С‚Р°
   const dayLabel = useMemo(() => {
     const d = new Date(selectedDate + "T00:00:00");
     const today = isToday(d.toISOString());
     const human = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-    return today ? `Записи за ${human}` : `Записи · ${human}`;
+    return today ? `Р—Р°РїРёСЃРё Р·Р° ${human}` : `Р—Р°РїРёСЃРё В· ${human}`;
   }, [selectedDate]);
 
   const recentlyChanged = dashboard?.recently_changed || [];
@@ -294,9 +179,9 @@ export function useHomeController() {
   const monthLabel = summary?.period_label ||
     `${RU_MONTHS_FULL[new Date().getMonth()]} ${new Date().getFullYear()}`;
   const breakdownColor = breakdownType === "income" ? "#167a4a" : "#c0432b";
-  const breakdownWord = breakdownType === "income" ? "Доходы" : "Расходы";
+  const breakdownWord = breakdownType === "income" ? "Р”РѕС…РѕРґС‹" : "Р Р°СЃС…РѕРґС‹";
 
-  // Онбординг: показываем, пока нет счетов или нет операций (и не скрыт вручную)
+  // РћРЅР±РѕСЂРґРёРЅРі: РїРѕРєР°Р·С‹РІР°РµРј, РїРѕРєР° РЅРµС‚ СЃС‡РµС‚РѕРІ РёР»Рё РЅРµС‚ РѕРїРµСЂР°С†РёР№ (Рё РЅРµ СЃРєСЂС‹С‚ РІСЂСѓС‡РЅСѓСЋ)
   const hasAccounts = flatAccounts.length > 0;
   const hasTx = (dashboard?.recent_transactions?.length || 0) > 0
     || monthIncome > 0 || monthExpense > 0
@@ -306,7 +191,7 @@ export function useHomeController() {
   const showOnboarding = !initialLoading && !accountsLoading && !onbDismissed
     && localStorage.getItem("cm_inline_onb") === "show" && (!hasAccounts || !hasTx);
 
-  // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
+  // РљР»РёРє РїРѕ РєР°С‚РµРіРѕСЂРёРё в†’ РїРµСЂРµС…РѕРґ РІ Р—Р°РїРёСЃРё СЃ С„РёР»СЊС‚СЂРѕРј (РєР°С‚РµРіРѕСЂРёСЏ + С‚РёРї + С‚РµРєСѓС‰РёР№ РјРµСЃСЏС†)
   const goToCategory = (catId) => {
     const { from, to } = currentMonthRange();
     const params = new URLSearchParams({ type: breakdownType, date_from: from, date_to: to });
@@ -314,7 +199,7 @@ export function useHomeController() {
     navigate(`/transactions?${params.toString()}`);
   };
 
-  // Клик по счёту → Записи по этому счёту
+  // РљР»РёРє РїРѕ СЃС‡С‘С‚Сѓ в†’ Р—Р°РїРёСЃРё РїРѕ СЌС‚РѕРјСѓ СЃС‡С‘С‚Сѓ
   const goToAccount = (accId) => {
     navigate(`/transactions?account_id=${accId}`);
   };

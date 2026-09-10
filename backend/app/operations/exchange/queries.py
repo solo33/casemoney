@@ -1,4 +1,5 @@
 """Exchange: queries. Callers supply resolved user and database session."""
+from app.money import decimal
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from app.models.exchange_rate import ExchangeRate
@@ -22,6 +23,6 @@ def convert_amount(amount: float=..., from_currency: str=..., to_currency: str=.
         from_currency=from_currency.upper(),
         to_currency=to_currency.upper(),
         amount=amount,
-        converted=round(amount * rate, 2),
+        converted=round(decimal(amount) * rate, 2),
         rate=rate,
     )

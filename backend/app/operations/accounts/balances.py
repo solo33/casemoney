@@ -1,4 +1,5 @@
 """Accounts: balances. Callers supply resolved user and database session."""
+from app.money import decimal
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -39,7 +40,7 @@ def add_balance(account_id: int, data: AccountBalanceCreate, db: Session=None, u
     for b in serialized.balances:
         if b.currency == currency:
             return b
-    return AccountBalanceResponse(currency=currency, balance=bal.balance, balance_in_main=0.0)
+    return AccountBalanceResponse(currency=currency, balance=bal.balance, balance_in_main=0)
 
 
 def update_balance(account_id: int, currency: str, data: AccountBalanceUpdate, db: Session=None, user_id: int=None):
@@ -60,7 +61,7 @@ def update_balance(account_id: int, currency: str, data: AccountBalanceUpdate, d
     for b in serialized.balances:
         if b.currency == currency:
             return b
-    return AccountBalanceResponse(currency=currency, balance=bal.balance, balance_in_main=0.0)
+    return AccountBalanceResponse(currency=currency, balance=bal.balance, balance_in_main=0)
 
 
 def adjust_balance(account_id: int, currency: str, data: AccountBalanceAdjustmentCreate, db: Session=None, user_id: int=None):
@@ -78,10 +79,10 @@ def adjust_balance(account_id: int, currency: str, data: AccountBalanceAdjustmen
     if not balance:
         raise ApplicationError(status_code=404, detail="Balance not found")
 
-    old_balance = round(float(balance.balance), 2)
-    new_balance = round(float(data.balance), 2)
+    old_balance = round(decimal(balance.balance), 2)
+    new_balance = round(decimal(data.balance), 2)
     difference = round(new_balance - old_balance, 2)
-    if abs(difference) < 0.005:
+    if abs(difference) < decimal('0.005'):
         raise ApplicationError(status_code=400, detail="Остаток не изменился")
 
     tx_type = TransactionType.income if difference > 0 else TransactionType.expense
@@ -154,7 +155,7 @@ def delete_balance(account_id: int, currency: str, db: Session=None, user_id: in
     ).first()
     if not bal:
         raise ApplicationError(status_code=404, detail="Balance not found")
-    if abs(bal.balance) > 0.005:
+    if abs(bal.balance) > decimal('0.005'):
         raise ApplicationError(
             status_code=400,
             detail=f"Нельзя удалить баланс с ненулевой суммой ({bal.balance} {currency})",

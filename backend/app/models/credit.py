@@ -1,9 +1,9 @@
+from app.money import Money
 from sqlalchemy import (
     Boolean,
     Column,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -25,10 +25,10 @@ class CreditObligation(Base):
     direction = Column(String(16), nullable=False, default="owe")  # owe, receivable
     currency = Column(String(10), nullable=False, default="RUB")
     counterparty = Column(String(160), nullable=True)
-    original_amount = Column(Float, nullable=True)
-    current_balance = Column(Float, nullable=True)
-    credit_limit = Column(Float, nullable=True)
-    monthly_payment = Column(Float, nullable=True)
+    original_amount = Column(Money, nullable=True)
+    current_balance = Column(Money, nullable=True)
+    credit_limit = Column(Money, nullable=True)
+    monthly_payment = Column(Money, nullable=True)
     due_day = Column(Integer, nullable=True)
     statement_day = Column(Integer, nullable=True)
     next_payment_date = Column(Date, nullable=True, index=True)
@@ -45,7 +45,7 @@ class CreditObligation(Base):
     notes = Column(Text, nullable=True)
     last_reminder_for_date = Column(Date, nullable=True)
     last_email_reminder_for_date = Column(Date, nullable=True)
-    annual_interest_rate = Column(Float, nullable=True)
+    annual_interest_rate = Column(Money, nullable=True)
     # What should change after an early mortgage repayment.  The actual
     # payment history is never recomputed; this setting only affects the
     # following forecast and, for reduce_payment, the new regular amount.
@@ -81,9 +81,9 @@ class CreditPayment(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
-    amount = Column(Float, nullable=False)
-    principal_amount = Column(Float, nullable=True)
-    interest_amount = Column(Float, nullable=True)
+    amount = Column(Money, nullable=False)
+    principal_amount = Column(Money, nullable=True)
+    interest_amount = Column(Money, nullable=True)
     # A separate early repayment reduces the principal in full and does not
     # include the regular monthly interest calculation.
     is_early_payment = Column(Boolean, nullable=False, default=False)
@@ -91,7 +91,7 @@ class CreditPayment(Base):
     currency = Column(String(10), nullable=False)
     paid_at = Column(DateTime(timezone=True), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
-    balance_after = Column(Float, nullable=True)
+    balance_after = Column(Money, nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

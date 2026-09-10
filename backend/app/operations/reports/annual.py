@@ -1,4 +1,5 @@
 """Reports: annual. Callers supply resolved user and database session."""
+from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, date
@@ -38,8 +39,8 @@ def get_annual(year: int=..., db: Session=None, user_id: int=None):
     }
 
     # Группируем: (cat_id, month) -> sum_in_main, отдельно для income/expense
-    inc_buckets: dict[Optional[int], list[float]] = {}
-    exp_buckets: dict[Optional[int], list[float]] = {}
+    inc_buckets: dict[Optional[int], list[Decimal]] = {}
+    exp_buckets: dict[Optional[int], list[Decimal]] = {}
     for t in transactions:
         if t.is_financing:
             continue
@@ -49,10 +50,10 @@ def get_annual(year: int=..., db: Session=None, user_id: int=None):
         amount = _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
         bucket = inc_buckets if t.type == TransactionType.income else exp_buckets
         if t.category_id not in bucket:
-            bucket[t.category_id] = [0.0] * 12
+            bucket[t.category_id] = [0] * 12
         bucket[t.category_id][m_idx] += amount
 
-    def build_rows(buckets: dict[Optional[int], list[float]], cat_type: str) -> List[AnnualRow]:
+    def build_rows(buckets: dict[Optional[int], list[Decimal]], cat_type: str) -> List[AnnualRow]:
         """Иерархия: root -> children. Родителю суммируются amounts детей."""
         # Идентификаторы участвующих категорий + их родителей
         involved_ids = set(buckets.keys()) - {None}
@@ -82,13 +83,13 @@ def get_annual(year: int=..., db: Session=None, user_id: int=None):
 
         rows: list[AnnualRow] = []
         for root in roots:
-            own = buckets.get(root.id, [0.0] * 12)
+            own = buckets.get(root.id, [0] * 12)
             kids = children_map.get(root.id, [])
 
             # Сумма по месяцам = own + сумма всех children
             total_monthly = list(own)
             for ch in kids:
-                ch_monthly = buckets.get(ch.id, [0.0] * 12)
+                ch_monthly = buckets.get(ch.id, [0] * 12)
                 for i in range(12):
                     total_monthly[i] += ch_monthly[i]
 
@@ -101,7 +102,7 @@ def get_annual(year: int=..., db: Session=None, user_id: int=None):
                 total=round(sum(total_monthly), 2),
             ))
             for ch in kids:
-                ch_monthly = buckets.get(ch.id, [0.0] * 12)
+                ch_monthly = buckets.get(ch.id, [0] * 12)
                 rows.append(AnnualRow(
                     category_id=ch.id,
                     category_name=ch.name,
@@ -129,12 +130,12 @@ def get_annual(year: int=..., db: Session=None, user_id: int=None):
     expense_rows = build_rows(exp_buckets, "expense")
 
     # Итоги по месяцам — сумма только корневых (children уже включены)
-    inc_totals = [0.0] * 12
+    inc_totals = [0] * 12
     for r in income_rows:
         if r.is_parent:
             for i in range(12):
                 inc_totals[i] += r.monthly[i]
-    exp_totals = [0.0] * 12
+    exp_totals = [0] * 12
     for r in expense_rows:
         if r.is_parent:
             for i in range(12):
@@ -177,7 +178,7 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
         .all()
     )
     if not accounts:
-        return AnnualBalancesResponse(main_currency=main, year=year, groups=[], total_monthly=[0.0] * 12)
+        return AnnualBalancesResponse(main_currency=main, year=year, groups=[], total_monthly=[0] * 12)
 
     account_ids = [a.id for a in accounts]
 
@@ -185,16 +186,16 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
     # оценке нужен только как точка отсчёта; изменения назад во времени
     # вычитаем по снимкам курсов самих операций.
     balances = db.query(AccountBalance).filter(AccountBalance.account_id.in_(account_ids)).all()
-    current_main: dict[int, float] = {}
+    current_main: dict[int, Decimal] = {}
     for b in balances:
-        current_main[b.account_id] = current_main.get(b.account_id, 0.0) + _to_main(
+        current_main[b.account_id] = current_main.get(b.account_id, 0) + _to_main(
             db, user_id, b.balance, b.currency, main
         )
 
     # Эффекты операций: помесячно внутри года + суммарно «после года».
     # У перевода две стороны: −amount на источнике и +to_amount на получателе.
-    month_eff: dict[int, list[float]] = {}   # account -> [12] в основной валюте
-    future_eff: dict[int, float] = {}        # сумма после 31.12.year
+    month_eff: dict[int, list[Decimal]] = {}   # account -> [12] в основной валюте
+    future_eff: dict[int, Decimal] = {}        # сумма после 31.12.year
 
     year_start = date(year, 1, 1)
     txs = (
@@ -207,13 +208,13 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
         .all()
     )
 
-    def add_effect(account_id: int, effect: float, occurred_at: datetime) -> None:
+    def add_effect(account_id: int, effect: Decimal, occurred_at: datetime) -> None:
         """Сохраняет изменение одного баланса в нужном месяце или будущем периоде."""
         if occurred_at.year == year:
-            arr = month_eff.setdefault(account_id, [0.0] * 12)
+            arr = month_eff.setdefault(account_id, [0] * 12)
             arr[occurred_at.month - 1] += effect
         else:  # год больше запрошенного → «будущее» относительно конца года
-            future_eff[account_id] = future_eff.get(account_id, 0.0) + effect
+            future_eff[account_id] = future_eff.get(account_id, 0) + effect
 
     for t in txs:
         if t.type == TransactionType.income:
@@ -229,12 +230,12 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
                     t.date,
                 )
 
-    def eom_series(acc_id: int) -> list[float]:
+    def eom_series(acc_id: int) -> list[Decimal]:
         """12 значений остатка на конец каждого месяца в основной валюте."""
-        cur_balance = current_main.get(acc_id, 0.0)
-        meff = month_eff.get(acc_id, [0.0] * 12)
-        feff = future_eff.get(acc_id, 0.0)
-        out = [0.0] * 12
+        cur_balance = current_main.get(acc_id, 0)
+        meff = month_eff.get(acc_id, [0] * 12)
+        feff = future_eff.get(acc_id, 0)
+        out = [0] * 12
         out[11] = cur_balance - feff               # конец декабря
         for m in range(10, -1, -1):                # ноябрь ... январь
             out[m] = out[m + 1] - meff[m + 1]
@@ -254,7 +255,7 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
     for a in accounts:
         accounts_by_group.setdefault(a.group_id, []).append(a)
 
-    total_monthly = [0.0] * 12
+    total_monthly = [0] * 12
     group_rows: list[BalanceGroupRow] = []
 
     for gid, gname in group_order:
@@ -262,7 +263,7 @@ def get_annual_balances(year: int=..., db: Session=None, user_id: int=None):
         if not bucket:
             continue
         acc_rows: list[BalanceAccountRow] = []
-        group_monthly = [0.0] * 12
+        group_monthly = [0] * 12
         for a in bucket:
             monthly_main = [round(v, 2) for v in eom_series(a.id)]
             acc_rows.append(BalanceAccountRow(
@@ -316,22 +317,22 @@ def get_yoy(type: Literal['income', 'expense']='expense', account_ids: Optional[
                 expanded.add(c.id)
         query = query.filter(Transaction.category_id.in_(expanded))
 
-    agg: dict[tuple[int, int], float] = {}
+    agg: dict[tuple[int, int], Decimal] = {}
     for t in query.all():
         key = (t.date.year, t.date.month)
-        agg[key] = agg.get(key, 0.0) + _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
+        agg[key] = agg.get(key, 0) + _to_main(db, user_id, t.amount, t.currency, main, transaction=t)
 
     years = sorted({y for y, _ in agg})
     rows = [
         YoyRow(
             month=m,
             label=RU_MONTHS[m].capitalize(),
-            values={y: round(agg.get((y, m), 0.0), 2) for y in years},
+            values={y: round(agg.get((y, m), 0), 2) for y in years},
         )
         for m in range(1, 13)
     ]
     totals = {
-        y: round(sum(agg.get((y, m), 0.0) for m in range(1, 13)), 2)
+        y: round(sum(agg.get((y, m), 0) for m in range(1, 13)), 2)
         for y in years
     }
     return YoyResponse(main_currency=main, type=type, years=years, rows=rows, totals=totals)

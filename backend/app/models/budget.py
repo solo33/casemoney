@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from app.money import Money
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -18,14 +19,14 @@ class Budget(Base):
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
     period = Column(String(16), nullable=False, default="month")  # month; quarter/year позже
     period_start = Column(Date, nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)
     rollover_mode = Column(String(24), nullable=False, default="none")
     include_planned = Column(Boolean, nullable=False, default=False)
     # Не заменяет лимит периода: это ориентир фактических трат по дням.
     # Его удобно задавать, когда важно не «сэкономить к концу месяца», а
     # равномерно расходовать деньги в течение периода.
-    daily_amount = Column(Float, nullable=True)
+    daily_amount = Column(Money, nullable=True)
     scope = Column(String(16), nullable=False, default="personal")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

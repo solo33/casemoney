@@ -199,7 +199,7 @@ def _carry_in(db: Session, budget: Budget) -> float:
         cursor = _previous_period_start(cursor, budget.period)
     chain.reverse()
 
-    carry = 0.0
+    carry = 0
     carry_currency: str | None = None
     for previous in chain:
         if carry_currency is not None:
@@ -210,14 +210,14 @@ def _carry_in(db: Session, budget: Budget) -> float:
             start, end, previous.include_planned, previous.scope,
         )
         if previous.rollover_mode == "none":
-            carry = 0.0
+            carry = 0
         else:
             remainder = previous.amount + carry - spent
-            carry = max(0.0, remainder) if previous.rollover_mode == "carry_remaining" else remainder
+            carry = max(0, remainder) if previous.rollover_mode == "carry_remaining" else remainder
         carry_currency = previous.currency
 
     if not chain or carry_currency is None or chain[-1].rollover_mode == "none":
-        return 0.0
+        return 0
     return round(convert_for_user(db, budget.user_id, carry, carry_currency, budget.currency), 2)
 
 

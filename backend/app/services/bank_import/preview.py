@@ -1,5 +1,6 @@
 """tbank_import: preview."""
 from __future__ import annotations
+from app.money import decimal
 
 from collections import Counter
 from sqlalchemy.orm import Session
@@ -150,7 +151,7 @@ def build_tbank_preview(
             "date": item.operation_at.isoformat() if item.operation_at else None,
             "source_key": item.source_key,
             "target_source_key": item.target_source_key,
-            "amount": float(item.amount),
+            "amount": decimal(item.amount),
             "currency": item.currency,
             "category": item.category,
             "description": item.description,

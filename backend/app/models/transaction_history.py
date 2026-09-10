@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from app.money import Money
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -21,12 +22,12 @@ class TransactionHistory(Base):
 
     op_date = Column(DateTime(timezone=True), nullable=True)  # дата самой операции
     type = Column(String(10), nullable=False)                # income | expense | transfer
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)
     account_name = Column(String, nullable=True)
     category_name = Column(String, nullable=True)            # путь "Родитель\Дочерняя"
     description = Column(String, nullable=True)
 
     # Для action=edited — значения до изменения (для показа «было → стало»)
-    prev_amount = Column(Float, nullable=True)
+    prev_amount = Column(Money, nullable=True)
     prev_currency = Column(String(10), nullable=True)

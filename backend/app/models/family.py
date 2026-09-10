@@ -1,7 +1,7 @@
+from app.money import Money
 from sqlalchemy import (
     Column,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -79,7 +79,7 @@ class FamilySettlement(Base):
     to_user_id = Column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)
     date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     description = Column(String(500), nullable=True)

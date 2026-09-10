@@ -29,7 +29,7 @@ def get_or_create_balance(
         AccountBalance.currency == currency,
     ).populate_existing().with_for_update().first()
     if bal is None:
-        bal = AccountBalance(account_id=account_id, currency=currency, balance=0.0)
+        bal = AccountBalance(account_id=account_id, currency=currency, balance=0)
         db.add(bal)
         db.flush()
     return bal
@@ -49,7 +49,7 @@ def serialize_account(
     Использует convert_for_user — учитывает ручные курсы пользователя.
     """
     balances_out = []
-    total_in_main = 0.0
+    total_in_main = 0
     # Keep the familiar base currency first regardless of insertion order.
     # The remaining currencies use a stable alphabetical order.
     balances = sorted(
@@ -71,7 +71,7 @@ def serialize_account(
         else:
             # Быстрый вариант для форм выбора счёта: сырые валютные остатки
             # нужны сразу, а сетевой пересчёт в основную валюту будет позже.
-            in_main = b.balance if b.currency.upper() == main_currency.upper() else 0.0
+            in_main = b.balance if b.currency.upper() == main_currency.upper() else 0
         balances_out.append(
             AccountBalanceResponse(
                 currency=b.currency,

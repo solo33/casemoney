@@ -35,8 +35,8 @@ def list_goals(include_archived: bool=False, db: Session=None, user_id: int=None
                 db, user_id, allocation_main, main_currency, item.currency,
             )
             allocation_amount = round(min(item.remaining_amount, allocation_amount), 2)
-            shortfall = round(max(0.0, item.remaining_amount - allocation_amount), 2)
-            available_main = round(max(0.0, available_main - allocation_main), 2)
+            shortfall = round(max(0, item.remaining_amount - allocation_amount), 2)
+            available_main = round(max(0, available_main - allocation_main), 2)
             allocation_by_id[item.id] = (allocation_amount, shortfall)
         except exchange_svc.ExchangeError:
             allocation_by_id[item.id] = (None, None)

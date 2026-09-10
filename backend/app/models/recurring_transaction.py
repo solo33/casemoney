@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint
+from app.money import Money
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -13,7 +14,7 @@ class RecurringTransaction(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(120), nullable=False)
     type = Column(Enum(TransactionType), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
@@ -23,7 +24,7 @@ class RecurringTransaction(Base):
     # rules as the original shared expense.
     family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True, index=True)
     is_family_expense = Column(Boolean, nullable=False, default=False)
-    reimbursement_amount = Column(Float, nullable=False, default=0)
+    reimbursement_amount = Column(Money, nullable=False, default=0)
     suggestion_fingerprint = Column(String(64), nullable=True, index=True)
     frequency = Column(String(16), nullable=False, default="monthly")
     # ``custom`` uses custom_interval_days; the standard values remain backward compatible.

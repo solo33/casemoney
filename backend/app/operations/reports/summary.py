@@ -1,4 +1,5 @@
 """Reports: summary. Callers supply resolved user and database session."""
+from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, date, timezone
@@ -51,9 +52,9 @@ def get_summary(period: Literal['month', 'quarter', 'year', 'custom']='month', y
         c.id: c for c in db.query(Category).filter(Category.user_id == user_id).all()
     }
 
-    def _node(cat_id: Optional[int], total: float, own: float, children: list) -> CategoryBreakdown:
+    def _node(cat_id: Optional[int], total: Decimal, own: Decimal, children: list) -> CategoryBreakdown:
         cat = categories_map.get(cat_id) if cat_id else None
-        percent = round((total / breakdown_total * 100), 1) if breakdown_total > 0 else 0.0
+        percent = round((total / breakdown_total * 100), 1) if breakdown_total > 0 else 0
         return CategoryBreakdown(
             category_id=cat_id,
             category_name=cat.name if cat else "Без категории",
@@ -73,15 +74,15 @@ def get_summary(period: Literal['month', 'quarter', 'year', 'custom']='month', y
         for cat_id, amount in cat_totals.items():
             cat = categories_map.get(cat_id) if cat_id else None
             if cat is None:
-                bucket = roots.setdefault(None, {"own": 0.0, "children": {}})
+                bucket = roots.setdefault(None, {"own": 0, "children": {}})
                 bucket["own"] += amount
                 continue
             if cat.parent_id and cat.parent_id in categories_map:
                 root_id = cat.parent_id
-                bucket = roots.setdefault(root_id, {"own": 0.0, "children": {}})
-                bucket["children"][cat.id] = bucket["children"].get(cat.id, 0.0) + amount
+                bucket = roots.setdefault(root_id, {"own": 0, "children": {}})
+                bucket["children"][cat.id] = bucket["children"].get(cat.id, 0) + amount
             else:
-                bucket = roots.setdefault(cat.id, {"own": 0.0, "children": {}})
+                bucket = roots.setdefault(cat.id, {"own": 0, "children": {}})
                 bucket["own"] += amount
 
         # Превращаем в CategoryBreakdown-узлы
@@ -155,8 +156,8 @@ def get_monthly_trend(months: int=6, include_planned: bool=False, end_date: Opti
         points_map[key] = {
             "month": key,
             "label": label,
-            "income": 0.0,
-            "expense": 0.0,
+            "income": 0,
+            "expense": 0,
         }
         m += 1
         if m > 12:

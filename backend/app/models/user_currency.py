@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, UniqueConstraint
+from app.money import Money
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, UniqueConstraint
 from app.database import Base
 
 
@@ -15,7 +16,7 @@ class UserCurrency(Base):
     currency = Column(String(10), nullable=False)            # ISO код (RUB, USD, BTC, ...)
     display_name = Column(String(64), nullable=True)         # "Доллар США"
     short_code = Column(String(10), nullable=True)           # отображаемое сокращение, default = currency
-    manual_rate = Column(Float, nullable=True)               # 1 unit = manual_rate * main_currency
+    manual_rate = Column(Money, nullable=True)               # 1 unit = manual_rate * main_currency
     auto = Column(Boolean, nullable=False, default=True)
 
     __table_args__ = (

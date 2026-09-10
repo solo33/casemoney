@@ -145,12 +145,12 @@ def get_dashboard(forecast_days: int=30, db: Session=None, user_id: int=None):
     exchange_svc.prime_user_rates(
         db, user_id, {item["currency"] for item in upcoming}, main,
     )
-    forecast_income = 0.0
-    forecast_expense = 0.0
+    forecast_income = 0
+    forecast_expense = 0
     forecast_events = []
     for item in upcoming:
         converted = _to_main(db, user_id, item["amount"], item["currency"], main)
-        impact = 0.0
+        impact = 0
         if item["type"] == TransactionType.income.value:
             impact = converted
             forecast_income += converted

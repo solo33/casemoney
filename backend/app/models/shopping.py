@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from app.money import Money
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -29,10 +30,10 @@ class ShoppingItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     list_id = Column(Integer, ForeignKey("shopping_lists.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(200), nullable=False)
-    quantity = Column(Float, nullable=False, default=1)
+    quantity = Column(Money, nullable=False, default=1)
     unit = Column(String(24), nullable=True)
-    planned_price = Column(Float, nullable=True)
-    actual_price = Column(Float, nullable=True)
+    planned_price = Column(Money, nullable=True)
+    actual_price = Column(Money, nullable=True)
     currency = Column(String(10), nullable=False, default="RUB")
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)

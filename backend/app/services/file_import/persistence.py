@@ -60,7 +60,7 @@ def execute_import(db: Session, user_id: int, rows: list[ParsedRow], *, commit: 
         for b in account.balances:
             if b.currency == currency:
                 return b
-        bal = AccountBalance(account_id=account.id, currency=currency, balance=0.0)
+        bal = AccountBalance(account_id=account.id, currency=currency, balance=0)
         db.add(bal)
         db.flush()
         account.balances.append(bal)

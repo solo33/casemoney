@@ -1,3 +1,4 @@
+from app.money import format_amount
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
@@ -36,7 +37,7 @@ def process_credit_reminders(db: Session, user_id: int | None = None) -> tuple[i
         title = (
             "Не отмечено поступление" if overdue else "Ожидается поступление"
         ) if is_income else ("Просрочен платёж" if overdue else "Скоро платёж")
-        amount = f" {credit.monthly_payment:g} {credit.currency}" if credit.monthly_payment else ""
+        amount = f" {format_amount(credit.monthly_payment)} {credit.currency}" if credit.monthly_payment else ""
         if is_income:
             message = (
                 f"Поступление{amount} ожидалось {credit.next_payment_date.strftime('%d.%m.%Y')}."

@@ -1,3 +1,4 @@
+from app.money import format_amount
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -74,7 +75,7 @@ def _remind_before_due(db: Session, schedule: RecurringTransaction, today: date)
             db, user, event="planned_operation",
             title=f"Скоро операция: {schedule.name}",
             message=(f"Через {schedule.reminder_days} дн. — {schedule.next_date.strftime('%d.%m.%Y')}: "
-                     f"{schedule.amount:g} {schedule.currency}."),
+                     f"{format_amount(schedule.amount)} {schedule.currency}."),
             link="/planning",
         )
 
@@ -135,7 +136,7 @@ def process_recurring_transactions(db: Session, today: date | None = None) -> in
                 notify_user(
                     db, user, event="planned_operation",
                     title=(f"Проведена операция: {schedule.name}" if status == "posted" else f"Запланирована операция: {schedule.name}"),
-                    message=(f"{due_date.strftime('%d.%m.%Y')} операция на {schedule.amount:g} {schedule.currency} "
+                    message=(f"{due_date.strftime('%d.%m.%Y')} операция на {format_amount(schedule.amount)} {schedule.currency} "
                              f"{'учтена в остатке.' if status == 'posted' else 'добавлена в план.'}"),
                     link="/planning",
                 )

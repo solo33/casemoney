@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from datetime import date
 from typing import Optional, Literal
 from app.database import get_db
+from app.api.financial_dependencies import report_db
 from app.operations.reports import summary, annual
 from app.schemas.reports_views import AnnualBalancesResponse, AnnualReport, MonthlyTrendResponse, SummaryResponse, YoyResponse
 
@@ -24,7 +25,7 @@ def get_summary(
         "expense", description="По какому типу строить разбивку по категориям"
     ),
     include_planned: bool = Query(False),
-    db: Session = Depends(get_db),
+    db: Session = Depends(report_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return summary.get_summary(period=period, year=year, month=month, quarter=quarter, date_from=date_from, date_to=date_to, rollup=rollup, breakdown_type=breakdown_type, include_planned=include_planned, db=db, user_id=user_id)
@@ -33,7 +34,7 @@ def get_summary(
 @router.get("/annual", response_model=AnnualReport)
 def get_annual(
     year: int = Query(..., ge=1900, le=2100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(report_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     "Годовой анализ: матрица 'категория x месяц', доходы и расходы.\n\n    Категории идут плоско, но в порядке parent -> children -> next parent.\n    Родительские суммы = own + сумма дочерних (per month).\n    "
@@ -43,7 +44,7 @@ def get_annual(
 @router.get("/annual-balances", response_model=AnnualBalancesResponse)
 def get_annual_balances(
     year: int = Query(..., ge=1900, le=2100),
-    db: Session = Depends(get_db),
+    db: Session = Depends(report_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Остаток каждого счёта на конец каждого месяца года, в основной валюте.\n\n    Доход увеличивает остаток, расход уменьшает его. Перевод не меняет\n    общий капитал, но меняет оба конкретных счёта: списывает сумму со\n    счёта-источника и зачисляет сумму в валюте счёта-получателя. Плановые\n    операции в фактический остаток не входят.\n\n    Остаток на конец месяца M = текущий баланс − эффект всех фактических\n    операций после конца M.\n    '
@@ -58,7 +59,7 @@ def get_monthly_trend(
         None,
         description="Последний месяц графика; по умолчанию текущий месяц",
     ),
-    db: Session = Depends(get_db),
+    db: Session = Depends(report_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return summary.get_monthly_trend(months=months, include_planned=include_planned, end_date=end_date, db=db, user_id=user_id)
@@ -69,7 +70,7 @@ def get_yoy(
     type: Literal["income", "expense"] = Query("expense"),
     account_ids: Optional[str] = Query(None, description="CSV id счетов"),
     category_ids: Optional[str] = Query(None, description="CSV id категорий (вкл. подкатегории)"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(report_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Сравнение год к году: строки — месяцы, колонки — все годы с данными.\n\n    Фильтры по счетам и категориям опциональны; для категорий автоматически\n    включаются подкатегории выбранных.\n    '

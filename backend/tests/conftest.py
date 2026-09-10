@@ -49,11 +49,6 @@ def _override_get_db():
     db = TestingSessionLocal()
     try:
         yield db
-        if (
-            db.info.pop("transaction_exchange_snapshots_dirty", False)
-            or db.info.pop("exchange_rates_dirty", False)
-        ):
-            db.commit()
     except Exception:
         db.rollback()
         raise

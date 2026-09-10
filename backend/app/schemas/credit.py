@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import date, datetime
 from typing import Literal, Optional
 
@@ -17,11 +18,11 @@ class CreditCreate(BaseModel):
     direction: CreditDirection = "owe"
     currency: str = Field("RUB", min_length=2, max_length=10)
     counterparty: Optional[str] = Field(None, max_length=160)
-    original_amount: Optional[float] = Field(None, ge=0)
-    current_balance: Optional[float] = Field(None, ge=0)
-    credit_limit: Optional[float] = Field(None, ge=0)
-    monthly_payment: Optional[float] = Field(None, gt=0)
-    annual_interest_rate: Optional[float] = Field(None, ge=0, le=100)
+    original_amount: Optional[MoneyValue] = Field(None, ge=0)
+    current_balance: Optional[MoneyValue] = Field(None, ge=0)
+    credit_limit: Optional[MoneyValue] = Field(None, ge=0)
+    monthly_payment: Optional[MoneyValue] = Field(None, gt=0)
+    annual_interest_rate: Optional[MoneyValue] = Field(None, ge=0, le=100)
     early_repayment_mode: EarlyRepaymentMode = "reduce_term"
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: bool = False
@@ -62,11 +63,11 @@ class CreditCreate(BaseModel):
 class CreditUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=2, max_length=160)
     counterparty: Optional[str] = Field(None, max_length=160)
-    original_amount: Optional[float] = Field(None, ge=0)
-    current_balance: Optional[float] = Field(None, ge=0)
-    credit_limit: Optional[float] = Field(None, ge=0)
-    monthly_payment: Optional[float] = Field(None, gt=0)
-    annual_interest_rate: Optional[float] = Field(None, ge=0, le=100)
+    original_amount: Optional[MoneyValue] = Field(None, ge=0)
+    current_balance: Optional[MoneyValue] = Field(None, ge=0)
+    credit_limit: Optional[MoneyValue] = Field(None, ge=0)
+    monthly_payment: Optional[MoneyValue] = Field(None, gt=0)
+    annual_interest_rate: Optional[MoneyValue] = Field(None, ge=0, le=100)
     early_repayment_mode: Optional[EarlyRepaymentMode] = None
     interest_payout_frequency: Optional[InterestPayoutFrequency] = None
     capitalization: Optional[bool] = None
@@ -85,7 +86,7 @@ class CreditUpdate(BaseModel):
 
 
 class CreditPaymentCreate(BaseModel):
-    amount: float = Field(gt=0)
+    amount: MoneyValue = Field(gt=0)
     account_id: int
     paid_at: Optional[datetime] = None
     notes: Optional[str] = Field(None, max_length=500)
@@ -94,21 +95,21 @@ class CreditPaymentCreate(BaseModel):
 
 
 class MortgagePaymentPreview(BaseModel):
-    principal_amount: float
-    interest_amount: float
+    principal_amount: MoneyValue
+    interest_amount: MoneyValue
     currency: str
 
 
 class CreditPaymentResponse(BaseModel):
     id: int
     transaction_id: Optional[int]
-    amount: float
-    principal_amount: Optional[float]
-    interest_amount: Optional[float]
+    amount: MoneyValue
+    principal_amount: Optional[MoneyValue]
+    interest_amount: Optional[MoneyValue]
     currency: str
     paid_at: datetime
     account_id: Optional[int]
-    balance_after: Optional[float]
+    balance_after: Optional[MoneyValue]
     notes: Optional[str]
     is_early_payment: bool = False
     early_repayment_mode: Optional[str] = None
@@ -124,11 +125,11 @@ class CreditResponse(BaseModel):
     direction: str
     currency: str
     counterparty: Optional[str]
-    original_amount: Optional[float]
-    current_balance: Optional[float]
-    credit_limit: Optional[float]
-    monthly_payment: Optional[float]
-    annual_interest_rate: Optional[float]
+    original_amount: Optional[MoneyValue]
+    current_balance: Optional[MoneyValue]
+    credit_limit: Optional[MoneyValue]
+    monthly_payment: Optional[MoneyValue]
+    annual_interest_rate: Optional[MoneyValue]
     early_repayment_mode: str
     interest_payout_frequency: Optional[str]
     capitalization: bool
@@ -165,15 +166,15 @@ class CreditSummary(BaseModel):
 
 class MortgageScheduleItem(BaseModel):
     payment_date: date
-    payment_amount: float
-    principal_amount: float
-    interest_amount: float
-    balance_after: float
+    payment_amount: MoneyValue
+    principal_amount: MoneyValue
+    interest_amount: MoneyValue
+    balance_after: MoneyValue
 
 
 class MortgageScheduleResponse(BaseModel):
     credit_id: int
     currency: str
-    monthly_payment: float
+    monthly_payment: MoneyValue
     early_repayment_mode: str
     items: list[MortgageScheduleItem]

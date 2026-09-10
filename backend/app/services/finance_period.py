@@ -6,6 +6,7 @@ prevents subtle differences in filters or currency conversion from appearing
 as contradictory numbers in the product.
 """
 from __future__ import annotations
+from decimal import Decimal
 
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -19,9 +20,9 @@ from app.services import exchange as exchange_svc
 
 @dataclass
 class PeriodTotals:
-    income: float = 0.0
-    expense: float = 0.0
-    expense_categories: dict[int | None, float] | None = None
+    income: Decimal = 0
+    expense: Decimal = 0
+    expense_categories: dict[int | None, Decimal] | None = None
 
 
 def _date_filter(column, value, *, is_start: bool):
@@ -76,7 +77,7 @@ def financial_period_totals(
             result.expense += amount
         if result.expense_categories is not None and transaction.type == category_type:
             category_id = transaction.category_id
-            result.expense_categories[category_id] = result.expense_categories.get(category_id, 0.0) + amount
+            result.expense_categories[category_id] = result.expense_categories.get(category_id, 0) + amount
 
     result.income = round(result.income, 2)
     result.expense = round(result.expense, 2)

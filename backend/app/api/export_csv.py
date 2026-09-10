@@ -5,7 +5,7 @@ from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.operations.export_csv import queries
 
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/export", tags=["export"])
 def export_csv(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(financial_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     'Скачать CSV всех транзакций пользователя.\n\n    Формат совместим с /api/import/preview: date;account;category;amount;currency;description;transfer\n    '

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Enum
+from app.money import Money
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Enum
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -12,7 +13,7 @@ class TransactionTemplate(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(120), nullable=False)
     type = Column(Enum(TransactionType), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)

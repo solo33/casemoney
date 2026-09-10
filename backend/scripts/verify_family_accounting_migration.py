@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from alembic.config import Config
 from alembic import command
 root=Path(__file__).resolve().parents[1]
-url=make_url(dotenv_values(root/'.env')['DATABASE_URL'])
+url=make_url(os.getenv('DATABASE_URL') or dotenv_values(root/'.env')['DATABASE_URL'])
 assert url.host in ('localhost','127.0.0.1'), 'Only isolated local PostgreSQL is permitted'
 name='casemoney_refactor_'+uuid.uuid4().hex[:12]
 admin=psycopg2.connect(url.set(database='postgres').render_as_string(hide_password=False));admin.autocommit=True
@@ -46,6 +46,45 @@ try:
   assert db.query(FamilyExpenseAccounting).count()==2
   assert before==[(t.id,t.amount) for t in db.query(Transaction).order_by(Transaction.id)]
  print('PASS: PostgreSQL legacy repair, idempotence, downgrade/upgrade, unchanged amounts', flush=True)
+
+ # Verify every monetary model is covered by the migration, and that rollback
+ # refuses new values which cannot be represented by the former Float columns.
+ from decimal import Decimal
+ from sqlalchemy import inspect, text
+ from app.database import Base
+ from app.money import Money
+ for table in Base.metadata.sorted_tables:
+  actual={column['name']:column['type'] for column in inspect(engine).get_columns(table.name)}
+  for column in table.columns:
+   if isinstance(column.type, Money):
+    assert str(actual[column.name]) == 'NUMERIC', f'{table.name}.{column.name}'
+ with engine.begin() as connection:
+  connection.execute(text("UPDATE transactions SET amount = 9007199254740993.123456789"))
+ try:
+  command.downgrade(cfg,'a0193a000001')
+ except RuntimeError as exc:
+  assert 'without losing precision' in str(exc)
+ else:
+  raise AssertionError('Lossy downgrade was accepted')
+ with engine.begin() as connection:
+  assert connection.execute(text('SELECT amount FROM transactions LIMIT 1')).scalar() == Decimal('9007199254740993.123456789')
+  assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == 'a0193a000002'
+  connection.execute(text('UPDATE transactions SET amount = 123.45'))
+ command.downgrade(cfg,'a0193a000001')
+ with engine.begin() as connection:
+  connection.execute(text("UPDATE transactions SET amount = 'NaN'::double precision"))
+ try:
+  command.upgrade(cfg,'head')
+ except RuntimeError as exc:
+  assert 'Non-finite monetary values' in str(exc)
+ else:
+  raise AssertionError('Non-finite amount was accepted')
+ with engine.begin() as connection:
+  assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == 'a0193a000001'
+  connection.execute(text('UPDATE transactions SET amount = 123.45'))
+ command.upgrade(cfg,'head')
+ print('PASS: NUMERIC inventory, precision retention, lossy downgrade and NaN rollback guards', flush=True)
+
  if '--suite' in sys.argv:
   import subprocess
   env={**os.environ, 'TEST_DATABASE_URL':test_url, 'RATELIMIT_ENABLED':'0'}

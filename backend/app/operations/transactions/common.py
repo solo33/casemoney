@@ -1,4 +1,6 @@
 """Transactions: common. Callers supply resolved user and database session."""
+from app.money import decimal
+from decimal import Decimal
 import hashlib
 import json
 from app.application import ApplicationError
@@ -17,8 +19,13 @@ from app.services.plans import ensure_family_plan
 
 
 def _request_hash(data: TransactionCreate) -> str:
+    payload = data.model_dump(mode="json")
+    # Preserve existing hashes, but distinguish values that share a float.
+    for name, value in data.model_dump().items():
+        if isinstance(value, Decimal) and decimal(payload[name]) != value:
+            payload[name] = format(value, "f")
     canonical = json.dumps(
-        data.model_dump(mode="json"),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
@@ -86,12 +93,12 @@ def _sync_transfer_fee(
         Transaction.linked_transfer_id == transfer.id,
     ).all()
     fee = fees[0] if fees else None
-    active = fee_amount is not None and float(fee_amount) > 0
+    active = fee_amount is not None and decimal(fee_amount) > 0
     if active and not fee_category_id:
         raise ApplicationError(status_code=400, detail="Укажите категорию комиссии")
     if active:
         _ensure_expense_category(db, transfer.user_id, fee_category_id)
-    transfer.fee_amount = round(float(fee_amount), 2) if active else None
+    transfer.fee_amount = round(decimal(fee_amount), 2) if active else None
     transfer.fee_category_id = fee_category_id if active else None
     if fee:
         apply_transaction_effect(db, fee, reverse=True)
@@ -99,7 +106,7 @@ def _sync_transfer_fee(
             write_transaction_history(db, transfer.user_id, fee, "deleted")
             db.delete(fee)
             return
-        fee.amount = round(float(fee_amount), 2)
+        fee.amount = round(decimal(fee_amount), 2)
         fee.currency = transfer.currency
         fee.category_id = fee_category_id
         fee.description = f"Комиссия перевода: {transfer.description or 'без описания'}"
@@ -114,7 +121,7 @@ def _sync_transfer_fee(
         return
     if active:
         fee = Transaction(
-            amount=round(float(fee_amount), 2), currency=transfer.currency,
+            amount=round(decimal(fee_amount), 2), currency=transfer.currency,
             type=TransactionType.expense,
             description=f"Комиссия перевода: {transfer.description or 'без описания'}",
             date=transfer.date, account_id=transfer.account_id,
@@ -147,7 +154,7 @@ def _resolve_transfer_dest(db: Session, user_id: int, src_currency: str, src_amo
                 to_amount = exchange_svc.convert_for_user(db, user_id, src_amount, src_currency, cur)
             except exchange_svc.ExchangeError:
                 raise ApplicationError(422, "Курс недоступен. Укажите фактическую сумму зачисления в валюте получателя")
-    return to_account_id, cur, round(float(to_amount), 2)
+    return to_account_id, cur, round(decimal(to_amount), 2)
 
 
 def _transfer_pair_confidence(expense: Transaction, income: Transaction) -> tuple[float, Optional[float]] | None:
@@ -159,24 +166,24 @@ def _transfer_pair_confidence(expense: Transaction, income: Transaction) -> tupl
         return None
     fee_amount = None
     if expense.currency == income.currency:
-        larger = max(float(expense.amount), float(income.amount), 1.0)
-        difference = abs(float(expense.amount) - float(income.amount))
-        if difference > max(5.0, larger * 0.03):
+        larger = max(decimal(expense.amount), decimal(income.amount), 1)
+        difference = abs(decimal(expense.amount) - decimal(income.amount))
+        if difference > max(5, larger * decimal('0.03')):
             return None
         if expense.amount > income.amount:
-            fee_amount = round(float(expense.amount) - float(income.amount), 2)
-        amount_score = 1 - min(difference / larger, 0.12)
+            fee_amount = round(decimal(expense.amount) - decimal(income.amount), 2)
+        amount_score = 1 - min(difference / larger, decimal('0.12'))
     else:
         if not expense.exchange_rate or not income.exchange_rate:
             return None
-        expense_value = float(expense.amount) * float(expense.exchange_rate)
-        income_value = float(income.amount) * float(income.exchange_rate)
-        larger = max(expense_value, income_value, 1.0)
+        expense_value = decimal(expense.amount) * decimal(expense.exchange_rate)
+        income_value = decimal(income.amount) * decimal(income.exchange_rate)
+        larger = max(expense_value, income_value, 1)
         difference = abs(expense_value - income_value)
-        if difference > larger * 0.05:
+        if difference > larger * decimal('0.05'):
             return None
         amount_score = 1 - difference / larger
-    return round(0.65 * amount_score + 0.35 * (1 - days / 4), 2), fee_amount
+    return round(decimal('0.65') * amount_score + decimal('0.35') * (1 - decimal(days) / 4), 2), fee_amount
 
 
 def _expand_categories(db: Session, user_id: int, category_id: int) -> list[int]:
@@ -222,4 +229,4 @@ def _family_fields(
             status_code=400,
             detail="Сумма к возмещению должна быть от 0 до суммы расхода",
         )
-    return membership.family_id, True, float(reimbursable)
+    return membership.family_id, True, decimal(reimbursable)

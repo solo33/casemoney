@@ -6,6 +6,7 @@ planned transaction.  Keeping the projection here gives every surface the
 same, de-duplicated view.
 """
 from __future__ import annotations
+from app.money import decimal
 
 from datetime import date, datetime, time, timezone
 
@@ -22,8 +23,8 @@ def _deposit_income(item: CreditObligation) -> float | None:
         return item.monthly_payment
     if item.annual_interest_rate is None:
         return item.monthly_payment
-    principal = float(item.current_balance or item.original_amount or 0)
-    rate = float(item.annual_interest_rate) / 100
+    principal = decimal(item.current_balance or item.original_amount or 0)
+    rate = decimal(item.annual_interest_rate) / 100
     if item.interest_payout_frequency == "maturity":
         start = item.opened_at or date.today()
         finish = item.end_date or item.next_payment_date or start
@@ -57,7 +58,7 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
         events.append({
             "id": f"planned-{item.id}", "source": "planned", "date": item.date.date(),
             "type": event_type, "title": item.description or ("Плановый доход" if event_type == "income" else "Плановый расход"),
-            "amount": float(item.amount), "currency": item.currency, "recurring": False,
+            "amount": decimal(item.amount), "currency": item.currency, "recurring": False,
             "account_id": item.account_id, "category_id": item.category_id,
         })
 
@@ -81,7 +82,7 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
         event_type = _as_type(item.type)
         events.append({
             "id": f"recurring-{item.id}-{item.next_date.isoformat()}", "source": "recurring", "date": item.next_date,
-            "type": event_type, "title": item.name, "amount": float(item.amount), "currency": item.currency,
+            "type": event_type, "title": item.name, "amount": decimal(item.amount), "currency": item.currency,
             "recurring": True, "frequency": item.frequency, "description": item.description or "",
             "account_id": item.account_id, "category_id": item.category_id,
         })
@@ -103,7 +104,7 @@ def list_upcoming_events(db: Session, user_id: int, start: date, end: date) -> l
         amount = _deposit_income(item) if item.kind == "deposit" else item.monthly_payment
         events.append({
             "id": f"obligation-{item.id}-{item.next_payment_date.isoformat()}", "source": "obligation", "date": item.next_payment_date,
-            "type": "income" if is_income else "expense", "title": item.name, "amount": float(amount or 0),
+            "type": "income" if is_income else "expense", "title": item.name, "amount": decimal(amount or 0),
             "currency": item.currency, "recurring": False, "kind": item.kind,
             "account_id": item.linked_account_id if is_income else item.source_account_id,
             "category_id": item.category_id,

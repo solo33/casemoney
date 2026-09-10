@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -7,8 +8,8 @@ class PreviewRow(BaseModel):
     date: Optional[str]
     account: str
     category_path: Optional[str]
-    amount: float
-    abs_amount: float
+    amount: MoneyValue
+    abs_amount: MoneyValue
     currency: str
     description: Optional[str]
     transfer_to: Optional[str]
@@ -21,8 +22,8 @@ class ImportTotals(BaseModel):
     ok: int
     errors: int
     transfers: int
-    income_sum: float
-    expense_sum: float
+    income_sum: MoneyValue
+    expense_sum: MoneyValue
 
 
 class PreviewResponse(BaseModel):

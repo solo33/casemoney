@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from datetime import date, datetime
 from typing import Optional
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel, Field
 class RecurringTransactionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     type: str = Field(pattern="^(income|expense)$")
-    amount: float = Field(gt=0)
+    amount: MoneyValue = Field(gt=0)
     currency: str = Field(min_length=2, max_length=10)
     account_id: Optional[int] = None
     category_id: Optional[int] = None
@@ -22,7 +23,7 @@ class RecurringTransactionCreate(BaseModel):
 
 class RecurringTransactionUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=120)
-    amount: Optional[float] = Field(None, gt=0)
+    amount: Optional[MoneyValue] = Field(None, gt=0)
     currency: Optional[str] = Field(None, min_length=2, max_length=10)
     account_id: Optional[int] = None
     category_id: Optional[int] = None

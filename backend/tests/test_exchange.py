@@ -1,12 +1,35 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from decimal import Decimal
 
 from app.models.exchange_rate import ExchangeRate
 from app.models.transaction import Transaction, TransactionType
 from app.models.user import User
 from app.services import exchange
 from tests.conftest import TestingSessionLocal
+
+
+def test_missing_transfer_side_preserves_original_valuation(monkeypatch):
+    with TestingSessionLocal() as db:
+        user = User(email="partial@test.com", username="partial", hashed_password="x", main_currency="EUR")
+        db.add(user)
+        db.flush()
+        transaction = Transaction(
+            user_id=user.id, account_id=1, type=TransactionType.transfer,
+            amount=10, currency="USD", to_amount=900, to_currency="RUB",
+            valuation_currency="RUB", exchange_rate=90,
+        )
+        calls = []
+        def capture(_db, _user_id, source, target):
+            calls.append((source, target))
+            return Decimal(1), "test"
+        monkeypatch.setattr(exchange, "get_rate_for_user", capture)
+        assert exchange.snapshot_transaction_rates(db, user.id, transaction)
+        assert calls == [("RUB", "RUB")]
+        assert transaction.valuation_currency == "RUB"
+        assert transaction.exchange_rate == Decimal(90)
+        assert transaction.to_exchange_rate == Decimal(1)
 
 
 def test_rate_is_reused_for_24_hours(monkeypatch):
@@ -65,7 +88,7 @@ def test_fiat_provider_response_is_cached_for_all_currencies(monkeypatch):
 
         assert exchange.get_rate_to_rub(db, "USD") == 90.0
         assert exchange.get_rate_to_rub(db, "EUR") == 100.0
-        assert exchange.get_rate_to_rub(db, "UAH") == 2.2
+        assert exchange.get_rate_to_rub(db, "UAH") == Decimal("2.2")
         assert calls["count"] == 1
     finally:
         db.close()
@@ -128,7 +151,7 @@ def test_transaction_uses_saved_exchange_snapshot_after_rate_changes(monkeypatch
         db.close()
 
 
-def test_old_transaction_snapshot_is_filled_once_lazily(monkeypatch):
+def test_old_transaction_snapshot_is_captured_once(monkeypatch):
     db = TestingSessionLocal()
     try:
         user = User(email="lazy-snapshot@test.com", username="lazy", hashed_password="x")
@@ -145,8 +168,10 @@ def test_old_transaction_snapshot_is_filled_once_lazily(monkeypatch):
         monkeypatch.setattr(exchange, "get_rate_for_user", lambda *_args: (101.5, "test"))
         assert exchange.convert_transaction_for_user(db, user.id, transaction, "RUB") == 507.5
         assert transaction.exchange_rate == 101.5
+        assert transaction.valuation_currency == "RUB"
 
         monkeypatch.setattr(exchange, "get_rate_for_user", lambda *_args: (120.0, "test"))
         assert exchange.convert_transaction_for_user(db, user.id, transaction, "RUB") == 507.5
+        assert transaction.exchange_rate == 101.5
     finally:
         db.close()

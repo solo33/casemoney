@@ -12,6 +12,7 @@
 
 Если SMTP_HOST не задан — письма выводятся в консоль (dev mode).
 """
+from app.money import format_amount
 import os
 import smtplib
 import logging
@@ -345,7 +346,7 @@ def send_credit_payment_reminder(
 ) -> bool:
     """Send a reminder for an upcoming expense or deposit income."""
     due = due_date.strftime("%d.%m.%Y")
-    amount_text = f"{amount:g} {currency}" if amount else "сумма не указана"
+    amount_text = f"{format_amount(amount)} {currency}" if amount else "сумма не указана"
     if is_income:
         status_text = "Поступление не отмечено" if overdue else "Приближается дата поступления"
         event_label = "Ожидаемый доход"

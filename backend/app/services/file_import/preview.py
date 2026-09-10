@@ -30,7 +30,7 @@ def build_preview(db: Session, user_id: int, rows: list[ParsedRow]) -> ImportPre
     new_categories: dict[tuple, str] = {}   # (parent_name, name) → type
     seen_categories: set[str] = set()
     currencies: set[str] = set()
-    total_income = total_expense = 0.0
+    total_income = total_expense = 0
     transfer_count = ok_count = err_count = 0
 
     for r in rows:

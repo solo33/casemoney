@@ -14,7 +14,7 @@ def _serialize(uc: UserCurrency, db: Session, user_id: int, main_currency: str) 
             db, user_id, uc.currency, main_currency,
         )
     except exchange_svc.ExchangeError:
-        rate, source = (uc.manual_rate or 0.0, "manual" if uc.manual_rate else "auto")
+        rate, source = (uc.manual_rate or 0, "manual" if uc.manual_rate else "auto")
     return UserCurrencyResponse(
         id=uc.id,
         currency=uc.currency,

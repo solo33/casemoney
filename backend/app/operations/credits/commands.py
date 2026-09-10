@@ -1,4 +1,5 @@
 """Credits: commands. Callers supply resolved user and database session."""
+from app.money import decimal
 from datetime import date, datetime, time, timezone
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
@@ -51,7 +52,7 @@ def create_credit(data: CreditCreate, db: Session=None, user_id: int=None):
     db.add(credit)
     db.flush()
     if data.funds_received:
-        amount = float(data.original_amount or data.current_balance or 0)
+        amount = decimal(data.original_amount or data.current_balance or 0)
         transaction = Transaction(
             amount=amount,
             currency=credit.currency,
@@ -208,17 +209,17 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
     if data.is_early_payment:
         if credit.kind not in {"mortgage", "loan", "private_debt"} or credit.direction != "owe":
             raise ApplicationError(status_code=400, detail="Досрочное погашение доступно только для вашего кредита или займа")
-        principal_amount = min(float(data.amount), max(0.0, float(credit.current_balance or 0)))
-        interest_amount = 0.0
+        principal_amount = min(decimal(data.amount), max(0, decimal(credit.current_balance or 0)))
+        interest_amount = 0
         mode = data.early_repayment_mode or credit.early_repayment_mode
         if credit.kind == "mortgage":
-            old_balance = max(0.0, float(credit.current_balance or 0))
-            old_payment = float(credit.monthly_payment or 0)
+            old_balance = max(0, decimal(credit.current_balance or 0))
+            old_payment = decimal(credit.monthly_payment or 0)
             rate = _monthly_rate(credit)
             if mode == "reduce_payment" and old_payment > 0:
                 months = _estimate_remaining_months(old_balance, old_payment, rate)
                 if months is not None:
-                    new_payment = _annuity_payment(max(0.0, old_balance - principal_amount), months, rate)
+                    new_payment = _annuity_payment(max(0, old_balance - principal_amount), months, rate)
                     if new_payment is not None:
                         credit.monthly_payment = new_payment
             credit.early_repayment_mode = mode
@@ -232,7 +233,7 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
         credit.current_balance = round(credit.current_balance + data.amount, 2)
     elif credit.kind != "deposit" and credit.current_balance is not None:
         balance_reduction = principal_amount if principal_amount is not None else data.amount
-        credit.current_balance = max(0.0, round(credit.current_balance - balance_reduction, 2))
+        credit.current_balance = max(0, round(credit.current_balance - balance_reduction, 2))
     payment = CreditPayment(
         credit_id=credit.id,
         user_id=user_id,
@@ -261,7 +262,7 @@ def register_payment(credit_id: int, data: CreditPaymentCreate, db: Session=None
     if credit.kind == "deposit":
         credit.monthly_payment = _calculate_deposit_income(credit)
         _sync_planned_interest(db, credit)
-    if credit.kind not in {"credit_card", "deposit"} and credit.current_balance is not None and credit.current_balance <= 0.005:
+    if credit.kind not in {"credit_card", "deposit"} and credit.current_balance is not None and credit.current_balance <= decimal('0.005'):
         credit.status = "closed"
     db.commit()
     db.refresh(payment)

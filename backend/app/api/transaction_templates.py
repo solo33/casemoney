@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.api.dependencies import require_family_user_id
-from app.database import get_db
+from app.api.financial_dependencies import financial_db
 from app.schemas.transaction_template import TransactionTemplateCreate, TransactionTemplateResponse
 from app.operations.transaction_templates import queries, commands
 
@@ -12,15 +12,15 @@ from app.operations.transaction_templates import queries, commands
 router = APIRouter(prefix="/api/transaction-templates", tags=["transaction templates"])
 
 @router.get("/", response_model=List[TransactionTemplateResponse])
-def list_templates(db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
+def list_templates(db: Session = Depends(financial_db, scope="function"), user_id: int = Depends(require_family_user_id)):
     return operation_response(queries.list_templates(db=db, user_id=user_id))
 
 
 @router.post("/", response_model=TransactionTemplateResponse, status_code=201)
-def create_template(data: TransactionTemplateCreate, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
+def create_template(data: TransactionTemplateCreate, db: Session = Depends(financial_db, scope="function"), user_id: int = Depends(require_family_user_id)):
     return operation_response(commands.create_template(data=data, db=db, user_id=user_id))
 
 
 @router.delete("/{template_id}", status_code=204)
-def delete_template(template_id: int, db: Session = Depends(get_db), user_id: int = Depends(require_family_user_id)):
+def delete_template(template_id: int, db: Session = Depends(financial_db, scope="function"), user_id: int = Depends(require_family_user_id)):
     return operation_response(commands.delete_template(template_id=template_id, db=db, user_id=user_id))

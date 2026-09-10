@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, ForeignKey, DateTime, Enum, UniqueConstraint
+from app.money import Money
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -22,7 +23,7 @@ class Transaction(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    amount = Column(Float, nullable=False)
+    amount = Column(Money, nullable=False)
     currency = Column(String(10), nullable=False)  # валюта транзакции — определяет, какой balance счёта меняется
     type = Column(Enum(TransactionType), nullable=False)
     description = Column(String, nullable=True)
@@ -43,7 +44,7 @@ class Transaction(Base):
     # Для переводов: счёт-получатель и сумма зачисления (в его валюте).
     # У income/expense эти поля NULL.
     to_account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
-    to_amount = Column(Float, nullable=True)
+    to_amount = Column(Money, nullable=True)
     to_currency = Column(String(10), nullable=True)
 
     # Снимок курса на момент записи. Храним коэффициент перевода одной
@@ -52,14 +53,14 @@ class Transaction(Base):
     # следующем обновлении внешнего курса. Для перевода есть второй снимок —
     # у стороны зачисления может быть другая валюта.
     valuation_currency = Column(String(10), nullable=True)
-    exchange_rate = Column(Float, nullable=True)
+    exchange_rate = Column(Money, nullable=True)
     exchange_rate_source = Column(String(24), nullable=True)
-    to_exchange_rate = Column(Float, nullable=True)
+    to_exchange_rate = Column(Money, nullable=True)
     to_exchange_rate_source = Column(String(24), nullable=True)
 
     # Commission input stays with the transfer; the ledger also contains a
     # linked expense row so that reports include it by category.
-    fee_amount = Column(Float, nullable=True)
+    fee_amount = Column(Money, nullable=True)
     fee_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
     # Комиссия перевода хранится отдельной расходной записью, связанной с переводом.
@@ -70,7 +71,7 @@ class Transaction(Base):
     # равно принадлежит владельцу счёта и не открывает семье его прочие данные.
     family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
     is_family_expense = Column(Boolean, nullable=False, default=False)
-    reimbursement_amount = Column(Float, nullable=False, default=0)
+    reimbursement_amount = Column(Money, nullable=False, default=0)
     # Changes a balance but must not be counted as earned income in reports.
     is_financing = Column(Boolean, nullable=False, default=False)
     # A future/planned operation is visible in planning reports but does not affect an account balance yet.

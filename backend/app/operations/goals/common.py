@@ -26,7 +26,7 @@ def _available_balance_in_main_currency(db: Session, user_id: int, main_currency
         Account.user_id == user_id,
         Account.include_in_balance.is_(True),
     ).all()
-    total = 0.0
+    total = 0
     for account in accounts:
         for balance in account.balances:
             try:
@@ -37,7 +37,7 @@ def _available_balance_in_main_currency(db: Session, user_id: int, main_currency
                 # Неполученный курс не должен ломать список целей. Эта валюта
                 # просто не участвует в оценке до следующего обновления курса.
                 continue
-    return round(max(0.0, total), 2)
+    return round(max(0, total), 2)
 
 
 def _serialize(
@@ -58,7 +58,7 @@ def _serialize(
         if acc:
             account_name = acc.name
             # Сумма всех балансов счёта в валюте цели
-            total = 0.0
+            total = 0
             for b in acc.balances:
                 try:
                     total += exchange_svc.convert_for_user(
@@ -72,7 +72,7 @@ def _serialize(
     contributions = [{"id": item.id, "user_id": item.user_id, "name": user.username or user.email, "amount": item.amount, "date": item.created_at.isoformat()} for item, user in rows]
     contribution_total = round(sum(item[0].amount for item in rows), 2)
     current += contribution_total
-    pct = 0.0
+    pct = 0
     if goal.target_amount > 0:
         pct = round(max(0, min(100, current / goal.target_amount * 100)), 1)
 

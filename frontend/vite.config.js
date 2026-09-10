@@ -54,7 +54,11 @@ export default defineConfig({
           { src: '/icon.svg',           sizes: 'any',     type: 'image/svg+xml', purpose: 'any' },
         ],
       },
-      injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'] },
+      injectManifest: {
+        // Emit one classic worker without the plugin's deprecated ES option.
+        rollupFormat: 'iife',
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+      },
       devOptions: {
         enabled: false, // включить только если нужно тестировать SW в dev
       },

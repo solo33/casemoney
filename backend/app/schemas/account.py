@@ -1,3 +1,4 @@
+from app.money import MoneyValue
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
@@ -6,8 +7,8 @@ from typing import Optional, List
 
 class AccountBalanceResponse(BaseModel):
     currency: str
-    balance: float
-    balance_in_main: Optional[float]  # None, если курс недоступен
+    balance: MoneyValue
+    balance_in_main: Optional[MoneyValue]  # None, если курс недоступен
 
     class Config:
         from_attributes = True
@@ -15,24 +16,24 @@ class AccountBalanceResponse(BaseModel):
 
 class AccountBalanceCreate(BaseModel):
     currency: str = Field(..., min_length=2, max_length=10)
-    balance: float = 0.0
+    balance: MoneyValue = 0.0
 
 
 class AccountBalanceUpdate(BaseModel):
-    balance: float
+    balance: MoneyValue
 
 
 class AccountBalanceAdjustmentCreate(BaseModel):
-    balance: float
+    balance: MoneyValue
     category_id: Optional[int] = None
 
 
 class AccountBalanceAdjustmentResponse(BaseModel):
     transaction_id: int
     currency: str
-    old_balance: float
-    new_balance: float
-    difference: float
+    old_balance: MoneyValue
+    new_balance: MoneyValue
+    difference: MoneyValue
     type: str
 
 
@@ -52,7 +53,7 @@ class AccountBase(BaseModel):
 class AccountCreate(AccountBase):
     # Начальная валюта и баланс — создаются первая запись AccountBalance
     initial_currency: str = Field("RUB", min_length=2, max_length=10)
-    initial_balance: float = 0.0
+    initial_balance: MoneyValue = 0.0
 
 
 class AccountUpdate(BaseModel):
@@ -70,7 +71,7 @@ class AccountResponse(AccountBase):
     id: int
     user_id: int
     balances: List[AccountBalanceResponse] = []
-    total_in_main: Optional[float] = None
+    total_in_main: Optional[MoneyValue] = None
     family_id: Optional[int] = None
     is_shared: bool = False
     access_level: Optional[str] = None
@@ -90,4 +91,4 @@ class GroupSummary(BaseModel):
 class AccountGroupBucket(BaseModel):
     group: GroupSummary
     accounts: List[AccountResponse]
-    total_in_main: Optional[float]
+    total_in_main: Optional[MoneyValue]
