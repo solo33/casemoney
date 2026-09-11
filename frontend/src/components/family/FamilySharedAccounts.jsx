@@ -3,7 +3,7 @@ import api from "../../api/client";
 export default function FamilySharedAccounts({ ownAccounts, shareDraft, submit, setMessage, selectAccountForSharing, activeMembers, state, setShareDraft, selectedSharedAccount }) {
   return (
     <section className="family-card family-shared-accounts">
-              <h2>Общие счета</h2>
+              <h2>Доступ к моим счетам</h2>
               <p>Личные счета остаются видны только владельцу. Откройте доступ лишь к тем счетам, которыми действительно пользуется семья.</p>
               {ownAccounts.length ? (
                 <form onSubmit={event => {

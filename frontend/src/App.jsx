@@ -296,8 +296,10 @@ export default function App() {
           }
         />
 
+        <Route path="/settings/family" element={<Navigate to="/family" replace />} />
+
         <Route
-          path="/settings/family"
+          path="/family/*"
           element={
             <ProtectedRoute>
               <FamilyPlanRoute><Family /></FamilyPlanRoute>

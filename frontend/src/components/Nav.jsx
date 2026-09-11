@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import MobileMoreMenu from "./MobileMoreMenu";
+import { useCallback, useEffect, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../contexts/UserContext";
 import { currencySymbol } from "../utils/money";
 import PwaInstallLink from "./PwaInstallLink";
@@ -31,24 +32,13 @@ const RECORD_LINKS = [
   { to: "/transactions", label: "Все записи" },
   { to: "/import", label: "Импорт" },
   { to: "/history", label: "История" },
+  { to: "/bank-drafts", label: "Черновики из банка" },
 ];
 
 const HELP_LINKS = [
   { to: "/help", label: "Помощь" },
   { to: "/articles", label: "Статьи" },
-];
-
-const MOBILE_MORE_LINKS = [
-  { to: "/bank-drafts", label: "Черновики из банка" },
-  { to: "/shopping", label: "Списки покупок" },
-  FAMILY_BUDGET_LINK,
-  FAMILY_DEPOSITS_LINK,
-  FAMILY_CREDITS_LINK,
-  { to: "/settings/family", label: "Семейные финансы" },
-  { to: "/goals", label: "Цели" },
-  { to: "/import", label: "Импорт" },
-  { to: "/history", label: "История изменений" },
-  { to: "/settings/personal", label: "Настройки" },
+  { to: "/about", label: "О программе" },
 ];
 
 // Раздел «Настройки» — выпадающее меню
@@ -57,16 +47,15 @@ const SETTINGS_LINKS = [
   { to: "/settings/categories", label: "Категории" },
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/automation", label: "Автоматизация" },
-  { to: "/bank-drafts", label: "Черновики из банка" },
-  { to: "/settings/family", label: "Семейные финансы" },
-  { to: "/shopping", label: "Списки покупок" },
-  { to: "/about", label: "О программе" },
+  { to: "/settings/billing", label: "Тариф и оплата" },
 ];
 
 export default function Nav() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [mobileMenu, setMobileMenu] = useState("more");
+  const closeMobileMenu = useCallback(() => setOpen(false), []);
+  const { pathname } = useLocation();
+  const moreActive = !MOBILE_PRIMARY_LINKS.some(link => pathname === link.to || pathname.startsWith(`${link.to}/`));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(() => localStorage.getItem("casemoney:last-successful-sync"));
   const { user, mainCurrency } = useUser();
@@ -75,14 +64,6 @@ export default function Nav() {
   // запуска. Переключение на Family не требует оплаты, пока она выключена.
   const hasFamilyPlan = Boolean(user?.family_access) && user?.preferred_mode === "family";
   const links = BASE_LINKS.filter(link => link.to !== "/goals" || hasFamilyPlan);
-  const visibleSettingsLinks = SETTINGS_LINKS.filter(
-    link => link.to !== "/settings/family" || hasFamilyPlan
-  );
-  const mobileMoreLinks = [...MOBILE_MORE_LINKS, FAMILY_PLAN_LINK].filter(link => (
-    (!link.familyOnly || hasFamilyPlan)
-    && (link.to !== "/goals" || hasFamilyPlan)
-    && (link.to !== "/settings/family" || hasFamilyPlan)
-  ));
 
   useEffect(() => {
     const onSync = event => setLastSyncedAt(event.detail || localStorage.getItem("casemoney:last-successful-sync"));
@@ -90,8 +71,8 @@ export default function Nav() {
     return () => window.removeEventListener("casemoney:last-successful-sync", onSync);
   }, []);
   const settingsLinks = user?.is_admin
-    ? [...visibleSettingsLinks, { to: "/admin", label: "Админка" }]
-    : visibleSettingsLinks;
+    ? [...SETTINGS_LINKS, { to: "/admin", label: "Админка" }]
+    : SETTINGS_LINKS;
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -112,10 +93,6 @@ export default function Nav() {
     transition: "color 180ms, background 180ms",
   });
 
-  const mobileLinkStyle = ({ isActive }) => ({
-    ...linkStyle({ isActive }),
-    fontSize: 15,
-  });
 
   return (
     <nav className="app-nav" style={{
@@ -156,20 +133,6 @@ export default function Nav() {
           {accountLabel}
         </NavLink>
 
-        <button
-          type="button"
-          className="nav-mobile-burger"
-          onClick={() => {
-            setMobileMenu("burger");
-            setOpen(true);
-          }}
-          aria-label="Открыть дополнительное меню"
-          aria-expanded={open}
-          aria-controls="mobile-more-menu"
-        >
-          <span aria-hidden="true">☰</span>
-        </button>
-
         <div style={{ display: "flex", gap: 2, flex: 1, alignItems: "center" }} className="nav-links-desktop">
           {links.map(l => (
             l.to === "/transactions" ? (
@@ -190,6 +153,7 @@ export default function Nav() {
             <DropdownNav label="Планирование" links={SCHEDULE_LINKS} linkStyle={linkStyle} />
           )}
 
+          {hasFamilyPlan ? <DropdownNav label="Семья" links={[{ to: "/family", label: "Обзор семьи" }, { to: "/family/purchases", label: "Общие покупки" }, { to: "/family/settlements", label: "Взаиморасчёты" }, { to: "/family/statistics", label: "Статистика" }, { to: "/family/settings", label: "Настройки семьи" }, { to: "/shopping", label: "Списки покупок" }]} linkStyle={linkStyle} /> : <NavLink to="/shopping" style={linkStyle}>Покупки</NavLink>}
           {/* Настройки — выпадающее меню */}
           <div style={{ position: "relative" }}>
             <button
@@ -306,59 +270,7 @@ export default function Nav() {
 
       </div>
 
-      {open && (
-        <>
-          <button
-            type="button"
-            className="nav-mobile-backdrop"
-            aria-label="Закрыть меню"
-            onClick={() => setOpen(false)}
-          />
-          <div id="mobile-more-menu" className="nav-mobile-menu" role="dialog" aria-modal="true" aria-label="Дополнительное меню">
-          <div className="nav-mobile-sheet-head">
-            <strong>{mobileMenu === "burger" ? "Меню" : "Ещё"}</strong>
-            <button type="button" onClick={() => setOpen(false)} className="btn-ghost" aria-label="Закрыть меню">×</button>
-          </div>
-          {mobileMenu === "burger" ? (
-            <>
-              <PwaInstallLink className="nav-mobile-install" />
-              <NavLink to="/articles" style={mobileLinkStyle} onClick={() => setOpen(false)}>Статьи</NavLink>
-              <NavLink to="/help" style={mobileLinkStyle} onClick={() => setOpen(false)}>Помощь</NavLink>
-              <NavLink to="/about" style={mobileLinkStyle} onClick={() => setOpen(false)}>О программе</NavLink>
-              {user?.is_admin && (
-                <NavLink to="/admin" style={mobileLinkStyle} onClick={() => setOpen(false)}>Админка</NavLink>
-              )}
-              <button
-                onClick={handleLogout}
-                style={{
-                  marginTop: 8, textAlign: "left", minHeight: 44,
-                  background: "transparent", border: "1px solid #e4ddcd",
-                  color: "#c0432b",
-                }}
-              >
-                Выйти
-              </button>
-            </>
-          ) : (
-            <>
-              {mobileMoreLinks.map(l => (
-                <NavLink
-                  key={l.to}
-                  to={l.to}
-                  style={mobileLinkStyle}
-                  onClick={() => setOpen(false)}
-                >
-                  {l.label}
-                </NavLink>
-              ))}
-              <NavLink to="/settings/currencies" style={mobileLinkStyle} onClick={() => setOpen(false)}>
-                Основная валюта <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)" }}>{currencySymbol(mainCurrency)} {mainCurrency}</span>
-              </NavLink>
-            </>
-          )}
-          </div>
-        </>
-      )}
+      {open && <MobileMoreMenu hasFamilyPlan={hasFamilyPlan} isAdmin={user?.is_admin} onClose={closeMobileMenu} onLogout={handleLogout} />}
 
       <div className="mobile-bottom-nav" aria-label="Основная навигация">
         {MOBILE_PRIMARY_LINKS.map(link => (
@@ -367,10 +279,7 @@ export default function Nav() {
             <small>{link.label}</small>
           </NavLink>
         ))}
-        <button type="button" onClick={() => {
-          setMobileMenu("more");
-          setOpen(true);
-        }} aria-label="Открыть дополнительные разделы">
+        <button type="button" onClick={() => setOpen(true)} aria-label="Открыть дополнительные разделы" aria-expanded={open} aria-controls="mobile-more-menu" className={moreActive || open ? "is-active" : undefined}>
           <span aria-hidden="true">•••</span>
           <small>Ещё</small>
         </button>
@@ -379,7 +288,6 @@ export default function Nav() {
       <style>{`
         .nav-links-desktop { display: flex !important; }
         .nav-settings-desktop { display: block !important; }
-        .nav-mobile-burger { display: none; }
         .nav-user-mobile { display: none; }
         .mobile-bottom-nav { display: none; }
         @media (max-width: 767px) {
@@ -392,13 +300,6 @@ export default function Nav() {
             color: rgba(244,241,232,.82); font-size: 12px; font-weight: 600;
             text-decoration: none; text-overflow: ellipsis; white-space: nowrap;
           }
-          .nav-mobile-burger {
-            display: flex; margin-left: 0; width: 48px; height: 48px; padding: 0;
-            align-items: center; justify-content: center; flex: 0 0 48px;
-            border: 0; border-radius: 8px; background: transparent; color: #fff;
-          }
-          .nav-mobile-burger:hover, .nav-mobile-burger:focus { background: rgba(255,255,255,.1); }
-          .nav-mobile-burger span { font-size: 25px; line-height: 1; }
           .nav-mobile-backdrop { position: fixed; inset: 0; z-index: 119; border: 0; border-radius: 0; background: rgba(10,29,44,.48); }
           .nav-mobile-menu {
             position: fixed; z-index: 120; left: 0; right: 0; bottom: 0;
@@ -413,6 +314,12 @@ export default function Nav() {
           .nav-mobile-sheet-head { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 4px 4px 11px; }
           .nav-mobile-sheet-head strong { font-size: 18px; }
           .nav-mobile-sheet-head button { width: 44px; height: 44px; padding: 0; font-size: 20px; }
+          .nav-mobile-group { margin: 8px 0; }
+          .nav-mobile-group h2 { margin: 12px 11px 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #596572; }
+          .nav-mobile-group a { padding: 10px 11px; text-decoration: none; font-size: 15px; gap: 12px; justify-content: space-between; border-bottom: 1px solid #eee8dc; overflow-wrap: anywhere; }
+          .nav-mobile-group summary { min-height: 44px; padding: 11px; color: #173a54; cursor: pointer; font-weight: 600; }
+          details.nav-mobile-group { border-top: 1px solid #e4ddcd; }
+          .nav-mobile-logout { text-align: left; min-height: 44px; margin: 6px 0; background: transparent; color: #a83220; border: 1px solid #e4ddcd; }
           .nav-mobile-install {
             min-height: 48px; padding: 10px 12px; margin-bottom: 4px;
             border: 1px solid #d9c79f !important; border-radius: 9px !important;
@@ -432,7 +339,7 @@ export default function Nav() {
             display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
             background: transparent; color: #7a8590; text-decoration: none;
           }
-          .mobile-bottom-nav a[aria-current="page"] { color: #173a54; }
+          .mobile-bottom-nav button.is-active, .mobile-bottom-nav a[aria-current="page"] { color: #173a54; }
           .mobile-bottom-nav span { font-size: 21px; line-height: 1; }
           .mobile-bottom-nav small { font-size: 10.5px; font-weight: 600; }
         }

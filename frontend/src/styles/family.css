@@ -1,5 +1,25 @@
 
         .family-page { max-width: 1120px; }
+        .family-page-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+        .family-page-heading h1 { margin-bottom: 4px; }
+        .family-page-heading p { margin: 0; color: #596572; overflow-wrap: anywhere; }
+        .family-settings-link { display: inline-flex; align-items: center; min-height: 44px; padding: 9px 13px; border: 1px solid #e4ddcd; border-radius: 8px; background: #fffdf7; color: #173a54; text-decoration: none; }
+        .family-settings-link[aria-current="page"] { background: #173a54; color: #fffdf7; }
+        .family-section-nav { display: flex; gap: 5px; border-bottom: 1px solid #e4ddcd; margin-bottom: 18px; }
+        .family-section-nav a { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; color: #596572; text-decoration: none; border-bottom: 3px solid transparent; }
+        .family-section-nav a[aria-current="page"] { background: #e8eef1; color: #173a54; border-bottom-color: #173a54; }
+        .family-period { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+        .family-period label { display: flex; align-items: center; gap: 10px; color: #596572; }
+        .family-period input { width: auto; max-width: 100%; min-width: 0; }
+        .family-period > span { color: #596572; font-size: 13px; }
+        .family-attention a, .family-inline-link { display: block; padding: 12px 0; color: #173a54; min-height: 44px; }
+        .family-stat a { color: #173a54; padding: 8px 0; }
+        .family-planning-suggestions { scroll-margin-top: 76px; margin-top: 20px; }
+        @media (max-width: 600px) {
+          .family-section-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          .family-section-nav a { padding: 10px 2px; font-size: 12px; }
+          .family-page-heading > div { min-width: 0; }
+        }
         .family-intro, .family-card, .family-heading, .family-stat {
           background: #fffdf7; border: 1px solid #e4ddcd; border-radius: 12px;
         }

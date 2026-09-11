@@ -3,15 +3,15 @@ const months = Array.from({ length: 12 }, (_, i) => 10000 + i * 1000);
 const cat = { id: 1, category_id: 1, name: longName, category_name: longName, type: 'expense', parent_id: null, children: [], total: 186000, own_total: 186000, monthly: months, percent: 100, color: '#173a54', sort_order: 0 };
 const account = { id: 1, user_id: 1, name: longName, type: 'card', group_id: 1, include_in_balance: true, show_for_entries: true, balances: [{ id: 1, currency: 'RUB', balance: 1234567.89 }], total_in_main: 1234567.89 };
 const tx = { id: 1, amount: 123456.78, currency: 'RUB', type: 'expense', account_id: 1, category_id: 1, description: longName, date: '2026-09-01T12:00:00Z', updated_at: '2026-09-06T12:00:00Z', created_at: '2026-09-01T12:00:00Z', is_family_expense: true, tags: [] };
-const user = { id: 1, username: 'Андрей', email: 'mobile@example.test', main_currency: 'RUB', preferred_mode: 'family', family_access: true, plan: 'family', is_admin: true, email_verified: true, onboarding_completed: true, dashboard_widgets: {} };
-const family = { id: 1, name: 'Наша семья', current_user_id: 1, current_user_role: 'owner', members: [{ id: 1, user_id: 1, name: 'Андрей', email: user.email, role: 'owner', status: 'active' }, { id: 2, user_id: 2, name: 'Светлана', email: 'member@example.test', role: 'editor', status: 'active' }] };
-export async function mockApi(page) {
+export const user = { id: 1, username: 'Андрей', email: 'mobile@example.test', main_currency: 'RUB', preferred_mode: 'family', family_access: true, plan: 'family', is_admin: true, email_verified: true, onboarding_completed: true, dashboard_widgets: {} };
+export const family = { id: 1, name: 'Наша семья', current_user_id: 1, current_user_role: 'owner', members: [{ id: 1, user_id: 1, name: 'Андрей', email: user.email, role: 'owner', status: 'active' }, { id: 2, user_id: 2, name: 'Светлана', email: 'member@example.test', role: 'editor', status: 'active' }] };
+export async function mockApi(page, overrides = {}) {
   // Analytics is unrelated to layout and can keep networkidle pending offline.
   await page.route('https://mc.yandex.ru/**', route => route.abort());
   await page.addInitScript(() => { localStorage.setItem('token', 'layout-test'); localStorage.setItem('cm_onb_done', '1'); localStorage.setItem('cm_cookie_consent', 'accepted'); });
   await page.route(/^https?:\/\/[^/]+\/api\//, async route => {
     const p = new URL(route.request().url()).pathname.replace(/\/$/, '');
-    const data = {
+    const data = overrides[p] ?? {
       '/api/me': user,
       '/api/me/limits': { plan: 'family', accounts: { used: 1, limit: null }, categories: { used: 1, limit: null } },
       '/api/accounts': [account],

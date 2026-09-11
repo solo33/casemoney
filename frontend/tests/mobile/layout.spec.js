@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockApi } from './fixtures';
 
-const paths = ['/home','/transactions','/accounts','/reports','/reports/annual','/reports/balances','/reports/yoy','/budget','/planning','/goals','/shopping','/settings/family','/credits','/deposits','/import','/import/file','/import/tbank','/settings/personal','/settings/categories','/settings/currencies','/settings/automation','/settings/billing','/history','/bank-drafts','/admin','/help','/about','/roadmap','/articles','/login','/register','/forgot-password','/reset-password','/privacy','/terms','/cookies','/'];
+const paths = ['/home','/transactions','/accounts','/reports','/reports/annual','/reports/balances','/reports/yoy','/budget','/planning','/goals','/shopping','/settings/family','/family','/family/purchases','/family/settlements','/family/statistics','/family/settings','/credits','/deposits','/import','/import/file','/import/tbank','/settings/personal','/settings/categories','/settings/currencies','/settings/automation','/settings/billing','/history','/bank-drafts','/admin','/help','/about','/roadmap','/articles','/login','/register','/forgot-password','/reset-password','/privacy','/terms','/cookies','/'];
 for (const width of [320,375,430,1280]) {
   test(`all routes fit ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 850 });

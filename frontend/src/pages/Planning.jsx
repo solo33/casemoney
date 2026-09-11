@@ -1,3 +1,4 @@
+import FamilyPlanningSuggestions from "../components/planning/FamilyPlanningSuggestions";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 
@@ -206,5 +207,6 @@ export default function Planning() {
     </section>
     {modal && <PlanningActionModal modal={modal} setModal={setModal} onSaveTemplate={submitTemplate} onSaveRecurring={submitRecurring} />}
     {recurringRuns && <RecurringRunsModal data={recurringRuns} onClose={() => setRecurringRuns(null)} />}
+    <FamilyPlanningSuggestions onChanged={load} />
   </main>;
 }

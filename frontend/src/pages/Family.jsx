@@ -1,144 +1,61 @@
-import FamilyRecurringSuggestions from "../components/family/FamilyRecurringSuggestions";
+import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
 import FamilyAnalytics from "../components/family/FamilyAnalytics";
-import FamilyMembers from "../components/family/FamilyMembers";
-import FamilySharedAccounts from "../components/family/FamilySharedAccounts";
-import FamilySettlementForm from "../components/family/FamilySettlementForm";
-import "../styles/family.css";
-import SettingsTabs from "../components/SettingsTabs";
-import api from "../api/client";
-import { formatMoney } from "../utils/money";
-import ExpenseImport from "../components/family/ExpenseImport";
+import FamilySetup from "../components/family/FamilySetup";
+import FamilySettings from "../components/family/FamilySettings";
+import FamilyOverview from "../components/family/FamilyOverview";
+import FamilyPurchases from "../components/family/FamilyPurchases";
+import FamilySettlements from "../components/family/FamilySettlements";
 import { useFamilyController } from "../hooks/useFamilyController";
+import "../styles/family.css";
+
+const sections = [
+  { path: "", label: "Обзор" },
+  { path: "/purchases", label: "Покупки" },
+  { path: "/settlements", label: "Расчёты" },
+  { path: "/statistics", label: "Статистика" },
+];
 
 export default function Family() {
-  const { state, report, analytics, recurringSuggestions, pendingExpenses, pendingCategoryDrafts, setPendingCategoryDrafts, pendingAccountDrafts, setPendingAccountDrafts, shareDraft, setShareDraft, analyticsPeriod, setAnalyticsPeriod, familyName, setFamilyName, inviteEmail, setInviteEmail, settlement, setSettlement, message, setMessage, error, setError, loading, exportingReport, submit, activeMembers, ownAccounts, pendingTotalsByAccount, selectedSharedAccount, roleLabel, selectAccountForSharing, downloadAnalyticsPdf, emailAnalytics, currencyOptions, selectSettlementRecipient, changeLabel } = useFamilyController();
-  return (
-    <main className="page family-page">
-      <h1>Семейные финансы</h1>
-      <SettingsTabs />
-
-      <section className="family-intro">
-        <strong>Общие покупки без раскрытия личных финансов</strong>
-        <p>
-          Каждый ведёт собственные счета. В семейный отчёт попадают только операции,
-          которые участник сам отметил как общие.
-        </p>
-      </section>
-
-      {loading && <p>Обновляем данные…</p>}
-      {error && <div className="family-error">{error}</div>}
-      {message && <div className="family-success">{message}</div>}
-
-      {!loading && !state.family && (
-        <>
-          {(state.pending_invitations || []).map(invitation => (
-            <section className="family-card" key={invitation.id}>
-              <h2>Вас приглашают в «{invitation.family_name}»</h2>
-              <button onClick={() => submit(async () => {
-                await api.post(`/api/family/invitations/${invitation.id}/accept`);
-                setMessage("Приглашение принято");
-              })}>
-                Принять приглашение
-              </button>
-            </section>
-          ))}
-          <section className="family-card">
-            <h2>Создать семейное пространство</h2>
-            <p>После создания вы сможете пригласить второго участника по email.</p>
-            <form onSubmit={event => {
-              event.preventDefault();
-              submit(async () => {
-                await api.post("/api/family/", { name: familyName });
-                setMessage("Семейное пространство создано");
-              });
-            }}>
-              <input
-                value={familyName}
-                onChange={event => setFamilyName(event.target.value)}
-                placeholder="Название семьи"
-                required
-              />
-              <button type="submit">Создать</button>
-            </form>
-          </section>
-        </>
-      )}
-
-      {state.family && (
-        <>
-          <div className="family-heading">
-            <div>
-              <span>Семейное пространство</span>
-              <h2>{state.family.name}</h2>
-            </div>
-            <span className="family-role">
-              {roleLabel(state.family.current_user_role)}
-            </span>
-          </div>
-
-          <div className="family-summary-grid">
-            {(report?.totals || []).map(item => (
-              <article className="family-stat" key={item.currency}>
-                <span>Все общие расходы за {String(analyticsPeriod.month).padStart(2, "0")}.{analyticsPeriod.year}</span>
-                <strong>{formatMoney(item.amount)} {item.currency}</strong>
-              </article>
-            ))}
-            {(report?.outstanding || []).map(item => (
-              <article className="family-stat family-stat-accent" key={`${item.user_id}-${item.currency}`}>
-                <span>К возмещению за все периоды: {item.name}</span>
-                <strong>{formatMoney(item.amount)} {item.currency}</strong>
-              </article>
-            ))}
-            {!report?.totals?.length && (
-              <article className="family-stat">
-                <span>Общие расходы</span>
-                <strong>Пока нет</strong>
-              </article>
-            )}
-          </div>
-
-          <FamilyRecurringSuggestions recurringSuggestions={recurringSuggestions} submit={submit} setMessage={setMessage} />
-
-          <FamilyAnalytics analyticsPeriod={analyticsPeriod} setAnalyticsPeriod={setAnalyticsPeriod} downloadAnalyticsPdf={downloadAnalyticsPdf} exportingReport={exportingReport} emailAnalytics={emailAnalytics} analytics={analytics} changeLabel={changeLabel} />
-
-          <div className="family-columns">
-            {state.family.current_user_role === "owner" && <FamilyMembers state={state} roleLabel={roleLabel} submit={submit} setMessage={setMessage} inviteEmail={inviteEmail} setInviteEmail={setInviteEmail} />}
-
-            <FamilySharedAccounts ownAccounts={ownAccounts} shareDraft={shareDraft} submit={submit} setMessage={setMessage} selectAccountForSharing={selectAccountForSharing} activeMembers={activeMembers} state={state} setShareDraft={setShareDraft} selectedSharedAccount={selectedSharedAccount} />
-
-            {state.family.current_user_role === "owner" && <ExpenseImport pendingExpenses={pendingExpenses} pendingCategoryDrafts={pendingCategoryDrafts} setPendingCategoryDrafts={setPendingCategoryDrafts} pendingAccountDrafts={pendingAccountDrafts} setPendingAccountDrafts={setPendingAccountDrafts} pendingTotalsByAccount={pendingTotalsByAccount} submit={submit} setError={setError} setMessage={setMessage} />}
-
-            {state.family.current_user_role === "owner" && <FamilySettlementForm submit={submit} settlement={settlement} setSettlement={setSettlement} setMessage={setMessage} selectSettlementRecipient={selectSettlementRecipient} activeMembers={activeMembers} state={state} currencyOptions={currencyOptions} />}
-          </div>
-
-          <section className="family-card">
-            <h2>Общие покупки</h2>
-            <div className="family-expenses">
-              {(report?.expenses || []).map(item => (
-                <article key={item.id}>
-                  <div>
-                    <strong>{item.description || item.category_name || "Общий расход"}</strong>
-                    <span>
-                      {item.paid_by_name} · {item.account_name || "личный счёт"} ·{" "}
-                      {new Date(item.date).toLocaleDateString("ru-RU")}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>{formatMoney(item.amount)} {item.currency}</strong>
-                    {item.reimbursement_amount > 0 && (
-                      <span>к возмещению {formatMoney(item.reimbursement_amount)} {item.currency}</span>
-                    )}
-                  </div>
-                </article>
-              ))}
-              {!report?.expenses?.length && (
-                <p>Отметьте расход как семейный при создании записи — он появится здесь.</p>
-              )}
-            </div>
-          </section>
-        </>
-      )}
-
-    </main>
-  );
+  const controller = useFamilyController();
+  const { pathname } = useLocation();
+  const section = pathname.replace(/^\/family/, "").replace(/\/$/, "");
+  const { state, loading, error, message, analyticsPeriod, setAnalyticsPeriod } = controller;
+  if (![...sections.map(item => item.path), "/settings"].includes(section)) {
+    return <Navigate to="/family" replace />;
+  }
+  return <main className="page family-page">
+    <header className="family-page-heading">
+      <div><h1>Семья</h1>{state.family && <p>{state.family.name} · {controller.roleLabel(state.family.current_user_role)}</p>}</div>
+      {state.family && <NavLink className="family-settings-link" to="/family/settings">Настройки семьи</NavLink>}
+    </header>
+    {state.family && <nav className="family-section-nav" aria-label="Разделы семьи">
+      {sections.map(item => <NavLink key={item.path} to={`/family${item.path}`} end>{item.label}</NavLink>)}
+    </nav>}
+    {error && <div className="family-error" role="alert">{error}</div>}
+    {message && <div className="family-success" role="status">{message}</div>}
+    {loading && <p role="status">Обновляем данные…</p>}
+    {!loading && !state.family && <>
+      <section className="family-intro"><strong>Общие покупки без раскрытия личных финансов</strong><p>В семейный отчёт попадают только операции, которые участник сам отметил как общие.</p></section>
+      <FamilySetup {...controller} />
+    </>}
+    {state.family && <>
+      {section !== "/settings" && <div className="family-period">
+        <label>Период
+          <input type="month" aria-label="Месяц семейного отчёта" value={`${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}`} onChange={event => {
+            const [year, month] = event.target.value.split("-").map(Number);
+            if (year > 0 && month >= 1 && month <= 12) setAnalyticsPeriod({ year, month });
+          }} />
+        </label>
+        {section === "/settlements" && <span>Задолженность — за всё время. История — за выбранный месяц.</span>}
+      </div>}
+      <div aria-busy={loading}>
+        {section === "" && <FamilyOverview controller={controller} />}
+        {section === "/purchases" && <FamilyPurchases controller={controller} />}
+        {section === "/settlements" && <FamilySettlements controller={controller} />}
+        {section === "/statistics" && <FamilyAnalytics {...controller} />}
+        {section === "/settings" && <FamilySettings controller={controller} />}
+      </div>
+      {section === "/settings" && <Link className="family-inline-link" to="/accounts">Перейти к счетам и балансам →</Link>}
+    </>}
+  </main>;
 }

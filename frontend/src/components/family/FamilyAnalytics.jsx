@@ -1,6 +1,6 @@
 import { formatMoney } from "../../utils/money";
 
-export default function FamilyAnalytics({ analyticsPeriod, setAnalyticsPeriod, downloadAnalyticsPdf, exportingReport, emailAnalytics, analytics, changeLabel }) {
+export default function FamilyAnalytics({ downloadAnalyticsPdf, exportingReport, emailAnalytics, analytics, changeLabel }) {
   return (
     <section className="family-card family-analytics">
             <div className="family-analytics-heading">
@@ -9,15 +9,6 @@ export default function FamilyAnalytics({ analyticsPeriod, setAnalyticsPeriod, d
                 <h2>Семейный отчёт</h2>
               </div>
               <div className="family-report-controls">
-                <input
-                  type="month"
-                  value={`${analyticsPeriod.year}-${String(analyticsPeriod.month).padStart(2, "0")}`}
-                  onChange={event => {
-                    const [year, month] = event.target.value.split("-").map(Number);
-                    if (year && month) setAnalyticsPeriod({ year, month });
-                  }}
-                  aria-label="Месяц семейного отчёта"
-                />
                 <div className="family-report-actions">
                   <button type="button" className="family-report-secondary" onClick={downloadAnalyticsPdf} disabled={exportingReport}>PDF</button>
                   <button type="button" onClick={emailAnalytics} disabled={exportingReport}>{exportingReport ? "Готовим…" : "На email"}</button>

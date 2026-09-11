@@ -1,5 +1,4 @@
 import { Link, useLocation } from "react-router-dom";
-import { useUser } from "../contexts/UserContext";
 
 const tabs = [
   { to: "/settings/personal", label: "Персональные" },
@@ -7,19 +6,14 @@ const tabs = [
   { to: "/settings/currencies", label: "Валюты" },
   { to: "/settings/automation", label: "Автоматизация" },
   { to: "/settings/billing", label: "Тариф и оплата" },
-  { to: "/settings/family", label: "Семья" },
 ];
 
 export default function SettingsTabs() {
   const { pathname } = useLocation();
-  const { user } = useUser();
-  const visibleTabs = tabs.filter(
-    tab => tab.to !== "/settings/family" || (user?.family_access && user?.preferred_mode === "family")
-  );
 
   return (
     <div className="settings-tabs" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-      {visibleTabs.map(tab => {
+      {tabs.map(tab => {
         const active = pathname === tab.to;
         return (
           <Link
