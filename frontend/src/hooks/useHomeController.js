@@ -27,8 +27,8 @@ export function useHomeController() {
   const [recordsTab, setRecordsTab] = useState("today"); // today | changed
   const [editingTx, setEditingTx] = useState(null);
   const [adjustingBalance, setAdjustingBalance] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(isoToday()); // РґР°С‚Р° С„РѕСЂРјС‹ = РґР°С‚Р° Р»РµРЅС‚С‹
-  const [dayTx, setDayTx] = useState([]);                       // Р·Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ
+  const [selectedDate, setSelectedDate] = useState(isoToday()); // дата формы = дата ленты
+  const [dayTx, setDayTx] = useState([]);                       // записи за выбранный день
   const [onbDismissed, setOnbDismissed] = useState(() => localStorage.getItem("cm_onb_done") === "1");
   const widgetSettings = useMemo(() => dashboardWidgetSettings(user?.dashboard_widgets), [user?.dashboard_widgets]);
   const widgetSettingsSignature = useMemo(() => JSON.stringify(user?.dashboard_widgets || {}), [user?.dashboard_widgets]);
@@ -81,19 +81,19 @@ export function useHomeController() {
     [effectiveAccountGroups]
   );
 
-  // РћР±РѕРіР°С‰Р°РµРј СЃС‹СЂСѓСЋ С‚СЂР°РЅР·Р°РєС†РёСЋ (РёР· /api/transactions) РёРјРµРЅР°РјРё СЃС‡С‘С‚Р°/РєР°С‚РµРіРѕСЂРёРё
+  // Обогащаем сырую транзакцию (из /api/transactions) именами счёта/категории
   const enrichTx = useCallback((t) => {
     const acc = flatAccounts.find(a => a.id === t.account_id);
     const cat = t.category_id ? categories.find(c => c.id === t.category_id) : null;
     return {
       ...t,
-      account_name: acc?.name || "вЂ”",
+      account_name: acc?.name || "—",
       category_name: cat?.name || null,
       category_icon: cat?.icon || null,
     };
   }, [flatAccounts, categories]);
 
-  // Р—Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ
+  // Записи за выбранный день
   const fetchDay = useCallback(async (dateStr) => {
     const localItems = await listPendingTransactions(dateStr).catch(() => []);
     try {
@@ -107,7 +107,7 @@ export function useHomeController() {
   }, []);
 
   const handleDeleteTx = async (tx) => {
-    if (!confirm("РЈРґР°Р»РёС‚СЊ Р·Р°РїРёСЃСЊ?")) return;
+    if (!confirm("Удалить запись?")) return;
     try {
       if (tx.pending_sync && tx.offline_mutation_id) {
         await removeOfflineMutation(tx.offline_mutation_id);
@@ -118,7 +118,7 @@ export function useHomeController() {
       fetchAll();
       fetchDay(selectedDate);
     } catch (e) {
-      setError(e.response?.data?.detail || "РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ");
+      setError(e.response?.data?.detail || "Не удалось удалить");
     }
   };
 
@@ -142,28 +142,28 @@ export function useHomeController() {
 
   useEffect(() => { fetchAll(); }, [mainCurrency, fetchAll]);
 
-  // РџРµСЂРµР·Р°РіСЂСѓР·РєР° Р»РµРЅС‚С‹ РґРЅСЏ РїСЂРё СЃРјРµРЅРµ РґР°С‚С‹ / РІР°Р»СЋС‚С‹
+  // Перезагрузка ленты дня при смене даты / валюты
   useEffect(() => { fetchDay(selectedDate); }, [selectedDate, mainCurrency, fetchDay]);
 
   const sym = currencySymbol(mainCurrency);
 
-  // breakdown СЃСѓРјРј РїРѕ РІР°Р»СЋС‚Р°Рј РїРѕ РІСЃРµРј СЃС‡РµС‚Р°Рј (С‚РѕР»СЊРєРѕ СѓС‡РёС‚С‹РІР°РµРјС‹Рµ РІ Р±Р°Р»Р°РЅСЃРµ)
+  // breakdown сумм по валютам по всем счетам (только учитываемые в балансе)
   const byCurrency = useMemo(() => aggregateByCurrency(grouped), [grouped]);
   const dashboardBalancesHidden = Boolean(user?.hide_dashboard_balances);
   const toggleDashboardBalances = () => updateUser({ hide_dashboard_balances: !dashboardBalancesHidden });
 
-  // Р“РёСЃС‚РѕРіСЂР°РјРјР° РґРІРёР¶РµРЅРёСЏ РґРµРЅРµРі: 3 РјРµСЃСЏС†Р°, СЃРІРµР¶РёРµ СЃРІРµСЂС…Сѓ (С‚РµРєСѓС‰РёР№ вЂ” В«Р­С‚РѕС‚ РјРµСЃСЏС†В»)
+  // Гистограмма движения денег: 3 месяца, свежие сверху (текущий — «Этот месяц»)
   const trendDesc = useMemo(() => [...monthlyTrend].reverse(), [monthlyTrend]);
 
-  // Р·Р°РїРёСЃРё Р·Р° РІС‹Р±СЂР°РЅРЅС‹Р№ РґРµРЅСЊ (РґР»СЏ РїСЂР°РІРѕР№ РєРѕР»РѕРЅРєРё), РѕР±РѕРіР°С‰С‘РЅРЅС‹Рµ РёРјРµРЅР°РјРё
+  // записи за выбранный день (для правой колонки), обогащённые именами
   const todayTx = useMemo(() => dayTx.map(enrichTx), [dayTx, enrichTx]);
 
-  // Р—Р°РіРѕР»РѕРІРѕРє С‚Р°Р±Р° = РІС‹Р±СЂР°РЅРЅР°СЏ РґР°С‚Р°
+  // Заголовок таба = выбранная дата
   const dayLabel = useMemo(() => {
     const d = new Date(selectedDate + "T00:00:00");
     const today = isToday(d.toISOString());
     const human = d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
-    return today ? `Р—Р°РїРёСЃРё Р·Р° ${human}` : `Р—Р°РїРёСЃРё В· ${human}`;
+    return today ? `Записи за ${human}` : `Записи · ${human}`;
   }, [selectedDate]);
 
   const recentlyChanged = dashboard?.recently_changed || [];
@@ -179,9 +179,9 @@ export function useHomeController() {
   const monthLabel = summary?.period_label ||
     `${RU_MONTHS_FULL[new Date().getMonth()]} ${new Date().getFullYear()}`;
   const breakdownColor = breakdownType === "income" ? "#167a4a" : "#c0432b";
-  const breakdownWord = breakdownType === "income" ? "Р”РѕС…РѕРґС‹" : "Р Р°СЃС…РѕРґС‹";
+  const breakdownWord = breakdownType === "income" ? "Доходы" : "Расходы";
 
-  // РћРЅР±РѕСЂРґРёРЅРі: РїРѕРєР°Р·С‹РІР°РµРј, РїРѕРєР° РЅРµС‚ СЃС‡РµС‚РѕРІ РёР»Рё РЅРµС‚ РѕРїРµСЂР°С†РёР№ (Рё РЅРµ СЃРєСЂС‹С‚ РІСЂСѓС‡РЅСѓСЋ)
+  // Онбординг: показываем, пока нет счетов или нет операций (и не скрыт вручную)
   const hasAccounts = flatAccounts.length > 0;
   const hasTx = (dashboard?.recent_transactions?.length || 0) > 0
     || monthIncome > 0 || monthExpense > 0
@@ -191,7 +191,7 @@ export function useHomeController() {
   const showOnboarding = !initialLoading && !accountsLoading && !onbDismissed
     && localStorage.getItem("cm_inline_onb") === "show" && (!hasAccounts || !hasTx);
 
-  // РљР»РёРє РїРѕ РєР°С‚РµРіРѕСЂРёРё в†’ РїРµСЂРµС…РѕРґ РІ Р—Р°РїРёСЃРё СЃ С„РёР»СЊС‚СЂРѕРј (РєР°С‚РµРіРѕСЂРёСЏ + С‚РёРї + С‚РµРєСѓС‰РёР№ РјРµСЃСЏС†)
+  // Клик по категории → переход в Записи с фильтром (категория + тип + текущий месяц)
   const goToCategory = (catId) => {
     const { from, to } = currentMonthRange();
     const params = new URLSearchParams({ type: breakdownType, date_from: from, date_to: to });
@@ -199,7 +199,7 @@ export function useHomeController() {
     navigate(`/transactions?${params.toString()}`);
   };
 
-  // РљР»РёРє РїРѕ СЃС‡С‘С‚Сѓ в†’ Р—Р°РїРёСЃРё РїРѕ СЌС‚РѕРјСѓ СЃС‡С‘С‚Сѓ
+  // Клик по счёту → Записи по этому счёту
   const goToAccount = (accId) => {
     navigate(`/transactions?account_id=${accId}`);
   };

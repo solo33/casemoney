@@ -1,6 +1,6 @@
 from app.money import Money
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, DateTime, Enum, UniqueConstraint, event, inspect
+from sqlalchemy.orm import relationship, attributes
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
@@ -30,7 +30,7 @@ class Transaction(Base):
     date = Column(DateTime(timezone=True), server_default=func.now())
 
     # Технические метки: когда запись создана / последний раз изменена.
-    # updated_at обновляется автоматически при любом изменении строки (onupdate).
+    # Обновление служебного снимка курса не считается редактированием операции.
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -81,3 +81,25 @@ class Transaction(Base):
     # Tags are independent from income/expense categories and may be used for
     # projects such as a trip, renovation, or a client.
     tags = relationship("Tag", secondary="transaction_tags", back_populates="transactions")
+
+
+_VALUATION_FIELDS = frozenset({
+    "valuation_currency", "exchange_rate", "exchange_rate_source",
+    "to_exchange_rate", "to_exchange_rate_source",
+})
+
+
+@event.listens_for(Transaction, "before_update")
+def preserve_timestamp_for_valuation_only(_mapper, _connection, transaction):
+    """Keep ordering stable when an old operation only receives cached rates.
+
+    Explicit timestamps and actual edits still use the normal update policy.
+    flag_modified forces the existing timestamp into SQL, suppressing onupdate
+    even when its value has not changed (including legacy NULL timestamps).
+    """
+    state = inspect(transaction)
+    changed = {attr.key for attr in state.attrs if attr.history.has_changes()}
+    if changed and changed <= _VALUATION_FIELDS:
+        # Ensure an expired timestamp is loaded before marking it for UPDATE.
+        _ = transaction.updated_at
+        attributes.flag_modified(transaction, "updated_at")

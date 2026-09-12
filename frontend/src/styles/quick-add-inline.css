@@ -1,0 +1,28 @@
+.quick-add-inline { container-type: inline-size; }
+.quick-add-inline .qai-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 220px 90px; gap: 10px; align-items: center; margin-bottom: 12px; }
+.quick-add-inline .qai-row > * { min-width: 0; }
+.quick-add-inline .qai-row > label, .quick-add-inline .qai-note-row > label:first-child { font-size: 14px; color: #596572; }
+.quick-add-inline input:not([type="checkbox"]), .quick-add-inline select, .quick-add-inline .category-picker-trigger, .quick-add-inline .single-currency { min-height: 42px; box-sizing: border-box; }
+.quick-add-inline .qai-row > select, .quick-add-inline .qai-note-row > input { width: 100%; }
+.quick-add-inline .qai-date-plan { grid-column: 3 / 5; }
+.quick-add-inline .qai-date-plan .qai-date { min-width: 0; width: 100%; font-size: 14px; }
+.quick-add-inline .qai-rate { grid-column: 2; font-size: 13px; color: #596572; }
+.quick-add-inline .same-transfer-amount { display: flex; align-items: center; justify-content: flex-end; min-height: 42px; color: #596572; font-size: 14px; }
+.quick-add-inline .qai-row > label:has(.transfer-swap-button) { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.quick-add-inline .qai-note-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 12px; }
+.quick-add-inline .qai-note-row:has(.family-expense-toggle) { grid-template-columns: 104px minmax(0, 1fr) auto; }
+.quick-add-inline .family-expense-toggle { display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; padding: 0 12px; min-height: 42px; box-sizing: border-box; font-size: 14px; line-height: 1.3; color: #725a20; white-space: nowrap; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 7px; cursor: pointer; }
+.quick-add-inline .family-expense-toggle input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; margin: 0; flex: 0 0 18px; }
+.quick-add-inline .family-expense-fields { margin: 0 0 12px 114px; }
+.quick-add-inline .family-reimbursement-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; color: #515c68; }
+.quick-add-inline .family-reimbursement-field input { width: 180px; text-align: right; }
+.quick-add-inline .transfer-fee { margin-left: 114px; }
+@container (max-width: 660px) {
+  .quick-add-inline .qai-row { grid-template-columns: minmax(0, 1fr) 90px; }
+  .quick-add-inline .qai-row > label, .quick-add-inline .qai-row > select:not(.currency-choice), .quick-add-inline .qai-row > .category-picker { grid-column: 1 / -1; }
+  .quick-add-inline .qai-date-plan, .quick-add-inline .qai-rate { grid-column: 1 / -1; }
+  .quick-add-inline .qai-note-row, .quick-add-inline .qai-note-row:has(.family-expense-toggle) { grid-template-columns: minmax(0, 1fr); }
+  .quick-add-inline .family-expense-toggle { justify-self: start; }
+  .quick-add-inline .family-expense-fields, .quick-add-inline .transfer-fee { margin-left: 0; }
+  .quick-add-inline .family-reimbursement-field input { flex: 1 1 120px; min-width: 0; }
+}

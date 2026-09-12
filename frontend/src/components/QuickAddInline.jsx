@@ -1,3 +1,5 @@
+import "../styles/quick-add-inline.css";
+import TransferFeeFields from "./TransferFeeFields";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import api, { isRetryableServiceError } from "../api/client";
 import { TX_ADDED_EVENT } from "./QuickAddFab";
@@ -51,6 +53,7 @@ export default function QuickAddInline({
     to_account_id: "",
     to_amount: "",
     to_currency: "",
+    fee_enabled: false,
     fee_amount: "",
     fee_category_id: "",
     description: "",
@@ -208,7 +211,7 @@ export default function QuickAddInline({
       if (!sameTransferCurrency && (!form.to_amount || parseFloat(form.to_amount) <= 0)) {
         setError("Введите сумму зачисления"); return;
       }
-      if (Number(form.fee_amount) > 0 && !form.fee_category_id) {
+      if (form.fee_enabled && Number(form.fee_amount) > 0 && !form.fee_category_id) {
         setError("Выберите категорию комиссии"); return;
       }
     }
@@ -225,8 +228,8 @@ export default function QuickAddInline({
         to_account_id: type === "transfer" ? parseInt(form.to_account_id) : undefined,
         to_amount: type === "transfer" ? parseFloat(sameTransferCurrency ? form.amount : form.to_amount) : undefined,
         to_currency: type === "transfer" ? form.to_currency : undefined,
-        fee_amount: type === "transfer" && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : undefined,
-        fee_category_id: type === "transfer" && form.fee_category_id ? parseInt(form.fee_category_id) : undefined,
+        fee_amount: type === "transfer" && form.fee_enabled && Number(form.fee_amount) > 0 ? parseFloat(form.fee_amount) : undefined,
+        fee_category_id: type === "transfer" && form.fee_enabled && form.fee_category_id ? parseInt(form.fee_category_id) : undefined,
         is_family_expense: hasFamilyPlan && type === "expense" && form.is_family_expense,
         reimbursement_amount: hasFamilyPlan && type === "expense" && form.is_family_expense
           ? parseFloat(form.reimbursement_amount || form.amount)
@@ -243,6 +246,7 @@ export default function QuickAddInline({
         ...f,
         amount: "",
         to_amount: "",
+        fee_enabled: false,
         fee_amount: "",
         fee_category_id: "",
         description: "",
@@ -303,9 +307,9 @@ export default function QuickAddInline({
 
       <form onSubmit={handleSubmit} style={{ padding: 16 }}>
         {/* Row 1: Со счета + Сумма + Валюта */}
-        <div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 280px) 110px 90px", gap: 10, alignItems: "center", marginBottom: 10 }}>
-          <label style={lbl}>Со счёта</label>
-          <select
+        <div className="qai-row">
+          <label htmlFor="qai-account">Со счёта</label>
+          <select id="qai-account"
             value={form.account_id}
             onChange={e => setForm({ ...form, account_id: e.target.value })}
             required
@@ -316,6 +320,7 @@ export default function QuickAddInline({
           <AmountInput
             type="number"
             placeholder="Сумма"
+            aria-label="Сумма"
             min="0.01"
             step="0.01"
             value={form.amount}
@@ -332,8 +337,8 @@ export default function QuickAddInline({
         </div>
 
         {/* Row 2: категория или отдельная сумма зачисления для перевода */}
-        <div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 280px) 110px 90px", gap: 10, alignItems: "center", marginBottom: 10 }}>
-          <label style={lbl}>
+        <div className="qai-row">
+          <label>
             {type === "transfer" ? "На счёт" : "Категория"}
             {type === "transfer" && form.to_account_id && (
               <button type="button" className="transfer-swap-button" onClick={swapTransferAccounts} title="Поменять счета местами" aria-label="Поменять счета отправки и получения местами">⇅</button>
@@ -364,6 +369,7 @@ export default function QuickAddInline({
                 <AmountInput
                   type="number"
                   inputMode="decimal"
+                  aria-label="Сумма зачисления"
                   placeholder={quoteLoading ? "Считаем…" : "Зачислить"}
                   min="0.01"
                   step="0.01"
@@ -383,6 +389,7 @@ export default function QuickAddInline({
             <div className="qai-date-plan">
               <input
                 type="date"
+                aria-label="Дата записи"
                 value={dateVal}
                 onChange={e => {
                   setDateVal(e.target.value);
@@ -401,32 +408,29 @@ export default function QuickAddInline({
         </div>
 
         {type === "transfer" && (
-          <div className="transfer-rate-row">
-            <span>
+          <div className="qai-row">
+            <span className="qai-rate">
               {form.currency && form.to_currency && form.currency !== form.to_currency && displayedRate > 0
                 ? `Курс: 1 ${form.currency} = ${displayedRate.toLocaleString("ru-RU", { maximumFractionDigits: 8 })} ${form.to_currency}`
                 : "Зачислится та же сумма"}
               {quoteLoading ? " · обновляем курс…" : ""}
             </span>
-            <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} />
+            <div className="qai-date-plan"><input type="date" className="qai-date" aria-label="Дата записи" value={dateVal} onChange={e => {
+              setDateVal(e.target.value);
+              if (e.target.value <= isoToday()) setForm(current => ({ ...current, is_planned: false }));
+            }} />
+              {showPlanToggle && <label className="qai-plan-toggle"><input type="checkbox" checked={form.is_planned} onChange={event => setForm({ ...form, is_planned: event.target.checked })} />План</label>}
+            </div>
           </div>
         )}
-        {type === "transfer" && (
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 170px", gap: 8, alignItems: "end", marginBottom: 10 }}>
-            <label style={lbl}>Комиссия
-              <AmountInput type="number" min="0" step="0.01" value={form.fee_amount} onChange={e => setForm({ ...form, fee_amount: e.target.value })} placeholder="0" />
-            </label>
-            <label style={lbl}>Категория комиссии
-              <CategoryPicker categories={categories.filter(c => c.type === "expense")} value={form.fee_category_id} onChange={value => setForm({ ...form, fee_category_id: value })} placeholder="Выберите" />
-            </label>
-          </div>
-        )}
+        {type === "transfer" && <TransferFeeFields form={form} setForm={setForm} categories={categories} />}
 
         {/* Row 3: Примечание (+ переключатель общего расхода для семейного тарифа) */}
-        <div style={{ display: "grid", gridTemplateColumns: hasFamilyPlan && type === "expense" ? "92px 1fr auto" : "92px 1fr", gap: 10, alignItems: "center", marginBottom: 12 }}>
-          <label style={lbl}>Примечание</label>
+        <div className="qai-note-row">
+          <label htmlFor="qai-description">Примечание</label>
           <input
             type="text"
+            id="qai-description"
             value={form.description}
             onChange={e => setForm({ ...form, description: e.target.value })}
             placeholder="Например: Пятерочка"
@@ -505,36 +509,7 @@ export default function QuickAddInline({
         </div>
       </form>
 
-      <style>{`
-        .qai-date { grid-column: 3 / span 2; width: 100%; min-width: 154px; box-sizing: border-box; }
-        .transfer-rate-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: -2px 0 10px 102px; color: #7a8590; font-size: 12px; }
-        .transfer-rate-row input { width: 200px; }
-        .family-expense-fields { margin: -2px 0 12px 102px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .same-transfer-amount { align-self: stretch; display: flex; align-items: center; justify-content: flex-end; color: #7a8590; font-size: 12px; }
-        label:has(.transfer-swap-button) { display: flex; align-items: center; gap: 6px; }
-        .family-expense-toggle { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #725a20; white-space: nowrap; min-height: 38px; padding: 0 12px; background: #fff8e6; border: 1px solid #ead7a8; border-radius: 7px; }
-        .family-expense-toggle input[type="checkbox"] { width: 16px; height: 16px; margin: 0; }
-        .family-expense-fields label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #515c68; }
-        .family-reimbursement-field { min-height: 38px; padding: 0 10px; border: 1px solid #e3dccd; border-radius: 7px; background: #fffdf8; }
-        .family-expense-fields input[type="number"] { width: 104px; min-height: 30px; padding: 4px 6px; border: 0; background: transparent; text-align: right; }
-        @media (max-width: 600px) {
-          form > div[style*="grid-template-columns"] {
-            grid-template-columns: 1fr !important;
-          }
-          .qai-date { grid-column: auto !important; width: 100%; min-width: 156px; }
-          .transfer-rate-row { margin-left: 0; align-items: stretch; flex-direction: column; }
-          .transfer-rate-row input { width: 100%; }
-          .family-expense-fields { margin: -2px 0 12px; align-items: stretch; flex-direction: column; gap: 8px; }
-          .family-expense-toggle, .family-reimbursement-field { width: 100%; min-height: 42px; box-sizing: border-box; }
-          .family-reimbursement-field input[type="number"] { flex: 1; width: auto; }
-        }
-      `}</style>
+
     </div>
   );
 }
-
-const lbl = {
-  fontSize: 13,
-  color: "#7a8590",
-  whiteSpace: "nowrap",
-};

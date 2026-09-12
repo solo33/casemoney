@@ -1,0 +1,12 @@
+.transfer-fee { margin-bottom: 12px; }
+.transfer-fee-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; width: fit-content; font-size: 14px; color: #515c68; cursor: pointer; }
+.transfer-fee-toggle input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; margin: 0; flex: 0 0 18px; }
+.transfer-fee-fields { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+.transfer-fee-amount { flex: 0 1 220px; min-width: 0; }
+.transfer-fee-category { flex: 1 1 220px; min-width: 0; max-width: 340px; }
+.transfer-fee-amount > label, .transfer-fee-category > span { display: block; margin-bottom: 6px; font-size: 14px; color: #515c68; }
+.transfer-fee-fields input, .transfer-fee-fields select, .transfer-fee-fields .category-picker-trigger { min-height: 42px; }
+.transfer-fee-fields .category-picker { width: 100%; }
+@media (max-width: 600px) {
+  .transfer-fee-amount, .transfer-fee-category { flex-basis: 100%; max-width: none; }
+}
