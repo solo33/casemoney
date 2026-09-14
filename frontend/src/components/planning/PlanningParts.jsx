@@ -1,20 +1,20 @@
 import { formatMoney } from "../../utils/money";
 import { MONTH_NAMES, FREQUENCY_LABELS } from "../../utils/planningView";
 
-export function PlanningCalendar({ month, entries }) {
+export function PlanningCalendar({ month, entries, selectedDate, onSelectDate }) {
   const year = month.getFullYear();
   const monthIndex = month.getMonth();
   const offset = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const cells = Array.from({ length: Math.ceil((offset + daysInMonth) / 7) * 7 }, (_, index) => index - offset + 1);
   const byDate = entries.reduce((result, item) => { (result[item.date] ||= []).push(item); return result; }, {});
-  return <div className="planning-calendar" role="grid" aria-label={`Календарь ${MONTH_NAMES[monthIndex]} ${year}`}>
+  return <div className="planning-calendar" role="group" aria-label={`Календарь ${MONTH_NAMES[monthIndex]} ${year}`}>
     {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map(day => <div className="planning-calendar-weekday" key={day}>{day}</div>)}
     {cells.map((day, index) => {
       if (day < 1 || day > daysInMonth) return <div className="planning-calendar-day is-empty" key={`empty-${index}`} />;
       const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const items = byDate[key] || [];
-      return <div className="planning-calendar-day" key={key}><strong>{day}</strong>{items.slice(0, 3).map((item, itemIndex) => <span className={item.type === "income" ? "income" : "expense"} title={`${item.title}: ${formatMoney(item.amount)} ${item.currency}`} key={`${item.title}-${itemIndex}`}>{item.recurring ? "↻ " : ""}{item.title}</span>)}{items.length > 3 && <small>ещё {items.length - 3}</small>}</div>;
+      return <button type="button" className="planning-calendar-day" key={key} aria-label={`${day} ${MONTH_NAMES[monthIndex]}, операций: ${items.length}`} aria-pressed={selectedDate === key} onClick={() => onSelectDate(key)}><strong>{day}</strong>{items.length > 0 && <small className="planning-day-count">{items.length}</small>}{items.slice(0, 3).map((item, itemIndex) => <span className={item.type === "income" ? "income" : "expense"} title={`${item.title}: ${formatMoney(item.amount)} ${item.currency}`} key={`${item.title}-${itemIndex}`}>{item.recurring ? "↻ " : ""}{item.title}</span>)}{items.length > 3 && <small className="planning-day-more">ещё {items.length - 3}</small>}</button>;
     })}
   </div>;
 }
@@ -25,7 +25,7 @@ export function PlanningActionModal({ modal, setModal, onSaveTemplate, onSaveRec
     event.preventDefault();
     const name = modal.name.trim();
     if (!name) return;
-    if (isRecurring) onSaveRecurring({ name, frequency: modal.frequency, next_date: modal.next_date });
+    if (isRecurring) onSaveRecurring({ ...modal, name });
     else onSaveTemplate(name);
   };
   return <div className="planning-modal-backdrop" onClick={() => setModal(null)}>

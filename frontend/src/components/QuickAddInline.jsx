@@ -337,7 +337,7 @@ export default function QuickAddInline({
         </div>
 
         {/* Row 2: категория или отдельная сумма зачисления для перевода */}
-        <div className="qai-row">
+        <div className={`qai-row${type === "transfer" ? "" : " qai-category-row"}`}>
           <label>
             {type === "transfer" ? "На счёт" : "Категория"}
             {type === "transfer" && form.to_account_id && (
@@ -355,6 +355,7 @@ export default function QuickAddInline({
             </select>
           ) : (
             <CategoryPicker
+              showParent
               categories={filteredCategories}
               value={form.category_id}
               onChange={category_id => setForm({ ...form, category_id })}

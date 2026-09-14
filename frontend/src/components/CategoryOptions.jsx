@@ -20,7 +20,8 @@ const categoryLabel = category => (
  * Группа является обычным выбираемым option, дочерние строки идут следом
  * с отступом. Так название не дублируется заголовком нативного optgroup.
  */
-export default function CategoryOptions({ categories }) {
+export default function CategoryOptions({ categories, selectedValue, selectedLabel }) {
+  const label = (category, fallback) => selectedLabel && String(category.id) === String(selectedValue) ? selectedLabel : fallback;
   const byParent = new Map();
   categories.forEach(category => {
     if (category.parent_id == null) return;
@@ -46,11 +47,11 @@ export default function CategoryOptions({ categories }) {
         return (
           <Fragment key={parent.id}>
             <option value={parent.id} style={{ fontWeight: 700 }}>
-              {categoryLabel(parent)}
+              {label(parent, categoryLabel(parent))}
             </option>
             {children.map(child => (
               <option key={child.id} value={child.id}>
-                ↳ {categoryLabel(child)}
+                {label(child, `↳ ${categoryLabel(child)}`)}
               </option>
             ))}
           </Fragment>
@@ -58,7 +59,7 @@ export default function CategoryOptions({ categories }) {
       })}
       {orphanedChildren.map(category => (
         <option key={category.id} value={category.id}>
-          {categoryLabel(category)}
+          {label(category, categoryLabel(category))}
         </option>
       ))}
     </>

@@ -5,6 +5,8 @@
 .quick-add-inline input:not([type="checkbox"]), .quick-add-inline select, .quick-add-inline .category-picker-trigger, .quick-add-inline .single-currency { min-height: 42px; box-sizing: border-box; }
 .quick-add-inline .qai-row > select, .quick-add-inline .qai-note-row > input { width: 100%; }
 .quick-add-inline .qai-date-plan { grid-column: 3 / 5; }
+.quick-add-inline .qai-category-row { grid-template-columns: 104px minmax(0, 1fr) 180px; }
+.quick-add-inline .qai-category-row .qai-date-plan { grid-column: 3; }
 .quick-add-inline .qai-date-plan .qai-date { min-width: 0; width: 100%; font-size: 14px; }
 .quick-add-inline .qai-rate { grid-column: 2; font-size: 13px; color: #596572; }
 .quick-add-inline .same-transfer-amount { display: flex; align-items: center; justify-content: flex-end; min-height: 42px; color: #596572; font-size: 14px; }
@@ -20,7 +22,7 @@
 @container (max-width: 660px) {
   .quick-add-inline .qai-row { grid-template-columns: minmax(0, 1fr) 90px; }
   .quick-add-inline .qai-row > label, .quick-add-inline .qai-row > select:not(.currency-choice), .quick-add-inline .qai-row > .category-picker { grid-column: 1 / -1; }
-  .quick-add-inline .qai-date-plan, .quick-add-inline .qai-rate { grid-column: 1 / -1; }
+  .quick-add-inline .qai-date-plan, .quick-add-inline .qai-rate, .quick-add-inline .qai-category-row .qai-date-plan { grid-column: 1 / -1; }
   .quick-add-inline .qai-note-row, .quick-add-inline .qai-note-row:has(.family-expense-toggle) { grid-template-columns: minmax(0, 1fr); }
   .quick-add-inline .family-expense-toggle { justify-self: start; }
   .quick-add-inline .family-expense-fields, .quick-add-inline .transfer-fee { margin-left: 0; }

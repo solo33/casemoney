@@ -27,6 +27,7 @@ export default function CategoryPicker({
   style,
   className = "",
   onCategoryCreated,
+  showParent = false,
 }) {
   const [open, setOpen] = useState(false);
   const [frequent, setFrequent] = useState([]);
@@ -52,6 +53,8 @@ export default function CategoryPicker({
     });
   }, [categories, value]);
   const selected = categories.find(category => String(category.id) === String(value));
+  const parent = selected?.parent_id == null ? null : categories.find(category => String(category.id) === String(selected.parent_id));
+  const selectedLabel = selected ? (showParent && parent ? `${labelFor(parent)} → ${labelFor(selected)}` : labelFor(selected)) : placeholder;
 
   const groups = useMemo(() => {
     const childrenByParent = new Map();
@@ -161,7 +164,7 @@ export default function CategoryPicker({
         onChange={event => onChange(event.target.value)}
       >
         <option value="">{placeholder}</option>
-        <CategoryOptions categories={visibleCategories} />
+        <CategoryOptions categories={visibleCategories} selectedValue={value} selectedLabel={showParent ? selectedLabel : undefined} />
       </select>
 
       <button
@@ -170,7 +173,7 @@ export default function CategoryPicker({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       >
-        <span>{selected ? labelFor(selected) : placeholder}</span>
+        <span title={selectedLabel}>{selectedLabel}</span>
         <span aria-hidden="true">⌄</span>
       </button>
 

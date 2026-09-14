@@ -9,7 +9,7 @@ async function setup(page) {
   await mockApi(page, {
     '/api/accounts': accounts,
     '/api/accounts/grouped': [{ group: { id: 1, name: "Мои счета" }, accounts, total_in_main: 110000 }],
-    '/api/categories': [{ id: 1, name: 'Комиссии', type: 'expense', parent_id: null }],
+    '/api/categories': [{ id: 1, name: 'Комиссии', type: 'expense', parent_id: null }, { id: 2, name: 'Жильё', type: 'expense', parent_id: null }, { id: 3, name: 'Квартира2', type: 'expense', parent_id: 2 }],
   });
 }
 
@@ -26,7 +26,11 @@ test('desktop quick entry aligns date and family option and provides room for th
   expect(amount.width).toBeGreaterThanOrEqual(170);
   const wrapper = await form.locator('.amount-input-with-calculator').first().boundingBox();
   const date = await form.getByLabel('Дата записи').boundingBox();
-  expect(Math.abs(wrapper.x - date.x)).toBeLessThan(2);
+  expect(date.width).toBeLessThanOrEqual(180);
+  const category = form.locator('.qai-category-row .category-picker-native');
+  await category.selectOption('3');
+  await expect(category.locator('option:checked')).toHaveText('Жильё → Квартира2');
+  expect((await category.boundingBox()).width).toBeGreaterThan(wrapper.x - (await category.boundingBox()).x);
   const note = await form.getByLabel('Примечание', { exact: true }).boundingBox();
   const family = await form.locator('.family-expense-toggle').boundingBox();
   expect(Math.abs(note.y - family.y)).toBeLessThan(2);

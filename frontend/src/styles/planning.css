@@ -1,0 +1,45 @@
+.planning-page { min-width: 0; padding-bottom: 110px; }
+.planning-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.planning-tabs button { background: #fffdf7; color: #173a54; border: 1px solid #e4ddcd; }
+.planning-tabs button[aria-current] { background: #173a54; color: white; }
+.planning-page .planning-actions { flex-wrap: wrap; min-width: 0; }
+.planning-page .planning-actions > * { flex: 0 1 auto; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.planning-page .recurring-list > div > div { min-width: 0; }
+.planning-page .recurring-list strong, .planning-obligation strong { overflow-wrap: anywhere; }
+.planning-page .planning-form { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+.planning-page .planning-form > *, .planning-page input, .planning-page select { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.planning-page .planning-form label { display: grid; gap: 6px; font-size: 14px; }
+.planning-page .planning-form label > input, .planning-page .planning-form label > select { width: 100%; }
+.planning-page .planning-form .planning-description { grid-column: 1 / -1; }
+.planning-page .planning-calendar-head { flex-direction: column; }
+.planning-page .planning-calendar-nav { width: 100%; justify-content: space-between; }
+.planning-page button.planning-calendar-day { min-width: 0; border-radius: 0; background: #fffdf7; color: #173a54; border: 0; border-bottom: 1px solid #e9e1d1; border-right: 1px solid #e9e1d1; text-align: left; white-space: normal; }
+.planning-page button.planning-calendar-day[aria-pressed="true"] { background: #e5edf2; outline: 2px solid #30628b; outline-offset: -2px; }
+.planning-page .planning-day-count { display: none; }
+.planning-agenda-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px; }
+.planning-agenda { display: grid; gap: 8px; }
+.planning-page .planning-event { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; background: #fffdf7; color: #173a54; border: 1px solid #e4ddcd; width: 100%; }
+.planning-event span { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.planning-event small, .planning-event time { font-size: 12px; color: #596572; }
+.planning-event-dialog { width: min(560px, calc(100% - 32px)); max-height: 85dvh; box-sizing: border-box; overflow: auto; border: 1px solid #e4ddcd; border-radius: 12px; background: #fffdf7; color: #173a54; padding: 20px; }
+.planning-event-dialog::backdrop { background: #173a5480; }
+.planning-event-dialog h2, .planning-event-dialog dd { overflow-wrap: anywhere; }
+.planning-event-dialog dl { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; }
+.planning-event-dialog dd { margin: 0; }
+.planning-obligation { padding: 14px 0; border-top: 1px solid #e4ddcd; }
+.planning-page .planning-calendar-feed { grid-template-columns: minmax(0, 1fr) auto auto; }
+.planning-page .planning-calendar-feed > div { grid-column: 1 / -1; }
+@media (max-width: 600px) {
+  .planning-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planning-tabs button { padding: 10px; min-width: 0; }
+  .planning-page .planning-form { grid-template-columns: minmax(0, 1fr); }
+  .planning-page .planning-calendar-day { min-height: 56px; padding: 5px; }
+  .planning-page .planning-calendar-day > span, .planning-page .planning-day-more { display: none; }
+  .planning-page .planning-day-count { display: inline-block; width: fit-content; min-width: 18px; text-align: center; border-radius: 10px; background: #173a54; color: white; padding: 1px 4px; }
+  .planning-page .planning-event { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .planning-page .planning-calendar-feed { grid-template-columns: minmax(0, 1fr); }
+  .planning-page .planning-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .planning-page .planning-actions > * { width: 100%; box-sizing: border-box; padding: 10px; }
+  .planning-page .recurring-list > div { width: 100%; box-sizing: border-box; }
+  .planning-event-dialog .planning-modal-head { align-items: flex-start; flex-wrap: wrap; }
+}
