@@ -1,3 +1,4 @@
+import "../styles/shopping.css";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 
@@ -126,17 +127,17 @@ export default function Shopping() {
     {error && <div className="form-error">{error}</div>}
     <section className="shopping-toolbar">
       <label>Список<select value={listId} onChange={e => setListId(e.target.value)}>{lists.map(list => <option key={list.id} value={list.id}>{list.name}{list.is_default ? " — основной" : ""}</option>)}</select></label>
-      <form onSubmit={createList} className="shopping-new-list"><input value={newList} placeholder="Новый список: Дача" onChange={e => setNewList(e.target.value)} /><label className="shopping-share"><input type="checkbox" checked={shareNewList} onChange={e => setShareNewList(e.target.checked)} /> Семейный</label><button type="submit" className="btn-secondary">Создать список</button></form>
+      <details className="shopping-list-create"><summary>+ Новый список</summary><form onSubmit={createList} className="shopping-new-list"><label>Название списка<input required value={newList} placeholder="Например, дача" onChange={e => setNewList(e.target.value)} /></label><label className="shopping-share"><input type="checkbox" checked={shareNewList} onChange={e => setShareNewList(e.target.checked)} /> Семейный</label><button type="submit" className="btn-secondary">Создать список</button></form></details>
     </section>
     <section className="shopping-add-card">
       <h2>Быстро добавить</h2>
       <form className="shopping-add-form" onSubmit={addItem}>
-        <input list="shopping-history" autoComplete="off" value={form.name} placeholder="Например, молоко" onChange={e => updateForm("name", e.target.value)} />
+        <label className="shopping-product-field">Товар<input required list="shopping-history" autoComplete="off" value={form.name} placeholder="Например, молоко" onChange={e => updateForm("name", e.target.value)} /></label>
         <datalist id="shopping-history">{history.map((item, index) => <option key={`${item.name}-${index}`} value={item.name} />)}</datalist>
-        <input inputMode="decimal" value={form.quantity} aria-label="Количество" onChange={e => updateForm("quantity", e.target.value)} />
-        <input value={form.unit} aria-label="Единица измерения" placeholder="шт." onChange={e => updateForm("unit", e.target.value)} />
-        <input inputMode="decimal" value={form.planned_price} aria-label="Цена" placeholder="Цена" onChange={e => updateForm("planned_price", e.target.value)} />
-        <button type="submit">Добавить</button>
+        <label>Количество<input type="number" min="0.01" step="any" required inputMode="decimal" value={form.quantity} onChange={e => updateForm("quantity", e.target.value)} /></label>
+        <label>Единица<input value={form.unit} aria-label="Единица измерения" placeholder="шт., кг, л" onChange={e => updateForm("unit", e.target.value)} /></label>
+        <label className="shopping-price-field">Цена, {form.currency}<input type="number" min="0" step="0.01" inputMode="decimal" value={form.planned_price} aria-label="Цена" placeholder="Необязательно" onChange={e => updateForm("planned_price", e.target.value)} /></label>
+        <button type="submit" disabled={!listId}>Добавить</button>
       </form>
       {history.length > 0 && <div className="shopping-suggestions"><span>Из прошлых покупок:</span>{history.slice(0, 8).map((item, index) => <button type="button" key={`${item.name}-${index}`} onClick={() => applySuggestion(item)}>{item.name}</button>)}</div>}
     </section>

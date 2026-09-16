@@ -87,7 +87,8 @@ test('personal mode keeps shopping and hides family-only menu groups', async ({ 
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Планирование' })).toHaveCount(0);
   await expect(dialog.getByRole('link', { name: 'Семья', exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('link', { name: 'Списки покупок' })).toBeVisible();
+  await expect(page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Покупки' })).toBeVisible();
+  await expect(dialog.getByRole('link').first()).toHaveText('Записи›');
   await dialog.locator('summary').filter({ hasText: 'Помощь и приложение' }).click();
   await expect(dialog.getByRole('link', { name: 'Администрирование' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Выйти', exact: true })).toBeVisible();

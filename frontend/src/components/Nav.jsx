@@ -16,7 +16,7 @@ const BASE_LINKS = [
 
 const MOBILE_PRIMARY_LINKS = [
   { to: "/home", label: "Главная", icon: "⌂" },
-  { to: "/transactions", label: "Записи", icon: "≡" },
+  { to: "/shopping", label: "Покупки", icon: "🛒" },
   { to: "/reports", label: "Анализ", icon: "⌁" },
   { to: "/accounts", label: "Счета", icon: "▣" },
 ];

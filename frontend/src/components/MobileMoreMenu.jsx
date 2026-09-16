@@ -52,16 +52,17 @@ export default function MobileMoreMenu({ hasFamilyPlan, isAdmin, onClose, onLogo
     <button type="button" className="nav-mobile-backdrop" aria-label="Закрыть меню" onClick={onClose} />
     <div ref={dialog} id="mobile-more-menu" className="nav-mobile-menu" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title">
       <div className="nav-mobile-sheet-head"><strong id="mobile-more-title">Ещё</strong><button type="button" onClick={onClose} className="btn-ghost" aria-label="Закрыть меню">×</button></div>
+      <section className="nav-mobile-group"><MenuLinks links={[["/transactions", "Записи"]]} onClose={onClose} /></section>
       {hasFamilyPlan && <section className="nav-mobile-group" aria-labelledby="mobile-family-title">
         <h2 id="mobile-family-title">Совместные финансы</h2>
-        <MenuLinks links={[["/family", "Семья"], ["/shopping", "Списки покупок"]]} onClose={onClose} />
+        <MenuLinks links={[["/family", "Семья"]]} onClose={onClose} />
       </section>}
       {hasFamilyPlan && <section className="nav-mobile-group" aria-labelledby="mobile-planning-title">
         <h2 id="mobile-planning-title">Планирование</h2><MenuLinks links={planning} onClose={onClose} />
       </section>}
       <section className="nav-mobile-group" aria-labelledby="mobile-records-title">
         <h2 id="mobile-records-title">Работа с записями</h2>
-        <MenuLinks links={hasFamilyPlan ? records : [...records, ["/shopping", "Списки покупок"]]} onClose={onClose} />
+        <MenuLinks links={records} onClose={onClose} />
       </section>
       <details className="nav-mobile-group" open={pathname.startsWith("/settings/") || undefined}>
         <summary>Настройки</summary><MenuLinks links={settings} onClose={onClose} />
