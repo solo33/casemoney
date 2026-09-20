@@ -57,7 +57,7 @@ export function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subF
           <button type="button" onClick={cancelEdit} className="btn-ghost" style={{ fontSize: 13, padding: "6px 12px" }}>Отмена</button>
         </form>
       ) : (
-      <div style={{
+      <div className="category-node-row" style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "10px 12px",
         cursor: hasChildren ? "pointer" : "default",
@@ -67,13 +67,13 @@ export function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subF
           background: root.color, flexShrink: 0,
         }} />
         {root.icon && <span style={{ fontSize: 18 }}>{root.icon}</span>}
-        <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{root.name}</span>
+        <span className="category-node-name" style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{root.name}</span>
         {hasChildren && (
           <span style={{ color: "#a6afb8", fontSize: 13 }}>
             {root.children.length} {isExpanded ? "▾" : "▸"}
           </span>
         )}
-        <OrderButtons
+        <div className="category-node-actions"><OrderButtons
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
           onMoveUp={onMoveUp}
@@ -105,6 +105,7 @@ export function RootNode({ root, isExpanded, onToggle, isAdding, setAdding, subF
         >
           Удалить
         </button>
+      </div>
       </div>
       )}
 

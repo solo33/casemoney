@@ -1,8 +1,10 @@
+import { useLocation } from "react-router-dom";
 import { useState, useCallback, useEffect, useMemo } from "react";
 import api from "../api/client";
 import { blankForm, isoDate, today } from "../utils/planningView";
 
 export default function usePlanningController() {
+  const { state } = useLocation();
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -12,7 +14,10 @@ export default function usePlanningController() {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarUrl, setCalendarUrl] = useState("");
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [form, setForm] = useState(blankForm);
+  const [form, setForm] = useState(() => {
+    const item = state?.regularPayment;
+    return item ? { ...blankForm(), type: item.transaction_type, amount: String(item.amount), currency: item.currency, account_id: String(item.account_id), category_id: String(item.category_id || ""), description: item.description, date: item.next_date } : blankForm();
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -93,7 +98,9 @@ export default function usePlanningController() {
       const response = await api.post("/api/transaction-templates/", { ...form, name, amount: Number(form.amount), account_id: Number(form.account_id), category_id: form.category_id ? Number(form.category_id) : null });
       setTemplates(current => [...current, response.data].sort((a, b) => a.name.localeCompare(b.name, "ru")));
       setModal(null);
-    } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось сохранить шаблон."); }
+      setError("");
+      return true;
+    } catch (requestError) { setError(requestError.response?.data?.detail || "Не удалось сохранить шаблон."); return false; }
   };
   const applyTemplate = template => setForm({ type: template.type, amount: String(template.amount), currency: template.currency, account_id: String(template.account_id || ""), category_id: String(template.category_id || ""), description: template.description || "", date: today() });
   const removeTemplate = async template => {
@@ -104,7 +111,7 @@ export default function usePlanningController() {
   const openRecurringModal = () => {
     if (!form.amount || !form.account_id) { setError("Сначала заполните операцию, которую нужно повторять."); return; }
     setError("");
-    setModal({ mode: "recurring", name: defaultName(), frequency: "monthly", next_date: form.date, custom_interval_days: 30, execution_mode: "planned", reminder_days: 0, end_date: "" });
+    setModal({ mode: "recurring", name: defaultName(), frequency: state?.regularPayment?.cadence === "еженедельно" ? "weekly" : "monthly", next_date: form.date, custom_interval_days: 30, execution_mode: "planned", reminder_days: 0, end_date: "" });
   };
   const submitRecurring = async ({ name, frequency, next_date, custom_interval_days, execution_mode, reminder_days, end_date }) => {
     try {

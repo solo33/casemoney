@@ -1,5 +1,5 @@
 import api from "../../api/client";
-import CategoryOptions from "../CategoryOptions";
+import CategoryPicker from "../CategoryPicker";
 import { formatMoney } from "../../utils/money";
 export default function ExpenseImport({ pendingExpenses, pendingCategoryDrafts, setPendingCategoryDrafts, pendingAccountDrafts, setPendingAccountDrafts, pendingTotalsByAccount, submit, setError, setMessage }) { return (<section className="family-card">
               <h2>Перенести общие покупки в мой учёт</h2>
@@ -12,14 +12,7 @@ export default function ExpenseImport({ pendingExpenses, pendingCategoryDrafts, 
                       <span>{item.source_name} · {item.source_category_name} · {new Date(item.date).toLocaleDateString("ru-RU")}</span>
                     </div>
                     <strong>{formatMoney(item.amount)} {item.currency}</strong>
-                    <select
-                      value={pendingCategoryDrafts[item.id] || ""}
-                      onChange={event => setPendingCategoryDrafts(current => ({ ...current, [item.id]: event.target.value }))}
-                      aria-label="Ваша категория"
-                    >
-                      <option value="">Выберите категорию</option>
-                      <CategoryOptions categories={pendingExpenses.categories} />
-                    </select>
+                    <CategoryPicker categories={pendingExpenses.categories} value={pendingCategoryDrafts[item.id] || ""} onChange={value => setPendingCategoryDrafts(current => ({ ...current, [item.id]: value }))} placeholder="Выберите категорию" />
                     <select
                       value={pendingAccountDrafts[item.id] || ""}
                       onChange={event => setPendingAccountDrafts(current => ({ ...current, [item.id]: event.target.value }))}

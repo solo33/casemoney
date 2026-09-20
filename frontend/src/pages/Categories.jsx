@@ -1,4 +1,5 @@
 
+import "../styles/categories.css";
 import SettingsTabs from "../components/SettingsTabs";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 
@@ -8,10 +9,10 @@ import { Section } from "../components/categories/CategorySection";
 
 export default function Categories() {
   const { loading, error, setError, expanded, addingTo, setAddingTo, subForm, setSubForm, editingId, editForm, setEditForm, rootForm, setRootForm, activeDrag, sensors, toggleExpand, handleCreateRoot, handleCreateSubcategory, startEdit, cancelEdit, saveEdit, handleDelete, handleDragStart, handleDragEnd, handleReorder, grouped } = useCategoriesController();
-  if (loading) return <div className="page">Загрузка...</div>;
+  if (loading) return <div className="page categories-page">Загрузка...</div>;
 
   return (
-    <div className="page">
+    <div className="page categories-page">
       <h1>Категории</h1>
       <SettingsTabs />
 

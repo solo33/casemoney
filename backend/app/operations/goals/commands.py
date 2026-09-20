@@ -7,13 +7,13 @@ from app.models.user import User
 from app.schemas.goal import GoalCreate, GoalUpdate
 from app.services.plans import ensure_family_plan
 from app.services.notifications import notify_family_members
-from app.operations.goals.common import _membership, _serialize, _validate_account
+from app.operations.goals.common import _membership, _serialize, _resolve_accounts
 from app.schemas.goals_views import ContributionCreate
 
 
 def create_goal(data: GoalCreate, db: Session=None, user_id: int=None):
     ensure_family_plan(db, user_id)
-    _validate_account(db, user_id, data.account_id)
+    accounts = _resolve_accounts(db, user_id, data.model_dump(exclude_unset=True))
     membership = _membership(db, user_id)
     if data.is_shared and not membership:
         raise ApplicationError(status_code=400, detail="Сначала создайте семейное пространство")
@@ -24,7 +24,8 @@ def create_goal(data: GoalCreate, db: Session=None, user_id: int=None):
         target_amount=data.target_amount,
         currency=data.currency.upper(),
         current_amount=data.current_amount,
-        account_id=data.account_id,
+        account_id=accounts[0].id if accounts else None,
+        accounts=accounts,
         due_date=data.due_date,
         sort_order=data.sort_order,
         family_id=membership.family_id if data.is_shared else None,
@@ -44,8 +45,11 @@ def update_goal(goal_id: int, data: GoalUpdate, db: Session=None, user_id: int=N
     update = data.model_dump(exclude_unset=True)
     if "currency" in update and update["currency"]:
         update["currency"] = update["currency"].upper()
-    if "account_id" in update:
-        _validate_account(db, user_id, update["account_id"])
+    if "account_id" in update or "account_ids" in update:
+        accounts = _resolve_accounts(db, user_id, update)
+        goal.accounts = accounts
+        update.pop("account_ids", None)
+        update["account_id"] = accounts[0].id if accounts else None
 
     for k, v in update.items():
         setattr(goal, k, v)

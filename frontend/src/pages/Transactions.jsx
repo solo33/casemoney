@@ -3,7 +3,7 @@ import TransactionTable from "../components/transactions/TransactionTable";
 
 import { Link } from "react-router-dom";
 
-import CategoryOptions from "../components/CategoryOptions";
+import CategoryPicker from "../components/CategoryPicker";
 import { Pagination, EditRow, MobileTransactionCard } from "../components/transactions/TransactionRows";
 import { formatMoney, currencySymbol } from "../utils/money";
 
@@ -77,10 +77,7 @@ export default function Transactions() {
           <option value="">Все счета</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <select value={filters.category_id} onChange={e => setFilter("category_id", e.target.value)}>
-          <option value="">Все категории</option>
-          <CategoryOptions categories={categories} />
-        </select>
+        <CategoryPicker includeHidden categories={categories} value={filters.category_id} onChange={value => setFilter("category_id", value)} placeholder="Все категории" />
         <select value={filters.tag_id} onChange={e => setFilter("tag_id", e.target.value)}>
           <option value="">Все метки и проекты</option>
           {tags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
@@ -145,10 +142,7 @@ export default function Transactions() {
         <div className="transactions-bulk-bar">
           <span>Выбрано: <b>{selectedIds.length}</b></span>
           {canBulkCategorize ? <>
-            <select value={bulkCategoryId} onChange={event => setBulkCategoryId(event.target.value)} aria-label="Новая категория для выбранных записей">
-              <option value="">Выберите категорию</option>
-              {bulkCategories.map(category => <option key={category.id} value={category.id}>{category.parent_id ? "↳ " : ""}{category.name}</option>)}
-            </select>
+            <CategoryPicker categories={bulkCategories} value={bulkCategoryId} onChange={setBulkCategoryId} ariaLabel="Новая категория для выбранных записей" placeholder="Выберите категорию" />
             <button type="button" disabled={!bulkCategoryId || bulkSaving} onClick={applyBulkCategory}>{bulkSaving ? "Меняем…" : "Изменить категорию"}</button>
           </> : <small>Выберите только доходы или только расходы — переводы не категоризируются.</small>}
           <button type="button" className="btn-ghost" onClick={() => setSelectedIds([])}>Снять выбор</button>
@@ -170,10 +164,7 @@ export default function Transactions() {
               </span>
               {suggestion.fee_amount > 0 && <label className="transfer-fee-select">
                 Комиссия {formatMoney(suggestion.fee_amount)} {currencySymbol(suggestion.currency)}
-                <select value={transferFees[suggestion.expense_id] || ""} onChange={event => setTransferFees(current => ({ ...current, [suggestion.expense_id]: event.target.value }))}>
-                  <option value="">не учитывать отдельно</option>
-                  {feeCategories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
-                </select>
+                <CategoryPicker categories={feeCategories} value={transferFees[suggestion.expense_id] || ""} onChange={value => setTransferFees(current => ({ ...current, [suggestion.expense_id]: value }))} placeholder="Не учитывать отдельно" />
               </label>}
               <button type="button" className="btn-ghost" disabled={matchingTransferId === suggestion.expense_id} onClick={() => confirmTransferSuggestion(suggestion)}>
                 {matchingTransferId === suggestion.expense_id ? "Связываем…" : "Связать"}

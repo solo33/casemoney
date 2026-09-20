@@ -1,3 +1,4 @@
+import CategoryPicker from "../components/CategoryPicker";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api/client";
 import SettingsTabs from "../components/SettingsTabs";
@@ -96,7 +97,7 @@ export default function Automation() {
       <form className="automation-rule-form" onSubmit={addRule}>
         <label><span>Если в комментарии есть</span><input value={pattern} maxLength="160" placeholder="Пятёрочка" onChange={event => setPattern(event.target.value)} /></label>
         <span className="automation-arrow">→</span>
-        <label><span>Выбрать категорию</span><select value={categoryId} onChange={event => setCategoryId(event.target.value)}><option value="">Категория</option>{expenseCategories.map(category => <option key={category.id} value={category.id}>{category.parent_id ? "↳ " : ""}{category.name}</option>)}</select></label>
+        <label><span>Выбрать категорию</span><CategoryPicker categories={expenseCategories} value={categoryId} onChange={setCategoryId} placeholder="Выберите категорию" /></label>
         <button type="submit" disabled={saving}>{saving ? "Сохраняем…" : "Добавить"}</button>
       </form>
       <div className="automation-rules">

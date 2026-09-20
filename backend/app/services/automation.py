@@ -7,7 +7,7 @@ from __future__ import annotations
 from app.money import decimal
 
 from collections import defaultdict
-from datetime import timedelta
+from datetime import date, timedelta
 
 from app.models.account import Account
 from app.models.category import Category
@@ -120,7 +120,7 @@ def suggest_category_from_history(
     }
 
 
-def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]:
+def regular_payment_suggestions(db, user_id: int, limit: int = 12, *, today: date | None = None) -> list[dict]:
     """Find conservative weekly/monthly payment candidates without creating anything.
 
     A candidate needs at least three real, non-financing income/expense
@@ -172,6 +172,14 @@ def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]
         else:
             continue
         last = transactions[-1]
+        reference_date = today or date.today()
+        # A historic pattern is not evidence of an active subscription.
+        age = (reference_date - last.date.date()).days
+        if age < 0 or age > delta + (3 if delta == 7 else 7):
+            continue
+        next_date = last.date.date() + timedelta(days=delta)
+        while next_date < reference_date:
+            next_date += timedelta(days=delta)
         account = values[-1][1]
         result.append({
             "key": "|".join(map(str, key)),
@@ -185,6 +193,6 @@ def regular_payment_suggestions(db, user_id: int, limit: int = 12) -> list[dict]
             "cadence": cadence,
             "occurrences": len(transactions),
             "last_date": last.date.date().isoformat(),
-            "next_date": (last.date.date() + timedelta(days=delta)).isoformat(),
+            "next_date": next_date.isoformat(),
         })
     return sorted(result, key=lambda item: (-item["occurrences"], item["next_date"]))[:limit]

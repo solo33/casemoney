@@ -97,7 +97,7 @@ def test_automation_settings_can_disable_rules_and_duplicate_review(client, auth
 def test_regular_payment_suggestions_are_read_only(client, auth):
     account = make_account(client, auth)
     food = _expense_category(client, auth)
-    first = datetime(2026, 5, 3, tzinfo=timezone.utc)
+    first = datetime.now(timezone.utc) - timedelta(days=60)
     for index in range(3):
         response = client.post("/api/transactions/", headers=auth, json={
             "type": "expense", "amount": 799, "currency": "RUB",
@@ -149,3 +149,16 @@ def test_confirming_transfer_suggestion_replaces_two_rows_without_changing_balan
     assert client.get("/api/transactions/", headers=auth).json()["total"] == 1
     assert account_balance(client, auth, source["id"]) == 1500
     assert account_balance(client, auth, target["id"]) == 600
+
+
+def test_old_regular_payments_are_not_current_suggestions(client, auth):
+    account = make_account(client, auth)
+    for year in (2021, 2023):
+        for month in (1, 2, 3):
+            response = client.post("/api/transactions/", headers=auth, json={
+                "type": "expense", "amount": year, "currency": "RUB", "account_id": account["id"],
+                "description": f"Old subscription {year}", "date": f"{year}-{month:02d}-15T12:00:00Z",
+            })
+            assert response.status_code == 201, response.text
+    assert client.get("/api/automation/regular-payments", headers=auth).json() == []
+    assert client.get("/api/transactions/", headers=auth).json()["total"] == 6

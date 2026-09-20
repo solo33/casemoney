@@ -1,7 +1,6 @@
 """Goals: common. Callers supply resolved user and database session."""
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
-from typing import Optional
 from datetime import date, timedelta
 from app.models.goal import Goal, GoalContribution
 from app.models.account import Account
@@ -48,25 +47,27 @@ def _serialize(
     priority_allocation_amount: float | None = None,
     priority_shortfall_amount: float | None = None,
 ) -> GoalResponse:
-    """Считает прогресс. Если есть account_id — current = баланс счёта в валюте цели."""
+    """Суммирует остатки привязанных счетов в валюте цели и явные взносы."""
     current = goal.current_amount
     account_name = None
+    account_ids = {account.id for account in goal.accounts}
     if goal.account_id:
-        acc = db.query(Account).filter(
-            Account.id == goal.account_id, Account.user_id == user_id,
-        ).first()
-        if acc:
-            account_name = acc.name
-            # Сумма всех балансов счёта в валюте цели
-            total = 0
-            for b in acc.balances:
+        account_ids.add(goal.account_id)
+    linked_accounts = db.query(Account).filter(
+        Account.id.in_(account_ids), Account.user_id == goal.user_id,
+    ).order_by(Account.id).all() if account_ids else []
+    if linked_accounts:
+        account_name = linked_accounts[0].name
+        total = 0
+        for account in linked_accounts:
+            for balance in account.balances:
                 try:
                     total += exchange_svc.convert_for_user(
-                        db, user_id, b.balance, b.currency, goal.currency,
+                        db, goal.user_id, balance.balance, balance.currency, goal.currency,
                     )
                 except exchange_svc.ExchangeError:
                     pass
-            current = round(total, 2)
+        current = round(total, 2)
 
     rows = db.query(GoalContribution, User).join(User, User.id == GoalContribution.user_id).filter(GoalContribution.goal_id == goal.id).all()
     contributions = [{"id": item.id, "user_id": item.user_id, "name": user.username or user.email, "amount": item.amount, "date": item.created_at.isoformat()} for item, user in rows]
@@ -108,7 +109,9 @@ def _serialize(
         currency=goal.currency,
         current_amount=current,
         progress_percent=pct,
-        account_id=goal.account_id,
+        account_id=linked_accounts[0].id if linked_accounts else None,
+        account_ids=[account.id for account in linked_accounts],
+        accounts=[{"id": account.id, "name": account.name} for account in linked_accounts],
         account_name=account_name,
         due_date=goal.due_date,
         sort_order=goal.sort_order,
@@ -128,11 +131,16 @@ def _serialize(
     )
 
 
-def _validate_account(db: Session, user_id: int, account_id: Optional[int]):
-    if account_id is None:
-        return
-    acc = db.query(Account).filter(
-        Account.id == account_id, Account.user_id == user_id,
-    ).first()
-    if not acc:
-        raise ApplicationError(status_code=400, detail="Account not found")
+def _resolve_accounts(db: Session, user_id: int, values: dict):
+    if "account_ids" in values:
+        if values["account_ids"] is None:
+            raise ApplicationError(status_code=422, detail="Укажите список счетов или [] для ручного прогресса")
+        ids = sorted(set(values["account_ids"]))
+        if "account_id" in values and values["account_id"] != (ids[0] if ids else None):
+            raise ApplicationError(status_code=422, detail="Привязки счетов противоречат друг другу")
+    else:
+        ids = [values["account_id"]] if values.get("account_id") else []
+    accounts = db.query(Account).filter(Account.id.in_(ids), Account.user_id == user_id).order_by(Account.id).all() if ids else []
+    if len(accounts) != len(ids):
+        raise ApplicationError(status_code=400, detail="Один из счетов не найден или недоступен")
+    return accounts

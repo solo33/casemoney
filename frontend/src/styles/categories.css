@@ -1,0 +1,10 @@
+.category-node-name { min-width: 0; overflow-wrap: anywhere; }
+.category-node-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.categories-page input { box-sizing: border-box; max-width: 100%; }
+@media (max-width: 600px) {
+ .category-node-row { flex-wrap: wrap; }
+ .category-node-name { flex-basis: calc(100% - 84px) !important; }
+ .category-node-actions { flex-basis: 100%; justify-content: flex-end; flex-wrap: wrap; }
+ .category-node-actions button { min-height: 40px; min-width: 36px; }
+ .categories-page form { min-width: 0; }
+}

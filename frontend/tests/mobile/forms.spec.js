@@ -11,7 +11,8 @@ test('mobile bulk category change submits selected records and clears selection'
   });
   await page.goto('/transactions', { waitUntil: 'networkidle' });
   await page.locator('.mobile-transaction-select input').first().check();
-  await page.getByLabel('Новая категория для выбранных записей').selectOption('2');
+  await page.getByLabel('Новая категория для выбранных записей').click();
+  await page.getByRole('dialog', { name: 'Выбор категории' }).getByRole('button', { name: 'Подкатегория', exact: true }).click();
   await page.getByRole('button', { name: 'Изменить категорию', exact: true }).click();
   await expect.poll(() => saved).toEqual({ transaction_ids: [1], category_id: 2 });
   await expect(page.locator('.transactions-bulk-bar')).not.toBeVisible();

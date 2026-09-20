@@ -26,10 +26,10 @@ export default function Planning() {
     {controller.error && <div className="form-error" role="status">{controller.error}</div>}
     {section === "calendar" && <><PlanningOverview {...controller} selectedDate={selectedDate} setSelectedDate={setSelectedDate} navigateSection={navigateSection} /><PlanningPending {...controller} /></>}
     {section === "schedules" && <><PlanningObligations obligations={controller.obligations} onDate={date => { controller.setCalendarMonth(new Date(`${date}T12:00:00`)); setSelectedDate(date); navigateSection("calendar"); }} /><PlanningRecurring {...controller} /><FamilyPlanningSuggestions onChanged={controller.load} /></>}
-    {section === "templates" && <PlanningTemplates {...controller} applyTemplate={template => { controller.applyTemplate(template); navigateSection("create"); }} />}
-    {section === "create" && <PlanningCreate {...controller} />}
+    {section === "templates" && <PlanningTemplates {...controller} createTemplate={() => setParams({ section: "create", mode: "template" })} applyTemplate={template => { controller.applyTemplate(template); navigateSection("create"); }} />}
+    {section === "create" && <PlanningCreate {...controller} templateMode={params.get("mode") === "template"} />}
     {section === "settings" && <section className="planning-templates-card"><h2>Подключение календаря</h2><p>Добавьте личную ссылку в Google, Яндекс или другой календарь.</p><div className="planning-calendar-feed"><div><strong>Личная ссылка iCalendar</strong><span>Не передавайте её другим: по ней видны названия и суммы плановых операций.</span></div><input readOnly value={controller.calendarUrl} aria-label="Ссылка календаря" /><button type="button" className="btn-secondary" onClick={controller.copyCalendarLink}>Копировать</button><button type="button" className="btn-ghost" onClick={controller.rotateCalendarLink}>Обновить ссылку</button></div></section>}
-    {controller.modal && <PlanningActionModal modal={controller.modal} setModal={controller.setModal} onSaveTemplate={controller.submitTemplate} onSaveRecurring={controller.submitRecurring} />}
+    {controller.modal && <PlanningActionModal modal={controller.modal} setModal={controller.setModal} onSaveTemplate={async name => { if (await controller.submitTemplate(name)) navigateSection("templates"); }} onSaveRecurring={controller.submitRecurring} />}
     {controller.recurringRuns && <RecurringRunsModal data={controller.recurringRuns} onClose={() => controller.setRecurringRuns(null)} />}
   </main>;
 }

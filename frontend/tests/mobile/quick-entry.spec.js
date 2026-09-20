@@ -27,9 +27,10 @@ test('desktop quick entry aligns date and family option and provides room for th
   const wrapper = await form.locator('.amount-input-with-calculator').first().boundingBox();
   const date = await form.getByLabel('Дата записи').boundingBox();
   expect(date.width).toBeLessThanOrEqual(180);
-  const category = form.locator('.qai-category-row .category-picker-native');
-  await category.selectOption('3');
-  await expect(category.locator('option:checked')).toHaveText('Жильё → Квартира2');
+  const category = form.locator('.qai-category-row .category-picker-trigger');
+  await category.click();
+  await page.getByRole('dialog', { name: 'Выбор категории' }).getByRole('button', { name: 'Квартира2', exact: true }).click();
+  await expect(category).toContainText('Жильё → Квартира2');
   expect((await category.boundingBox()).width).toBeGreaterThan(wrapper.x - (await category.boundingBox()).x);
   const note = await form.getByLabel('Примечание', { exact: true }).boundingBox();
   const family = await form.locator('.family-expense-toggle').boundingBox();
@@ -67,11 +68,12 @@ test('disabling a commission clears the draft and excludes it from the submitted
   const checkbox = form.getByRole('checkbox', { name: 'Добавить комиссию' });
   await checkbox.check();
   await form.getByLabel('Комиссия, RUB', { exact: true }).fill('50');
-  await form.locator('.transfer-fee-category select').selectOption('1');
+  await form.locator('.transfer-fee-category .category-picker-trigger').click();
+  await page.getByRole('dialog', { name: 'Выбор категории' }).getByRole('button', { name: 'Комиссии', exact: true }).click();
   await checkbox.uncheck();
   await checkbox.check();
   await expect(form.getByLabel('Комиссия, RUB', { exact: true })).toHaveValue('');
-  await expect(form.locator('.transfer-fee-category select')).toHaveValue('');
+  await expect(form.locator('.transfer-fee-category .category-picker-trigger')).not.toContainText('Комиссии');
   await checkbox.uncheck();
   await form.getByRole('button', { name: 'Записать', exact: true }).click();
   await expect.poll(() => saved?.amount).toBe(1000);
@@ -100,7 +102,8 @@ test('an enabled commission is validated and submitted with its category', async
   await form.getByRole('button', { name: 'Записать', exact: true }).click();
   await expect(form).toContainText('Выберите категорию комиссии');
   expect(saved).toBeUndefined();
-  await form.locator('.transfer-fee-category select').selectOption('1');
+  await form.locator('.transfer-fee-category .category-picker-trigger').click();
+  await page.getByRole('dialog', { name: 'Выбор категории' }).getByRole('button', { name: 'Комиссии', exact: true }).click();
   await form.getByRole('button', { name: 'Записать', exact: true }).click();
   await expect.poll(() => saved?.fee_amount).toBe(25.5);
   expect(saved.fee_category_id).toBe(1);

@@ -1,3 +1,4 @@
+import "../../styles/goals.css";
 import { currencySymbol, formatMoney, COMMON_CURRENCIES } from "../../utils/money";
 import api from "../../api/client";
 
@@ -14,13 +15,13 @@ export function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived =
     catch { window.alert("Не удалось добавить взнос."); }
   };
   return (
-    <div style={{
+    <div className="goal-card" style={{
       background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 18,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+      <div className="goal-card-heading" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
         <span style={{ fontSize: 24 }}>{g.icon || "🎯"}</span>
-        <div style={{ flex: 1 }}>
+        <div className="goal-card-title" style={{ flex: 1 }}>
           <div style={{
             fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600,
             color: "#1b2531",
@@ -28,9 +29,9 @@ export function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived =
             {g.name}
             {g.is_shared && <span style={{ marginLeft: 8, fontSize: 12, color: "#a06b18" }}>Общая цель</span>}
           </div>
-          {g.account_name && (
+          {(g.accounts?.length > 0 || g.account_name) && (
             <div style={{ fontSize: 12, color: "#a6afb8" }}>
-              привязано к счёту: {g.account_name}
+              Счета: {g.accounts?.length ? g.accounts.map(account => account.name).join(", ") : g.account_name}
             </div>
           )}
           {g.due_date && (
@@ -60,7 +61,7 @@ export function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived =
         {archived ? (
           <button className="btn-ghost" onClick={onRestore} style={{ padding: "4px 10px", fontSize: 13 }}>Вернуть</button>
         ) : <>
-          <button className="btn-ghost" onClick={onEdit} style={{ padding: "4px 10px", fontSize: 13 }}>
+          <button className="btn-ghost" onClick={onEdit} aria-label={`Редактировать цель ${g.name}`} style={{ padding: "4px 10px", fontSize: 13 }}>
             ✎
           </button>
           <button className="btn-ghost" onClick={onArchive} style={{ padding: "4px 10px", fontSize: 13 }}>
@@ -88,7 +89,7 @@ export function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived =
         }} />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", fontVariantNumeric: "tabular-nums" }}>
+      <div className="goal-card-progress" style={{ display: "flex", justifyContent: "space-between", fontVariantNumeric: "tabular-nums" }}>
         <span style={{ color: reached ? "#167a4a" : "#1b2531", fontWeight: 600, fontSize: 14 }}>
           {formatMoney(g.current_amount)} {sym}
         </span>
@@ -115,9 +116,9 @@ export function GoalCard({ g, onEdit, onDelete, onArchive, onRestore, archived =
 }
 
 export function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }) {
-  const hasAccount = !!form.account_id;
+  const hasAccount = form.account_ids.length > 0;
   return (
-    <form onSubmit={onSubmit} style={{
+    <form className="goal-form" onSubmit={onSubmit} style={{
       background: "#fffdf7", border: "1px solid #e4ddcd", borderRadius: 10,
       padding: 18, marginBottom: 16,
       display: "flex", flexDirection: "column", gap: 12,
@@ -159,15 +160,16 @@ export function GoalForm({ form, setForm, accounts, onSubmit, onCancel, isEdit }
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <label style={lbl}>Прогресс</label>
-        <select
-          value={form.account_id}
-          onChange={e => setForm({ ...form, account_id: e.target.value })}
-          style={{ minWidth: 200 }}
-        >
-          <option value="">— вручную —</option>
-          {accounts.map(a => <option key={a.id} value={a.id}>📈 Баланс «{a.name}»</option>)}
-        </select>
+        <fieldset className="goal-account-picker"><legend>Счета цели</legend>
+          <p>Выберите один или несколько счетов. Их остатки суммируются в валюте цели. Без выбора — ручной ввод.</p>
+          <div className="goal-account-options">{accounts.map(account => <label key={account.id}>
+            <input type="checkbox" checked={form.account_ids.includes(String(account.id))} onChange={event => {
+              const checked = event.target.checked;
+              setForm(current => ({ ...current, account_ids: checked ? [...current.account_ids, String(account.id)] : current.account_ids.filter(id => id !== String(account.id)) }));
+            }} /><span>{account.name}</span>
+          </label>)}</div>
+          <small>Выбрано счетов: {form.account_ids.length}</small>
+        </fieldset>
         {!hasAccount && (
           <>
             <span style={lbl}>Текущая сумма</span>

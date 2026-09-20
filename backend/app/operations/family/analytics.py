@@ -152,10 +152,15 @@ def _shared_goal_progress(db, family_id, start, end, main_currency, skipped_curr
     ).order_by(Goal.sort_order, Goal.id).all()
     for goal in shared_goals:
         current_in_goal_currency = goal.current_amount
+        account_ids = {account.id for account in goal.accounts}
         if goal.account_id:
-            account = db.query(Account).filter(Account.id == goal.account_id).first()
-            if account:
-                current_in_goal_currency = 0
+            account_ids.add(goal.account_id)
+        linked_accounts = db.query(Account).filter(
+            Account.id.in_(account_ids), Account.user_id == goal.user_id,
+        ).all() if account_ids else []
+        if linked_accounts:
+            current_in_goal_currency = 0
+            for account in linked_accounts:
                 for balance in account.balances:
                     converted = _convert_or_skip(
                         db, goal.user_id, balance.balance, balance.currency,

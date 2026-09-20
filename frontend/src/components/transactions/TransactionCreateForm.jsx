@@ -56,12 +56,15 @@ export default function TransactionCreateForm({ handleCreate, newTx, setNewTx, n
               />
               {frequentCategories.length > 0 && (
                 <div className="quick-category-pills" aria-label="Частые категории">
-                  {frequentCategories.map(category => (
+                  {frequentCategories.map(category => {
+                    const fullCategory = categories.find(item => String(item.id) === String(category.id));
+                    const parent = categories.find(item => String(item.id) === String(fullCategory?.parent_id));
+                    return (
                     <button type="button" key={category.id}
                       className={String(newTx.category_id) === String(category.id) ? "is-active" : ""}
                       onClick={() => setNewTx({ ...newTx, category_id: String(category.id) })}
-                    >{category.icon ? `${category.icon} ` : ""}{category.name}</button>
-                  ))}
+                    >{parent && <span className="category-picker-frequent-group">{parent.name}</span>}<span>{category.icon ? `${category.icon} ` : ""}{category.name}</span></button>
+                  ); })}
                 </div>
               )}
               {categorySuggestion && (

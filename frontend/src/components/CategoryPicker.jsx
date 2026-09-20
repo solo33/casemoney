@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import CategoryOptions from "./CategoryOptions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import "../styles/category-picker.css";
 import api from "../api/client";
 
 const isUncategorized = category => (
@@ -27,8 +28,12 @@ export default function CategoryPicker({
   style,
   className = "",
   onCategoryCreated,
-  showParent = false,
+  showParent = true,
+  includeHidden = false,
+  ariaLabel,
 }) {
+  const triggerRef = useRef(null);
+  const sheetRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [frequent, setFrequent] = useState([]);
   const [query, setQuery] = useState("");
@@ -46,12 +51,12 @@ export default function CategoryPicker({
     return categories.filter(category => {
       const isSelected = String(category.id) === selectedId;
       const parent = category.parent_id == null ? null : byId.get(String(category.parent_id));
-      const isSelectedParent = parent && String(parent.id) === selectedId;
+      const isSelectedParent = String(category.id) === String(byId.get(selectedId)?.parent_id);
 
-      if (isSelected || isSelectedParent) return true;
+      if (includeHidden || isSelected || isSelectedParent) return true;
       return !category.is_hidden && !(parent && parent.is_hidden);
     });
-  }, [categories, value]);
+  }, [categories, value, includeHidden]);
   const selected = categories.find(category => String(category.id) === String(value));
   const parent = selected?.parent_id == null ? null : categories.find(category => String(category.id) === String(selected.parent_id));
   const selectedLabel = selected ? (showParent && parent ? `${labelFor(parent)} → ${labelFor(selected)}` : labelFor(selected)) : placeholder;
@@ -95,17 +100,32 @@ export default function CategoryPicker({
 
   const filteredFrequent = useMemo(() => {
     const term = normalize(query);
-    return term ? frequent.filter(category => normalize(category.name).includes(term)) : frequent;
-  }, [frequent, query]);
+    const byId = new Map(categories.map(category => [String(category.id), category]));
+    return frequent.map(category => {
+      const fullCategory = byId.get(String(category.id));
+      const group = byId.get(String(fullCategory?.parent_id));
+      return { ...category, groupLabel: group ? labelFor(group) : "" };
+    }).filter(category => !term || normalize(`${category.name} ${category.groupLabel}`).includes(term));
+  }, [frequent, query, categories]);
 
   const hasResults = filteredGroups.roots.length > 0 || filteredGroups.orphans.length > 0 || filteredFrequent.length > 0;
   const maxFrequentUses = useMemo(() => Math.max(0, ...frequent.map(category => category.uses || 0)), [frequent]);
 
   useEffect(() => {
     if (!open) return undefined;
+    const trigger = triggerRef.current;
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = original; };
+    const handleKey = event => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setOpen(false); }
+      if (event.key !== "Tab") return;
+      const nodes = [...(sheetRef.current?.querySelectorAll('button:not(:disabled), input:not(:disabled)') || [])];
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener("keydown", handleKey, true);
+    return () => { document.body.style.overflow = original; document.removeEventListener("keydown", handleKey, true); trigger?.focus(); };
   }, [open]);
 
   useEffect(() => {
@@ -158,18 +178,12 @@ export default function CategoryPicker({
 
   return (
     <div className={`category-picker ${className}`} style={style}>
-      <select
-        className="category-picker-native"
-        value={value}
-        onChange={event => onChange(event.target.value)}
-      >
-        <option value="">{placeholder}</option>
-        <CategoryOptions categories={visibleCategories} selectedValue={value} selectedLabel={showParent ? selectedLabel : undefined} />
-      </select>
-
       <button
         type="button"
         className="category-picker-trigger"
+        ref={triggerRef}
+        aria-expanded={open}
+        aria-label={ariaLabel}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       >
@@ -177,9 +191,10 @@ export default function CategoryPicker({
         <span aria-hidden="true">⌄</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div className="category-picker-backdrop" onClick={() => setOpen(false)}>
           <section
+            ref={sheetRef}
             className="category-picker-sheet"
             role="dialog"
             aria-modal="true"
@@ -217,17 +232,18 @@ export default function CategoryPicker({
                     style={{ fontSize: `${weightFor(category.uses, maxFrequentUses)}px` }}
                     onClick={() => choose(category.id)}
                   >
-                    {labelFor(category)}
+                    {category.groupLabel && <span className="category-picker-frequent-group">{category.groupLabel}</span>}
+                    <span className="category-picker-frequent-name">{labelFor(category)}</span>
                   </button>
                 ))}</div>
               </div>}
               {filteredGroups.roots.map(parent => (
                 <div className="category-picker-group" key={parent.id}>
-                  <button type="button" className="category-picker-parent" onClick={() => choose(parent.id)}>
+                  <button type="button" className="category-picker-parent" aria-pressed={String(value) === String(parent.id)} onClick={() => choose(parent.id)}>
                     {labelFor(parent)}
                   </button>
                   {(filteredGroups.childrenByParent.get(parent.id) || []).sort(compareByName).map(child => (
-                    <button type="button" className="category-picker-child" key={child.id} onClick={() => choose(child.id)}>
+                    <button type="button" className="category-picker-child" aria-pressed={String(value) === String(child.id)} key={child.id} onClick={() => choose(child.id)}>
                       {labelFor(child)}
                     </button>
                   ))}
@@ -278,7 +294,7 @@ export default function CategoryPicker({
               </div>
             )}
           </section>
-        </div>
+        </div>, document.body
       )}
     </div>
   );

@@ -17,7 +17,7 @@ export function useGoalsController() {
   const blank = {
     name: "", icon: "🎯", target_amount: "",
     currency: mainCurrency, current_amount: 0,
-    account_id: "", due_date: "", sort_order: 0, is_shared: false,
+    account_ids: [], due_date: "", sort_order: 0, is_shared: false,
   };
   const [form, setForm] = useState(blank);
 
@@ -55,8 +55,8 @@ export function useGoalsController() {
       icon: g.icon || "🎯",
       target_amount: String(g.target_amount),
       currency: g.currency,
-      current_amount: g.account_id ? 0 : g.current_amount,
-      account_id: g.account_id ? String(g.account_id) : "",
+      current_amount: (g.account_ids?.length || g.account_id) ? 0 : Number(g.current_amount) - Number(g.contributions_total || 0),
+      account_ids: (g.account_ids || (g.account_id ? [g.account_id] : [])).map(String),
       due_date: g.due_date || "",
       sort_order: g.sort_order || 0, is_shared: g.is_shared,
     });
@@ -80,7 +80,7 @@ export function useGoalsController() {
         target_amount: parseFloat(form.target_amount),
         currency: form.currency,
         current_amount: parseFloat(form.current_amount) || 0,
-        account_id: form.account_id ? parseInt(form.account_id) : null,
+        account_ids: form.account_ids.map(Number),
         due_date: form.due_date || null,
         sort_order: Number(form.sort_order) || 0,
         is_shared: form.is_shared,

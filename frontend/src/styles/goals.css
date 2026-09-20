@@ -1,0 +1,15 @@
+.goal-card-title { min-width: 0; overflow-wrap: anywhere; }
+.goal-card-heading { flex-wrap: wrap; }
+.goal-card-progress { flex-wrap: wrap; gap: 8px; }
+.goal-account-picker { width: 100%; min-width: 0; margin: 0; padding: 12px; border: 1px solid #e4ddcd; border-radius: 8px; box-sizing: border-box; }
+.goal-account-picker p { margin: 0 0 10px; font-size: 13px; color: #596572; }
+.goal-account-options { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
+.goal-account-options label { display: flex; align-items: center; gap: 10px; padding: 8px 0; min-height: 32px; cursor: pointer; }
+.goal-account-options input[type="checkbox"] { width: 20px; height: 20px; margin: 0; flex: 0 0 20px; }
+.goal-account-options span { min-width: 0; overflow-wrap: anywhere; }
+.goal-account-picker small { display: block; margin-top: 10px; color: #596572; }
+.goal-form input, .goal-form select { max-width: 100%; box-sizing: border-box; }
+@media (max-width: 600px) {
+  .goal-card .goal-card-title { flex-basis: calc(100% - 48px) !important; }
+  .goal-form input { min-width: 0 !important; }
+}

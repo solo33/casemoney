@@ -11,6 +11,7 @@ class GoalCreate(BaseModel):
     currency: str = Field("RUB", min_length=2, max_length=10)
     current_amount: MoneyValue = 0.0
     account_id: Optional[int] = None    # если задан — прогресс live из баланса счёта
+    account_ids: Optional[list[int]] = Field(default=None, max_length=100)
     due_date: Optional[date] = None
     sort_order: int = 0
     is_shared: bool = False
@@ -23,8 +24,14 @@ class GoalUpdate(BaseModel):
     currency: Optional[str] = None
     current_amount: Optional[MoneyValue] = None
     account_id: Optional[int] = None
+    account_ids: Optional[list[int]] = Field(default=None, max_length=100)
     due_date: Optional[date] = None
     sort_order: Optional[int] = None
+
+
+class GoalAccountResponse(BaseModel):
+    id: int
+    name: str
 
 
 class GoalResponse(BaseModel):
@@ -37,6 +44,8 @@ class GoalResponse(BaseModel):
     progress_percent: MoneyValue        # 0..100 (clamped)
     account_id: Optional[int]
     account_name: Optional[str]
+    account_ids: list[int] = Field(default_factory=list)
+    accounts: list[GoalAccountResponse] = Field(default_factory=list)
     due_date: Optional[date]
     sort_order: int
     remaining_amount: MoneyValue

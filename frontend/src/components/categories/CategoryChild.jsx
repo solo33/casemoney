@@ -56,6 +56,7 @@ export function ChildNode({ child, onDelete, editingId, editForm, setEditForm, s
   return (
     <div
       ref={setNodeRef}
+      className="category-node-row"
       style={{
         ...style,
         display: "flex", alignItems: "center", gap: 8,
@@ -73,8 +74,8 @@ export function ChildNode({ child, onDelete, editingId, editForm, setEditForm, s
         background: child.color, flexShrink: 0,
       }} />
       {child.icon && <span style={{ fontSize: 14 }}>{child.icon}</span>}
-      <span style={{ flex: 1 }}>{child.name}</span>
-      <OrderButtons
+      <span className="category-node-name" style={{ flex: 1 }}>{child.name}</span>
+      <div className="category-node-actions"><OrderButtons
         canMoveUp={canMoveUp}
         canMoveDown={canMoveDown}
         onMoveUp={onMoveUp}
@@ -100,6 +101,7 @@ export function ChildNode({ child, onDelete, editingId, editForm, setEditForm, s
       >
         ×
       </button>
+      </div>
     </div>
   );
 }

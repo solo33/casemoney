@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import FinanceAssistant from "../components/reports/FinanceAssistant";
 import TrendChart from "../components/reports/TrendChart";
 import CategoryPieChart from "../components/reports/CategoryPieChart";
@@ -60,9 +61,9 @@ export default function Reports() {
 
           {hasFamilyPlan && regularPayments.length > 0 && (
             <section className="report-regular-card">
-              <div><p className="finance-insights-eyebrow">ФИНАНСОВАЯ КАРТИНА</p><h2>Регулярные платежи и поступления</h2><p>Найдены по истории операций. Это подсказки: они не создают записи и не меняют план без вашего решения.</p></div>
+              <div><p className="finance-insights-eyebrow">ФИНАНСОВАЯ КАРТИНА</p><h2>Регулярные платежи и поступления</h2><p>Похожие недавние операции повторялись несколько раз. Если платёж ещё актуален, перенесите его в расписание и проверьте дату и частоту. Сохранение требует вашего подтверждения.</p></div>
               <div className="report-regular-grid">{regularPayments.map(item => <article key={item.key}>
-                <div><strong>{item.description}</strong><span>{item.transaction_type === "expense" ? "Расход" : "Доход"} · {item.cadence} · {item.account_name}</span><small>Следующее ориентировочно {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")}</small></div>
+                <div><strong>{item.description}</strong><span>{item.transaction_type === "expense" ? "Расход" : "Доход"} · {item.cadence} · {item.account_name}</span><small>Последняя операция: {new Date(`${item.last_date}T12:00:00`).toLocaleDateString("ru-RU")}</small><small>Следующее ориентировочно {new Date(`${item.next_date}T12:00:00`).toLocaleDateString("ru-RU")}</small><Link to="/planning?section=create" state={{ regularPayment: item }}>Настроить повторение →</Link></div>
                 <b className={item.transaction_type === "expense" ? "is-expense" : "is-income"}>{item.transaction_type === "expense" ? "−" : "+"}{formatMoney(item.amount)} {item.currency}</b>
               </article>)}</div>
             </section>
