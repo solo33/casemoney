@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from alembic import command
 root=Path(__file__).resolve().parents[1]
 url=make_url(os.getenv('DATABASE_URL') or dotenv_values(root/'.env')['DATABASE_URL'])
@@ -68,7 +69,7 @@ try:
   raise AssertionError('Lossy downgrade was accepted')
  with engine.begin() as connection:
   assert connection.execute(text('SELECT amount FROM transactions LIMIT 1')).scalar() == Decimal('9007199254740993.123456789')
-  assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == 'a0193a000002'
+  assert connection.execute(text('SELECT version_num FROM alembic_version')).scalar() == ScriptDirectory.from_config(cfg).get_current_head()
   connection.execute(text('UPDATE transactions SET amount = 123.45'))
  command.downgrade(cfg,'a0193a000001')
  with engine.begin() as connection:
