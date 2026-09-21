@@ -24,7 +24,7 @@ export default function Reports() {
             checked={includePlanned}
             onChange={event => setIncludePlanned(event.target.checked)}
           />
-          Показать планируемые записи
+          Учитывать план
         </label>
       )}
 

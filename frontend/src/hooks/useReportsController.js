@@ -141,6 +141,7 @@ export function useReportsController() {
       date_to: summary.date_to,
     });
     if (catId != null) params.set("category_id", String(catId));
+    if (includePlanned) params.set("include_planned", "true");
     navigate(`/transactions?${params.toString()}`);
   };
   return { gran, setGran, anchor, setAnchor, setDrillCatId, expandedRows, setExpandedRows, breakdownType, setBreakdownType, trendMonths, setTrendMonths, includePlanned, setIncludePlanned, hasFamilyPlan, summary, insights, regularPayments, aiInsight, aiLoading, aiError, loading, error, label, breakdownLabel, breakdownGenitive, requestAiInsight, sym, drillRoot, pieData, barData, goToCategory };

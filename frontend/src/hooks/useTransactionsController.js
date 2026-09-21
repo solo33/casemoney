@@ -90,7 +90,8 @@ export function useTransactionsController() {
     setError(null);
     try {
       const params = { limit: PAGE_SIZE, offset: page * PAGE_SIZE };
-      Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
+      Object.entries(filters).forEach(([k, v]) => { if (v && k !== "include_planned") params[k] = v; });
+      if (filters.include_planned !== "true") params.is_planned = false;
       const res = await api.get("/api/transactions/", { params });
       setData(res.data);
       setError(null);

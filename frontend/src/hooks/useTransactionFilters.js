@@ -14,6 +14,7 @@ export function useTransactionFilters() {
     date_from: searchParams.get("date_from") || "",
     date_to: searchParams.get("date_to") || "",
     q: searchParams.get("q") || "",
+    include_planned: searchParams.get("include_planned") === "true" ? "true" : "",
   }));
   const [page, setPage] = useState(0);
 
@@ -28,6 +29,7 @@ export function useTransactionFilters() {
       date_from: searchParams.get("date_from") || "",
       date_to: searchParams.get("date_to") || "",
       q: searchParams.get("q") || "",
+    include_planned: searchParams.get("include_planned") === "true" ? "true" : "",
     });
     setPage(0);
   }, [searchParams]);
@@ -57,7 +59,7 @@ export function useTransactionFilters() {
   };
 
   const resetFilters = () => {
-    setFilters({ account_id: "", currency: "", category_id: "", tag_id: "", type: "", date_from: "", date_to: "", q: "" });
+    setFilters({ account_id: "", currency: "", category_id: "", tag_id: "", type: "", date_from: "", date_to: "", q: "", include_planned: "" });
     setPage(0);
     setSearchParams({}, { replace: true });
   };

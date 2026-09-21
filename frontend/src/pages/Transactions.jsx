@@ -101,6 +101,10 @@ export default function Transactions() {
           <button type="button" onClick={() => applyDatePreset("this_month")}>Этот месяц</button>
           <button type="button" onClick={() => applyDatePreset("last_month")}>Прошлый месяц</button>
         </div>
+        <label className="transactions-plan-toggle">
+          <input type="checkbox" checked={filters.include_planned === "true"} onChange={event => setFilter("include_planned", event.target.checked ? "true" : "")} />
+          Учитывать план
+        </label>
         {filters.currency && (
           <span style={{
             display: "flex", alignItems: "center", gap: 6,

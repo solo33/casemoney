@@ -37,6 +37,7 @@ export function Row({ tx, accountName, categoryName, formatDate, formatDateTime,
       </td>
       <td style={{ padding: "8px 12px", color: TYPE_COLOR[tx.type], fontWeight: 500, fontSize: 13 }}>
         {TYPE_ICON[tx.type]} {TYPE_LABEL[tx.type]}
+        {tx.is_planned && <small className="transaction-planned-label">План</small>}
         {tx.is_family_expense && <small style={{ marginLeft: 6, color: "#9a6d17", fontWeight: 700 }}>Семейная</small>}
       </td>
       <td style={{
@@ -81,6 +82,7 @@ export function MobileTransactionCard({ tx, accountName, categoryName, formatDat
         <span className="mobile-transaction-icon" style={{ color: TYPE_COLOR[tx.type] }}>{TYPE_ICON[tx.type]}</span>
         <span className="mobile-transaction-copy">
           <strong>{title}{tx.is_family_expense && <em style={{ marginLeft: 6, color: "#9a6d17", fontStyle: "normal", fontSize: 11 }}>Семейная</em>}</strong>
+          {tx.is_planned && <small className="transaction-planned-label">План · ожидает подтверждения</small>}
           <small>{formatDate(tx.date)} · {accountName(tx.account_id)} · {category}</small>
           <small>Изменено: {formatDateTime(tx.updated_at || tx.created_at || tx.date)}</small>
           {(tx.tags || []).length > 0 && <small className="transaction-tags-mobile">{(tx.tags || []).map(tag => `#${tag.name}`).join(" ")}</small>}
