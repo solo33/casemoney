@@ -2,6 +2,7 @@
 from typing import Optional
 from app.application import ApplicationError
 from sqlalchemy.orm import Session
+from sqlalchemy import false
 from app.models.category import Category
 from app.models.shopping import ShoppingItem, ShoppingList
 from app.models.family import FamilyMember
@@ -30,7 +31,7 @@ def _family_id(db: Session, user_id: int):
 def _get_list(db: Session, user_id: int, list_id: int) -> ShoppingList:
     family_id = _family_id(db, user_id)
     result = db.query(ShoppingList).filter(
-        ShoppingList.id == list_id, (ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else -1)
+        ShoppingList.id == list_id, (ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else false())
     ).first()
     if not result:
         raise ApplicationError(status_code=404, detail="Список покупок не найден")
@@ -38,11 +39,10 @@ def _get_list(db: Session, user_id: int, list_id: int) -> ShoppingList:
 
 
 def _get_item(db: Session, user_id: int, item_id: int) -> ShoppingItem:
-    result = db.query(ShoppingItem).join(ShoppingList).filter(
-        ShoppingItem.id == item_id, ShoppingList.user_id == user_id
-    ).first()
+    result = db.query(ShoppingItem).filter(ShoppingItem.id == item_id).first()
     if not result:
         raise ApplicationError(status_code=404, detail="Позиция списка не найдена")
+    _get_list(db, user_id, result.list_id)
     return result
 
 

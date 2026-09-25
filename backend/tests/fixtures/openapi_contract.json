@@ -169,5 +169,5 @@
   "PUT /api/family/accounts/{account_id}/access": "0004fa7e067c844916e085d3a6635d6a9edb14795bfbdacb7627b06e4dfc41ce",
   "PUT /api/me/": "1024328a84db0f6db3e94f86d102e18863ba001eb3cd32357ab9c5c2e781a527",
   "PUT /api/notifications/settings": "ea9938cd96cbd0bb714400f1ec97981874ed1dbac85af6b10e7895fb00435da7",
-  "components": "5f11b3a61361740afedeb1257c68fbbba99d468a4c89c9d63f95f357bf2f6e62"
+  "components": "9d0d557fa0a7b502cf8d6096c357e9e93e6867e5c1941e370ebb3329f5dfaf21"
 }

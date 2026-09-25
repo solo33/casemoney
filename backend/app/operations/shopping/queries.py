@@ -1,5 +1,5 @@
 """Shopping: queries. Callers supply resolved user and database session."""
-from sqlalchemy import func
+from sqlalchemy import func, false
 from sqlalchemy.orm import Session
 from app.models.shopping import ShoppingItem, ShoppingList
 from app.schemas.shopping import ShoppingSuggestion
@@ -9,7 +9,7 @@ from app.operations.shopping.common import _default_list, _family_id, _get_list
 def list_lists(db: Session=None, user_id: int=None):
     _default_list(db, user_id)
     family_id = _family_id(db, user_id)
-    return db.query(ShoppingList).filter((ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else -1)).order_by(
+    return db.query(ShoppingList).filter((ShoppingList.user_id == user_id) | (ShoppingList.family_id == family_id if family_id else false())).order_by(
         ShoppingList.is_default.desc(), ShoppingList.name.asc()
     ).all()
 

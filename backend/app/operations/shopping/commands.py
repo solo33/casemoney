@@ -21,7 +21,17 @@ def create_list(data: ShoppingListCreate, db: Session=None, user_id: int=None):
 
 def update_list(list_id: int, data: ShoppingListUpdate, db: Session=None, user_id: int=None):
     result = _get_list(db, user_id, list_id)
+    if result.user_id != user_id:
+        raise ApplicationError(status_code=403, detail="Управлять списком может только его владелец")
     changes = data.model_dump(exclude_unset=True)
+    if "is_shared" in changes:
+        shared = changes.pop("is_shared")
+        if shared is None:
+            raise ApplicationError(status_code=422, detail="Укажите доступность списка семье")
+        family_id = _family_id(db, user_id) if shared else None
+        if shared and not family_id:
+            raise ApplicationError(status_code=400, detail="Сначала создайте семейное пространство")
+        result.family_id = family_id
     if changes.get("is_default"):
         db.query(ShoppingList).filter(ShoppingList.user_id == user_id).update({ShoppingList.is_default: False})
     for key, value in changes.items():
@@ -33,6 +43,8 @@ def update_list(list_id: int, data: ShoppingListUpdate, db: Session=None, user_i
 
 def delete_list(list_id: int, db: Session=None, user_id: int=None):
     result = _get_list(db, user_id, list_id)
+    if result.user_id != user_id:
+        raise ApplicationError(status_code=403, detail="Управлять списком может только его владелец")
     if result.is_default:
         raise ApplicationError(status_code=400, detail="Основной список нельзя удалить — переименуйте его или выберите другой основным")
     db.delete(result)
@@ -54,7 +66,8 @@ def create_item(list_id: int, data: ShoppingItemCreate, db: Session=None, user_i
 def update_item(item_id: int, data: ShoppingItemUpdate, db: Session=None, user_id: int=None):
     result = _get_item(db, user_id, item_id)
     changes = data.model_dump(exclude_unset=True)
-    _validate_category(db, user_id, changes.get("category_id", result.category_id))
+    if "category_id" in changes:
+        _validate_category(db, user_id, changes["category_id"])
     _validate_transaction(db, user_id, changes.get("transaction_id"))
     for key, value in changes.items():
         if key == "name" and value is not None:

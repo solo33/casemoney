@@ -11,12 +11,14 @@ class ShoppingListCreate(BaseModel):
 
 
 class ShoppingListUpdate(BaseModel):
+    is_shared: Optional[bool] = None
     name: Optional[str] = Field(None, min_length=1, max_length=120)
     is_default: Optional[bool] = None
 
 
 class ShoppingListResponse(BaseModel):
     id: int
+    user_id: int
     name: str
     is_default: bool
     family_id: Optional[int] = None
