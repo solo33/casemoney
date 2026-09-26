@@ -48,6 +48,9 @@ test('annual mobile total and drilldown preserve the full year', async ({ page }
   await mockApi(page); await page.goto('/reports/annual');
   await expect(page.locator('.mobile-period-select select')).toHaveValue('year');
   await expect(page.locator('.mobile-report-totals')).toContainText('186');
-  await page.locator('.mobile-report-row').first().click();
+  const reportRow = page.locator('.mobile-report-row').first();
+  await reportRow.hover();
+  await expect(reportRow).toHaveCSS('color', 'rgb(23, 58, 84)');
+  await reportRow.click();
   await expect(page).toHaveURL(/date_from=\d{4}-01-01.*date_to=\d{4}-12-31/);
 });

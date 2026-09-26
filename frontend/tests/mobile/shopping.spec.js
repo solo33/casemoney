@@ -26,11 +26,9 @@ for (const width of [320, 375]) {
     await shortcut.click();
     await expect(page).toHaveURL(/\/shopping$/);
     await expect(page.getByLabel('Название списка')).not.toBeVisible();
-    await page.getByLabel('Товар', { exact: true }).fill('Молоко');
+    await page.getByLabel('Товар', { exact: true }).fill('Молоко; 2 л');
     await expect(page.getByLabel('Количество', { exact: true })).not.toBeVisible();
     await page.getByText('Количество и единица', { exact: true }).click();
-    await page.getByLabel('Количество', { exact: true }).fill('2');
-    await page.getByLabel('Единица измерения').fill('л');
     for (const control of await page.locator('.shopping-add-form input, .shopping-add-form button').all()) {
       const box = await control.boundingBox();
       expect(box.x + box.width).toBeLessThanOrEqual(width);
@@ -39,6 +37,8 @@ for (const width of [320, 375]) {
     await page.getByRole('button', { name: 'Добавить', exact: true }).click();
     await expect(page.locator('.shopping-item')).toContainText('Молоко');
     expect(saved.quantity).toBe(2);
+    expect(saved.unit).toBe('л');
+    expect(saved.name).toBe('Молоко');
     expect(saved.planned_price).toBeNull();
     await expect(page.getByRole("button", { name: "Учесть расход" })).toHaveCount(0);
     expect((await page.locator(".shopping-check > span").boundingBox()).width).toBe(22);
@@ -72,17 +72,19 @@ test('existing shopping list can be shared and compact entry works on a short sc
   await expect.poll(() => shared?.is_shared).toBe(true);
   await expect(page.getByRole('checkbox', { name: 'Доступен семье' })).toBeChecked();
   const input = page.getByLabel('Товар', { exact: true });
-  await input.fill('Молоко');
+  await input.fill('Молоко; 1,5 кг');
   await input.scrollIntoViewIfNeeded();
   const box = await input.boundingBox();
   const addBox = await page.getByRole('button', { name: 'Добавить', exact: true }).boundingBox();
   expect(Math.abs(box.y - addBox.y)).toBeLessThan(3);
   await input.press('Enter');
   await expect.poll(() => added?.name).toBe('Молоко');
-  expect(added.quantity).toBe(1);
+  expect(added.quantity).toBe(1.5);
+  expect(added.unit).toBe('кг');
   expect(added.planned_price).toBeNull();
   expect(financialWrites).toBe(0);
   await expect(page.getByRole('button', { name: 'Учесть расход' })).toHaveCount(0);
+  await expect(page.locator('.shopping-item')).toHaveCSS('display', 'grid');
   await page.setViewportSize({ width: 375, height: 850 });
   await page.screenshot({ path: test.info().outputPath('compact-family-shopping.png'), fullPage: true });
 });

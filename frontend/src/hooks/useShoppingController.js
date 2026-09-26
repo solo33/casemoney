@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import api from "../api/client";
-import { blankItem } from "../utils/shoppingView";
+import { blankItem, parseShoppingEntry } from "../utils/shoppingView";
 
 export default function useShoppingController() {
   const [lists, setLists] = useState([]);
@@ -65,9 +65,14 @@ export default function useShoppingController() {
   const addItem = async event => {
     event.preventDefault();
     if (!form.name.trim() || !listId) return;
+    const parsedEntry = parseShoppingEntry(form.name);
     try {
       const response = await api.post(`/api/shopping/lists/${listId}/items`, {
-        ...form, quantity: Number(form.quantity || 1), planned_price: form.planned_price === "" ? null : Number(form.planned_price),
+        ...form,
+        ...parsedEntry,
+        quantity: parsedEntry.quantity ?? Number(form.quantity || 1),
+        unit: parsedEntry.unit ?? form.unit,
+        planned_price: form.planned_price === "" ? null : Number(form.planned_price),
         category_id: form.category_id || null,
       });
       setItems(current => [response.data, ...current]);

@@ -21,7 +21,7 @@ export default function Shopping() {
     <section className="shopping-add-card">
       <h2>Добавить товар</h2>
       <form className="shopping-add-form" onSubmit={addItem}>
-        <label className="shopping-product-field">Товар<input required list="shopping-history" autoComplete="off" enterKeyHint="done" value={form.name} placeholder="Например, молоко" onChange={e => updateForm("name", e.target.value)} /></label>
+        <label className="shopping-product-field">Товар<input required aria-label="Товар" list="shopping-history" autoComplete="off" enterKeyHint="done" value={form.name} placeholder="Например: молоко; 2 шт" onChange={e => updateForm("name", e.target.value)} /></label>
         <datalist id="shopping-history">{history.map((item, index) => <option key={`${item.name}-${index}`} value={item.name} />)}</datalist>
         <button type="submit" disabled={!listId}>Добавить</button>
         <details className="shopping-item-details"><summary>Количество и единица</summary><div>
